@@ -11,6 +11,7 @@ plugins {
 android {
     namespace = "com.isaakhanimann.journal"
     compileSdk = 35
+    buildToolsVersion = "35.0.0"
 
     defaultConfig {
         applicationId = "app.psyzine"

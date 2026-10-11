@@ -12,6 +12,9 @@ release
 # Local assistant configuration, not application source
 CLAUDE.md
 .claude/
+.agents/
+.codex/
+.aws/
 # Private release credentials
 *.jks
 *.keystore

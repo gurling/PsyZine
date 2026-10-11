@@ -133,3 +133,55 @@ jobs:
           target: default
           disable-animations: true
           script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon
+
+  development-prerelease:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [checks, instrumented]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: PsyZine-development-APKs-${{ github.sha }}
+          path: artifacts/apks
+      - name: Verify downloaded APK and source checksums
+        working-directory: artifacts/apks
+        run: sha256sum --check SHA256SUMS
+      - name: Publish verified testing pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: v1.0.0-dev.${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
+          Development-signed testing build; this is a pre-release, not a production release.
+
+          All four APK variants, both JVM test suites, Android lint, APK signatures,
+          package integrity, application IDs and checksums passed. The required
+          Android emulator instrumentation matrix also passed. See BUILD_RESULTS.json
+          and the linked Actions run for evidence and remaining manual acceptance checks.
+
+          Installation: download a Direct Debug APK for isolated testing, enable
+          installation from your chosen browser/file manager, then open the APK.
+          Direct Release and Play Release use development signing and retain their
+          release application IDs. Play APKs can be sideloaded without Google Play.
+          Verify downloads with `sha256sum --check SHA256SUMS`.
+
+          Upgrades require the same application ID and signing certificate. CI uses
+          an ephemeral development key unless a stable development-key secret is
+          configured; builds from separate runs may require reinstalling. Export
+          test data before changing signing identities. Production keys differ.
+
+          Corresponding GPL-3.0-or-later source and notices are included. Physical
+          camera, reboot/process recovery, tablet and accessibility acceptance are
+          separate checks documented in docs/verification.md.
+          NOTES
+          printf '\nSource commit: %s\n\nBuild evidence: https://github.com/%s/actions/runs/%s\n' \
+            "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$RUNNER_TEMP/release-notes.md"
+          gh release create "$RELEASE_TAG" artifacts/apks/* \
+            --target "$GITHUB_SHA" --prerelease \
+            --title "PsyZine 1.0.0 development test build $GITHUB_RUN_NUMBER" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release view "$RELEASE_TAG" --json url,isPrerelease,assets
