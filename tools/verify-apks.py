@@ -44,7 +44,7 @@ def main():
         if not candidate:
             raise SystemExit('apkanalyzer is unavailable; install Android command-line tools.')
         apkanalyzer = Path(candidate)
-    for tool in [build_tools / 'apksigner', build_tools / 'zipalign', apkanalyzer]:
+    for tool in [build_tools / 'apksigner', build_tools / 'zipalign', build_tools / 'aapt2', apkanalyzer]:
         if not tool.is_file():
             raise SystemExit(f'Required SDK verification tool is missing: {tool}')
     commit = run('git', 'rev-parse', 'HEAD')
@@ -98,6 +98,11 @@ def main():
             expected = 'app.psyzine' + ('.play' if flavor == 'play' else '') + ('.debug' if build_type == 'debug' else '')
             if application_id != expected:
                 raise SystemExit(f'Unexpected application ID: {application_id}, expected {expected}')
+            badging = run(build_tools / 'aapt2', 'dump', 'badging', apk)
+            application_labels = re.findall(r"^application-label(?:-[^:]+)?:'([^']*)'$", badging, re.MULTILINE)
+            launcher_labels = re.findall(r"^launchable-activity:.*? label='([^']*)'", badging, re.MULTILINE)
+            if not application_labels or set(application_labels) != {'PsyZine'} or launcher_labels != ['PsyZine']:
+                raise SystemExit(f'Application and launcher labels must resolve to PsyZine: {apk}')
             version = manifest('version-name')
             if version not in (['1.0.0'] if build_type == 'debug' else ['1.0.0', '1.0.0-dev']):
                 raise SystemExit(f'Unexpected APK version: {version}')
@@ -117,7 +122,8 @@ def main():
             digest = hashlib.sha256(apk.read_bytes()).hexdigest()
             record = {'filename': label, 'path': str((args.output_dir / label).resolve()),
                       'sourcePath': str(apk), 'bytes': apk.stat().st_size, 'sha256': digest,
-                      'applicationId': application_id, 'versionName': version, 'versionCode': version_code,
+                      'applicationId': application_id, 'applicationLabel': application_labels[0],
+                      'launcherLabel': launcher_labels[0], 'versionName': version, 'versionCode': version_code,
                       'minSdk': min_sdk, 'targetSdk': target_sdk,
                       'signing': 'production' if build_type == 'release' and not version.endswith('-dev') else 'development',
                       'signerCertificateSha256': certificates, 'signatureVerified': True,
@@ -142,7 +148,7 @@ def main():
     (args.output_dir / 'BUILD_RESULTS.md').write_text(
         f"# PsyZine build results\n\nCommit: `{commit}`; working tree dirty: `{dirty}`.\n\n"
         "Actual Gradle build, both flavor unit suites and all four lint tasks succeeded. "
-        "APK signatures, ZIP integrity, alignment, IDs, versions and SDK levels verified. "
+        "APK signatures, ZIP integrity, alignment, IDs, PsyZine application/launcher labels, versions and SDK levels verified. "
         "Device installation has not been tested by this packaging command. "
         "Versions ending in `-dev` use development signing and are for testing.\n\n"
         "| APK | Application ID | Bytes | SHA-256 |\n| --- | --- | ---: | --- |\n" + '\n'.join(rows) + '\n')

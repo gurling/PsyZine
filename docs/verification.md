@@ -48,7 +48,7 @@ sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 git diff --check
 ```
 
-Inspect generated Room schema 8 and merged manifests. Check that no network fetcher, analytics, broad storage, camera or location permission arrives transitively. Run dependency insight for Kotlin/Compose if the resolved versions differ from the pins. Install only on an isolated test device:
+Inspect generated Room schema 8 and merged manifests. Check that no network fetcher, analytics, broad storage, camera or location permission arrives transitively. Run dependency insight for Kotlin/Compose if the resolved versions differ from the pins. For future physical-device tests, install only Direct Debug (`app.psyzine.debug`). Do not install Direct Release, Play Debug or Play Release on the phone. Verify those APKs with host tools and emulators. Use only an isolated test device, retain existing data and signing compatibility, and never uninstall or clear data to bypass an update failure:
 
 ```bash
 adb install -r app/build/outputs/apk/direct/debug/app-direct-debug.apk
@@ -72,7 +72,7 @@ Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.
 
 ## Manual acceptance matrix
 
-Use synthetic journals/photos only. Retain a pristine export and record APK SHA, SDK/device/launcher, theme and result for every run. Repeat core checks on API 26/29/30/32/33/35/36/37, an AOSP device without Play services, a physical camera and a tablet. Check the minified release separately.
+Use synthetic journals/photos only. Retain a pristine export and record APK SHA, SDK/device/launcher, theme and result for every run. Repeat core checks on API 26/29/30/32/33/35/36/37, an AOSP device without Play services, a physical camera and a tablet. Check the minified release separately on an emulator; physical-device installation remains Direct Debug only.
 
 1. **Existing journal:** create through ingestion, combine nearby ingestions, choose another entry, clone, edit doses/custom units/substances/companions, timed notes/ratings, favorites, location, search, calendar, charts/statistics and reference links. Confirm existing data/preferences remain intact after migration and relaunch; inspect every tab and dialog offline. No delayed-release control or behavior should appear.
 2. **Themes and accessibility:** apply all 13 themes and Follow system. Relaunch/reboot, change Android appearance while a fixed theme is active, switch themes during unsaved edits and navigation, and inspect date/time dialogs, charts, selections, disabled/error states and external presentations. Review normal text at 4.5:1 and meaningful controls/large text at 3:1. Use TalkBack, keyboard navigation, 200% font size and tablet layouts; verify labels, focus, clipping and 48dp controls. Host contrast checks do not replace composed-screen review.

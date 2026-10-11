@@ -17,7 +17,7 @@
   -->
 
 <resources>
-    <string name="app_name">Journal</string>
+    <string name="app_name" translatable="false">PsyZine</string>
     <string name="live_activity_channel_name">Active experience</string>
     <string name="live_activity_channel_description">Estimated timeline and substance information during an active experience</string>
     <string name="live_activity_loading">Loading experience timeline…</string>

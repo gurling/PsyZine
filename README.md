@@ -4,6 +4,14 @@ PsyZine is an independent GPL-3.0-or-later journal based on PsychonautWiki Journ
 
 The PsyLog port is pinned to [`0c29a70fa1ced6106c8379b2c02541699d61f966`](https://codeberg.org/PsyLog/PsyLog-android/commit/0c29a70fa1ced6106c8379b2c02541699d61f966). The PsychonautWiki Journal baseline is [`8224449a62e26ffd448aade0a7079b005fdd9d37`](https://github.com/isaakhanimann/psychonautwiki-journal-android/tree/8224449a62e26ffd448aade0a7079b005fdd9d37). Features were ported individually. PsyLog’s unmerged delayed-release PR #6 is excluded.
 
+## Install testing builds
+
+Download a development-signed APK from [GitHub pre-releases](https://github.com/gurling/PsyZine/releases). For physical-device testing, install only **Direct Debug** (`app.psyzine.debug`); keep the other variants for build verification and emulator testing.
+
+[Add PsyZine to Obtainium](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.psyzine.debug%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fgurling%2FPsyZine%22%2C%22author%22%3A%22gurling%22%2C%22name%22%3A%22PsyZine%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5EPsyZine-Direct-Debug-.%2A%5C%5C%5C%5C.apk%24%5C%22%2C%5C%22versionDetection%5C%22%3Afalse%7D%22%7D) imports the GitHub source with pre-releases enabled and filters APKs to Direct Debug. It tracks release tags because these testing APKs retain version `1.0.0`. Review the import in Obtainium before installing. Manual setup: add `https://github.com/gurling/PsyZine`, enable **Include pre-releases**, set **Filter APKs by regular expression** to `^PsyZine-Direct-Debug-.*\.apk$`, and disable **Version detection**.
+
+These are testing builds, not production releases. CI signing certificates may differ between runs and from local builds; matching package IDs alone do not make an update compatible. Preserve a backup before changing signing identities. A rejected update must not be worked around by clearing journal data.
+
 ## Build
 
 Use JDK 17, Android SDK platform 35, build tools 35.0.0, and the checked-in Gradle 8.14 wrapper. AGP remains 8.7.3, Kotlin 2.0.20, Compose BOM 2025.01.00, Room 2.6.1, and Hilt 2.52. New runtime dependencies are Glance 1.1.1, Coil Compose 3.0.4 without network fetchers, ExifInterface 1.4.2, and Lifecycle Runtime Compose 2.8.7. Coil is pinned to the Kotlin 2.0.20 integration target; changing it requires checking the resolved Kotlin/Compose graph again.
