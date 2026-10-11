@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -117,9 +118,14 @@ class OnboardingTimelineUiTest {
     private fun showGraph(wide: Boolean = false) {
         val model = exampleModel()
         compose.setContent { PsyZineTheme(ThemeId.NORD) {
-            Box(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState())) {
-                AllTimelines(model, false, TimeDisplayOption.RELATIVE_TO_START,
-                    (if (wide) Modifier.width(1200.dp) else Modifier.width(360.dp)).height(240.dp))
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                // TouchInputScope.width uses clipped bounds. Keep the normal fixture
+                // fully visible so fractional touches map to the intended graph time.
+                val graphWidth = if (wide) 1200.dp else minOf(360.dp, maxWidth)
+                Box(Modifier.horizontalScroll(rememberScrollState())) {
+                    AllTimelines(model, false, TimeDisplayOption.RELATIVE_TO_START,
+                        Modifier.width(graphWidth).height(240.dp))
+                }
             }
         } }
     }
