@@ -19,6 +19,7 @@
 package com.isaakhanimann.journal.data.substances.classes.roa
 
 import androidx.compose.ui.graphics.Color
+import com.isaakhanimann.journal.ui.theme.ThemePalette
 
 enum class DoseClass {
     THRESHOLD {
@@ -27,13 +28,7 @@ enum class DoseClass {
                     "These effects are distinctly beyond that of placebo but may still be ignored with some effort by directing one's focus towards the external environment.\n" +
                     "Subjects may perceive a vague sense of \"something\" or anticipatory energy building up in the background at this level."
 
-        override fun getComposeColor(isDarkTheme: Boolean): Color {
-            return if (isDarkTheme) {
-                Color(red = 100, green = 210, blue = 255)
-            } else {
-                Color(red = 50, green = 173, blue = 230)
-            }
-        }
+        override fun getComposeColor(palette: ThemePalette): Color = palette.accent(2)
     },
     LIGHT {
         override val description: String
@@ -41,13 +36,7 @@ enum class DoseClass {
                     "The effects can be ignored by increasing the focus one directs towards the external environment and performing complex tasks.\n" +
                     "The subject may have to pay particular attention for the substance's effects to be perceptible, or they may be slightly noticeable but will not insist upon the subject's attention."
 
-        override fun getComposeColor(isDarkTheme: Boolean): Color {
-            return if (isDarkTheme) {
-                Color(red = 48, green = 209, blue = 88)
-            } else {
-                Color(red = 52, green = 199, blue = 89)
-            }
-        }
+        override fun getComposeColor(palette: ThemePalette): Color = palette.accent(3)
     },
     COMMON {
         override val description: String
@@ -55,13 +44,7 @@ enum class DoseClass {
                     "The subject will generally be able to partake in regular behaviors and remain functional and able to communicate, although this can depend on the individual.\n" +
                     "The effects can be allowed to occupy a predominant role or they may be suppressed and made secondary to other chosen activities with sufficient effort or in case of an emergency."
 
-        override fun getComposeColor(isDarkTheme: Boolean): Color {
-            return if (isDarkTheme) {
-                Color(red = 255, green = 214, blue = 10)
-            } else {
-                Color(red = 255, green = 204, blue = 0)
-            }
-        }
+        override fun getComposeColor(palette: ThemePalette): Color = palette.accent(4)
     },
     STRONG {
         override val description: String
@@ -69,13 +52,7 @@ enum class DoseClass {
                     "The effects of the substance are clear and can no longer be ignored or suppressed, leaving the subject entirely engaged in the experience regardless of their desire or volition. Negative effects become more common at this level.\n" +
                     "As subjects are not able to alter the trajectory of their behavior at strong doses, it is vital that they have prepared their environment and activities in advance as well as taken any precautionary measures."
 
-        override fun getComposeColor(isDarkTheme: Boolean): Color {
-            return if (isDarkTheme) {
-                Color(red = 255, green = 159, blue = 10)
-            } else {
-                Color(red = 255, green = 149, blue = 0)
-            }
-        }
+        override fun getComposeColor(palette: ThemePalette): Color = palette.accent(5)
     },
     HEAVY {
         override val description: String
@@ -85,15 +62,9 @@ enum class DoseClass {
                     "Users should also be aware that the line between a heavy dose and overdose is often very blurry and they are placing themselves at a significantly higher risk of injury, hospitalization, and death whenever they choose to take a heavy dose.\n" +
                     "The desire or compulsion to regularly take heavy doses (\"chronic use\") may also be an indicator of tolerance, addiction or other mental health problems."
 
-        override fun getComposeColor(isDarkTheme: Boolean): Color {
-            return if (isDarkTheme) {
-                Color(red = 255, green = 69, blue = 58)
-            } else {
-                Color(red = 255, green = 59, blue = 48)
-            }
-        }
+        override fun getComposeColor(palette: ThemePalette): Color = palette.accent(6)
     };
 
     abstract val description: String
-    abstract fun getComposeColor(isDarkTheme: Boolean): Color
+    abstract fun getComposeColor(palette: ThemePalette): Color
 }

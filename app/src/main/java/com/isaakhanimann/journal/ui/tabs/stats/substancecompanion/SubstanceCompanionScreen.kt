@@ -18,7 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.stats.substancecompanion
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -51,7 +51,7 @@ import com.isaakhanimann.journal.data.room.experiences.entities.SubstanceCompani
 import com.isaakhanimann.journal.data.substances.classes.Tolerance
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.CardWithTitle
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.ToleranceSection
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 import com.isaakhanimann.journal.ui.utils.getShortTimeText
@@ -80,7 +80,7 @@ fun SubstanceCompanionScreen(
 @Preview
 @Composable
 fun SubstanceCompanionPreview(@PreviewParameter(SubstanceCompanionScreenPreviewProvider::class) pair: Pair<SubstanceCompanion, List<IngestionsBurst>>) {
-    JournalTheme {
+    PsyZineTheme {
         SubstanceCompanionScreen(
             substanceCompanion = pair.first,
             ingestionBursts = pair.second,
@@ -181,7 +181,7 @@ fun IngestionRowOnSubstanceCompanionScreen(ingestionAndCustomUnit: IngestionsBur
             if (ingestionAndCustomUnit.customUnit != null) {
                 append(" " + ingestionAndCustomUnit.customUnit.name)
             }
-            withStyle(style = SpanStyle(color = if (isSystemInDarkTheme()) Color.Gray else Color.LightGray )) {
+            withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant )) {
                 val routeText =
                     ingestionAndCustomUnit.ingestion.administrationRoute.displayText.lowercase()
                 if (ingestionAndCustomUnit.customUnit == null) {

@@ -51,7 +51,7 @@ fun CategoryChipDelete(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(shape = CircleShape)
-            .background(color = categoryChipModel.color.copy(alpha = 0.2f))
+            .background(color = com.isaakhanimann.journal.ui.theme.DomainColors.category(categoryChipModel.chipName, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current).copy(alpha = 0.2f))
             .clickable(onClick = onClick)
             .padding(vertical = 3.dp, horizontal = 8.dp)
 

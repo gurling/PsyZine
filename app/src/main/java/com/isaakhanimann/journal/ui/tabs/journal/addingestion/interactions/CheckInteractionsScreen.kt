@@ -245,7 +245,7 @@ fun InteractionRow(
         modifier = Modifier
             .fillMaxWidth(),
         shape = RectangleShape,
-        color = interactionType.color
+        color = com.isaakhanimann.journal.ui.theme.DomainColors.severity(interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)
     ) {
         Row(
             modifier = Modifier.padding(
@@ -257,7 +257,7 @@ fun InteractionRow(
             Text(
                 text = text,
                 textAlign = TextAlign.Center,
-                color = Color.Black,
+                color = com.isaakhanimann.journal.ui.theme.readable(com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current.background, com.isaakhanimann.journal.ui.theme.DomainColors.severity(interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)),
                 style = MaterialTheme.typography.titleMedium,
             )
             Spacer(modifier = Modifier.weight(1f))
@@ -266,7 +266,7 @@ fun InteractionRow(
                     Icon(
                         imageVector = Icons.Outlined.WarningAmber,
                         contentDescription = "Warning",
-                        tint = Color.Black,
+                        tint = com.isaakhanimann.journal.ui.theme.readable(com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current.background, com.isaakhanimann.journal.ui.theme.DomainColors.severity(interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)),
                     )
                 }
             }

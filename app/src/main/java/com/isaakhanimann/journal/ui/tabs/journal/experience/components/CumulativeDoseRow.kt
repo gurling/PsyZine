@@ -57,7 +57,7 @@ fun CumulativeDoseRow(
             ) {
                 val text = buildAnnotatedString {
                     append(cumulativeRouteAndDose.doseDescription)
-                    withStyle(style = SpanStyle(color = Color.Gray)) {
+                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                         append(" " + cumulativeRouteAndDose.route.displayText.lowercase())
                     }
                 }

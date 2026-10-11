@@ -1,61 +1,83 @@
-name: Build App on new release
+name: PsyZine signed release
 
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*.*'
+    tags: ['v*.*.*']
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    name: Build, sign and release app
+  release:
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up jdk
-        uses: actions/setup-java@v4
         with:
-          distribution: "zulu"
-          java-version: "17"
-          cache: "gradle"
-
-      - name: build app
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Setup Android SDK
-        run: |
-          ${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager "build-tools;35.0.0"
-
-      - name: Sign app APK
-        uses: ilharp/sign-android-release@nightly
-        id: sign
+          fetch-depth: 0
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
         with:
-          signingKey: ${{ secrets.KEYSTORE }}
-          keyAlias: ${{ secrets.SIGNING_KEY_ALIAS }}
-          keyStorePassword: ${{ secrets.SIGNING_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.SIGNING_KEY_PASSWORD }}
-          buildToolsVersion: 35.0.0
-
-      - name: Rename signed APK
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v3
+      - name: Install pinned SDK
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Check publication prerequisites
+        env:
+          CONTENT_RIGHTS_VERIFIED: ${{ vars.CONTENT_RIGHTS_VERIFIED }}
         run: |
-          mv "${{steps.sign.outputs.signedFile}}" "psychonautwiki-journal_${{ github.ref_name }}.apk"
-
-      # Uploads to the action results if not pointed at a tag
+          test "$CONTENT_RIGHTS_VERIFIED" = true || { echo "Reference-content redistribution review must be recorded before signing or publication."; exit 1; }
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            test "$GITHUB_REF_NAME" = v1.0.0 || { echo "Release tag must match the application version."; exit 1; }
+          fi
+      - name: Prepare independent production key
+        env:
+          PSYZINE_KEYSTORE_BASE64: ${{ secrets.PSYZINE_KEYSTORE_BASE64 }}
+          PSYZINE_KEY_ALIAS: ${{ secrets.PSYZINE_KEY_ALIAS }}
+          PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
+          PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$PSYZINE_KEYSTORE_BASE64"
+          umask 077
+          printf '%s' "$PSYZINE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/psyzine.jks"
+      - name: Build and check production APKs with Gradle signing
+        env:
+          PSYZINE_RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/psyzine.jks
+          PSYZINE_KEY_ALIAS: ${{ secrets.PSYZINE_KEY_ALIAS }}
+          PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
+          PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
+          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-development.jks
+        run: bash tools/build-apks.sh -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
+      - name: Verify production candidate
+        run: |
+          set -euo pipefail
+          tools="$ANDROID_HOME/build-tools/35.0.0"
+          cp artifacts/apks/PsyZine-Direct-Release-v1.0.0.apk PsyZine-v1.0.0.apk
+          "$tools/apksigner" verify --verbose --print-certs PsyZine-v1.0.0.apk
+          "$tools/zipalign" -c -P 16 4 PsyZine-v1.0.0.apk
+      - name: Package corresponding source and checksums
+        run: |
+          git archive --format=tar.gz --prefix=PsyZine-v1.0.0/ HEAD > PsyZine-v1.0.0-source.tar.gz
+          sha256sum PsyZine-v1.0.0.apk PsyZine-v1.0.0-source.tar.gz > SHA256SUMS
       - uses: actions/upload-artifact@v4
-        if: "! startsWith(github.ref, 'refs/tags/')"
         with:
-          name: "psychonautwiki-journal_${{ github.ref_name }}.apk"
-          path: "psychonautwiki-journal_${{ github.ref_name }}.apk"
+          name: PsyZine-v1.0.0
+          path: |
+            PsyZine-v1.0.0.apk
+            PsyZine-v1.0.0-source.tar.gz
+            SHA256SUMS
           if-no-files-found: error
-
-      # Creates a release if pointed at a tag
-      - name: Create release
-        uses: softprops/action-gh-release@v2
+      - name: Publish tagged source and APK
         if: startsWith(github.ref, 'refs/tags/')
-        with:
-          files: "psychonautwiki-journal_${{ github.ref_name }}.apk"
-          fail_on_unmatched_files: true
-          make_latest: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" PsyZine-v1.0.0.apk PsyZine-v1.0.0-source.tar.gz SHA256SUMS --verify-tag --title "PsyZine 1.0.0" --notes "Independent GPL-3.0-or-later release. Corresponding source and build instructions are included. See NOTICE.md, THIRD_PARTY_NOTICES.md and PRIVACY.md in the source archive."
+      - name: Remove ephemeral signing files
+        if: always()
+        run: rm -f "$RUNNER_TEMP/psyzine.jks" "$RUNNER_TEMP/psyzine-development.jks"

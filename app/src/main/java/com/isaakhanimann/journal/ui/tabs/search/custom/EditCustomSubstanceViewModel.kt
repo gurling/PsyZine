@@ -25,17 +25,19 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.isaakhanimann.journal.data.room.JournalSessionGuard
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import com.isaakhanimann.journal.ui.main.navigation.graphs.EditCustomSubstanceRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class EditCustomSubstanceViewModel @Inject constructor(
     val experienceRepo: ExperienceRepository,
+    private val sessionGuard: JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
 
@@ -43,37 +45,57 @@ class EditCustomSubstanceViewModel @Inject constructor(
     var name by mutableStateOf("")
     var units by mutableStateOf("")
     var description by mutableStateOf("")
+    private var generation: String? = null
+    var isSaving by mutableStateOf(false)
+        private set
+    var saveError by mutableStateOf<String?>(null)
+        private set
+    fun dismissSaveError() { saveError = null }
 
-    val isValid get() = name.isNotBlank() && units.isNotBlank()
+    val isValid get() = id > 0 && name.isNotBlank() && units.isNotBlank() && !isSaving
 
     init {
         val editCustomSubstanceRoute = state.toRoute<EditCustomSubstanceRoute>()
         val customSubstanceId = editCustomSubstanceRoute.customSubstanceId
         viewModelScope.launch {
-            val customSubstance =
-                experienceRepo.getCustomSubstanceFlow(customSubstanceId).firstOrNull() ?: return@launch
-            id = customSubstanceId
-            name = customSubstance.name
-            units = customSubstance.units
-            description = customSubstance.description
+            try {
+                generation = state.get<String>("journalGeneration") ?: sessionGuard.currentGeneration().also { state["journalGeneration"] = it }
+                val customSubstance = sessionGuard.withSession(generation) { experienceRepo.getCustomSubstance(customSubstanceId) }
+                checkNotNull(customSubstance) { "This custom substance was deleted. Close this screen." }
+                id = customSubstanceId
+                name = customSubstance.name
+                units = customSubstance.units
+                description = customSubstance.description
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not load this substance. Close this screen and try again."
+            }
         }
     }
 
-    fun onDoneTap() {
-        viewModelScope.launch {
-            val customSubstance = CustomSubstance(
-                id,
-                name,
-                units,
-                description
-            )
-            experienceRepo.insert(customSubstance)
+    fun onDoneTap(dismiss: () -> Unit) {
+        if (isValid) mutate(dismiss) {
+            check(experienceRepo.getCustomSubstance(id) != null) { "This custom substance was deleted. Close this screen." }
+            experienceRepo.update(CustomSubstance(id, name, units, description))
         }
     }
 
-    fun deleteCustomSubstance() {
+    fun deleteCustomSubstance(dismiss: () -> Unit) {
+        if (id > 0 && !isSaving) mutate(dismiss) { experienceRepo.delete(CustomSubstance(id, name, units, description)) }
+    }
+
+    private fun mutate(dismiss: () -> Unit, action: suspend () -> Unit) {
+        isSaving = true
         viewModelScope.launch {
-            experienceRepo.delete(CustomSubstance(id, name, units, description))
+            try {
+                sessionGuard.withSession(generation, action)
+                dismiss()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not save changes. Try again."
+            } finally { isSaving = false }
         }
     }
 }

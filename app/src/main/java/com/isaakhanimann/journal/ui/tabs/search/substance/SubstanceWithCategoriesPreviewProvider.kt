@@ -30,7 +30,7 @@ class SubstanceWithCategoriesPreviewProvider : PreviewParameterProvider<Substanc
             substance = Substance(
                 name = "Example Substance",
                 commonNames = listOf("Hat", "Boot", "Hoodie", "Shirt", "Blouse"),
-                url = "https://psychonautwiki.org/wiki/Lsd",
+                url = "https://psy.st/wiki/Lsd",
                 isApproved = true,
                 categories = listOf("entactogen, common"),
                 tolerance = Tolerance(
@@ -224,19 +224,19 @@ class SubstanceWithCategoriesPreviewProvider : PreviewParameterProvider<Substanc
                 Category(
                     name = "psychedelic",
                     description = "Psychedelics are drugs which alter the perception, causing a number of mental effects which manifest in many forms including altered states of consciousness, visual or tactile effects.",
-                    url = "https://psychonautwiki.org/wiki/Psychedelics",
+                    url = "https://psy.st/wiki/Psychedelics",
                     color = Color(4287564543)
                 ),
                 Category(
                     name = "stimulant",
                     description = "Stimulants excite the nervous system and increase physiological function.",
-                    url = "https://psychonautwiki.org/wiki/Stimulants",
+                    url = "https://psy.st/wiki/Stimulants",
                     color = Color(4278246860)
                 ),
                 Category(
                     name = "entactogen",
                     description = "Entactogens (also known as empathogens) are a class of psychoactive substances that produce distinctive emotional and social effects similar to those of MDMA.",
-                    url = "https://psychonautwiki.org/wiki/Entactogens",
+                    url = "https://psy.st/wiki/Entactogens",
                     color = Color(4294904442)
                 )
             )

@@ -122,7 +122,7 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
 
     val areSubstanceHeightsIndependentFlow: Flow<Boolean> = dataStore.data
         .map { preferences ->
-            preferences[PreferencesKeys.KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT] ?: false
+            preferences[PreferencesKeys.KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT] ?: true
         }
 
     val isTimelineHiddenFlow: Flow<Boolean> = dataStore.data

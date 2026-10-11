@@ -1,21 +1,29 @@
 <!--
   ~ Copyright (c) 2022-2023. Isaak Hanimann.
-  ~ This file is part of PsychonautWiki Journal.
+  ~ This file is part of PsyZine.
   ~
-  ~ PsychonautWiki Journal is free software: you can redistribute it and/or modify
+  ~ PsyZine is free software: you can redistribute it and/or modify
   ~ it under the terms of the GNU General Public License as published by
   ~ the Free Software Foundation, either version 3 of the License, or (at
   ~ your option) any later version.
   ~
-  ~ PsychonautWiki Journal is distributed in the hope that it will be useful,
+  ~ PsyZine is distributed in the hope that it will be useful,
   ~ but WITHOUT ANY WARRANTY; without even the implied warranty of
   ~ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
   ~ GNU General Public License for more details.
   ~
   ~ You should have received a copy of the GNU General Public License
-  ~ along with PsychonautWiki Journal.  If not, see https://www.gnu.org/licenses/gpl-3.0.en.html.
+  ~ along with PsyZine.  If not, see https://www.gnu.org/licenses/gpl-3.0.en.html.
   -->
 
 <resources>
     <string name="app_name">Journal</string>
+    <string name="live_activity_channel_name">Active experience</string>
+    <string name="live_activity_channel_description">Estimated timeline and substance information during an active experience</string>
+    <string name="live_activity_loading">Loading experience timeline…</string>
+    <string name="live_activity_unavailable">Timeline temporarily unavailable</string>
+    <string name="timeline_description">Estimated experience timeline</string>
+    <string name="widget_description">Your active experience timeline and ingestions</string>
+    <string name="widget_loading">Loading…</string>
+    <string name="widget_no_active_experience">No active experience</string>
 </resources>

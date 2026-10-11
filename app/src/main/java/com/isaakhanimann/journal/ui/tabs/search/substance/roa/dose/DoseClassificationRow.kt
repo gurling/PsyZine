@@ -18,7 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.substance.roa.dose
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -59,7 +59,7 @@ fun DoseClassificationRow(
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        val isDarkTheme = isSystemInDarkTheme()
+        val isDarkTheme = LocalPsyZinePalette.current
         val threshColor = DoseClass.THRESHOLD.getComposeColor(isDarkTheme)
         val lightColor = DoseClass.LIGHT.getComposeColor(isDarkTheme)
         val commonColor = DoseClass.COMMON.getComposeColor(isDarkTheme)

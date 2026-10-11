@@ -19,7 +19,7 @@
 package com.isaakhanimann.journal.ui.tabs.stats
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.isaakhanimann.journal.ui.YOU
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 
 
@@ -93,7 +93,7 @@ fun StatsPreview(
         StatsPreviewProvider::class,
     ) statsModel: StatsModel
 ) {
-    JournalTheme {
+    PsyZineTheme {
         StatsScreen(
             navigateToSubstanceCompanion = { _, _ -> },
             onTapOption = {},
@@ -187,7 +187,7 @@ fun StatsScreen(
                     }
                 }
                 if (statsModel.statItems.isNotEmpty()) {
-                    val isDarkTheme = isSystemInDarkTheme()
+                    val isDarkTheme = LocalPsyZinePalette.current
                     Column {
                         Text(
                             text = "Experiences since ${statsModel.startDateText}",

@@ -236,7 +236,7 @@ fun SaferUseScreen(
             ) {
                 TextButton(
                     onClick = {
-                        uriHandler.openUri("https://psychonautwiki.org/wiki/Responsible_drug_use")
+                        uriHandler.openUri("https://psy.st/wiki/Responsible_drug_use")
                     },
                     modifier = Modifier.padding(horizontal = horizontalPadding)
                 ) {

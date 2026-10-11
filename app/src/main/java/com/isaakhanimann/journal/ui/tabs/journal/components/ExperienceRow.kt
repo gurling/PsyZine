@@ -20,7 +20,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -144,13 +144,13 @@ fun ExperienceRow(
 
 @Composable
 fun ColorRectangle(ingestions: List<IngestionWithCompanionAndCustomUnit>) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     val width = 11.dp
     val cornerRadius = 3.dp
     if (ingestions.size >= 2) {
-        val brush = remember(ingestions) {
+        val brush = remember(ingestions, isDarkTheme) {
             val colors =
-                ingestions.map { it.substanceCompanion!!.color.getComposeColor(isDarkTheme) }
+                ingestions.map { (it.substanceCompanion?.color ?: com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor.RED).getComposeColor(isDarkTheme) }
             Brush.verticalGradient(colors = colors)
         }
         Box(
@@ -167,7 +167,7 @@ fun ColorRectangle(ingestions: List<IngestionWithCompanionAndCustomUnit>) {
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(cornerRadius))
                 .background(
-                    ingestions.first().substanceCompanion!!.color.getComposeColor(
+                    (ingestions.first().substanceCompanion?.color ?: com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor.RED).getComposeColor(
                         isDarkTheme
                     )
                 ),
@@ -178,7 +178,7 @@ fun ColorRectangle(ingestions: List<IngestionWithCompanionAndCustomUnit>) {
                 .width(width)
                 .fillMaxHeight()
                 .clip(RoundedCornerShape(cornerRadius))
-                .background(Color.LightGray.copy(0.1f)),
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
         ) {}
     }
 }

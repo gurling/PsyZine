@@ -38,11 +38,22 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
 import java.time.Instant
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ExperienceRepository @Inject constructor(private val experienceDao: ExperienceDao) {
+class ExperienceRepository @Inject constructor(private val experienceDao: ExperienceDao,
+    private val photoDao: com.isaakhanimann.journal.data.room.attachments.PhotoAttachmentDao,
+    private val storage: com.isaakhanimann.journal.data.attachments.AttachmentStorage,
+    private val lock: com.isaakhanimann.journal.data.attachments.JournalMutationLock) {
+    suspend fun updateFavorite(id: Int, value: Boolean) = experienceDao.updateFavorite(id, value)
+    private fun collectLater(photos: List<com.isaakhanimann.journal.data.room.attachments.PhotoAttachment>) {
+        photos.forEach { runCatching { storage.file(it.relativePath).setLastModified(System.currentTimeMillis()) } }
+    }
+
     suspend fun insert(rating: ShulginRating) = experienceDao.insert(rating)
     suspend fun insert(customUnit: CustomUnit) = experienceDao.insert(customUnit).toInt()
     suspend fun insert(timedNote: TimedNote) = experienceDao.insert(timedNote)
@@ -76,16 +87,23 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         substanceCompanion
     )
 
-    suspend fun deleteEverything() = experienceDao.deleteEverything()
+    suspend fun deleteEverything() = lock.mutex.withLock {
+        val photos = photoDao.all()
+        withContext(NonCancellable) {
+            experienceDao.deleteEverythingAndInvalidate(java.util.UUID.randomUUID().toString())
+            collectLater(photos)
+        }
+    }
 
     suspend fun delete(ingestion: Ingestion) = experienceDao.delete(ingestion)
     suspend fun delete(customUnit: CustomUnit) = experienceDao.delete(customUnit)
 
-    suspend fun deleteEverythingOfExperience(experienceId: Int) =
-        experienceDao.deleteEverythingOfExperience(experienceId)
+    suspend fun deleteEverythingOfExperience(experienceId: Int) = lock.mutex.withLock {
+        val photos = photoDao.forExperience(experienceId)
+        withContext(NonCancellable) { experienceDao.deleteEverythingOfExperience(experienceId); collectLater(photos) }
+    }
 
-    suspend fun delete(experience: Experience) =
-        experienceDao.delete(experience)
+    suspend fun delete(experience: Experience) = deleteEverythingOfExperience(experience.id)
 
     suspend fun delete(rating: ShulginRating) =
         experienceDao.delete(rating)
@@ -93,8 +111,7 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
     suspend fun delete(timedNote: TimedNote) =
         experienceDao.delete(timedNote)
 
-    suspend fun delete(experienceWithIngestions: ExperienceWithIngestions) =
-        experienceDao.deleteExperienceWithIngestions(experienceWithIngestions)
+    suspend fun delete(experienceWithIngestions: ExperienceWithIngestions) = deleteEverythingOfExperience(experienceWithIngestions.experience.id)
 
     suspend fun deleteUnusedSubstanceCompanions() =
         experienceDao.deleteUnusedSubstanceCompanions()
@@ -132,6 +149,8 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
 
     suspend fun getCustomSubstance(name: String): CustomSubstance? =
         experienceDao.getCustomSubstance(name)
+
+    suspend fun getCustomSubstance(id: Int): CustomSubstance? = experienceDao.getCustomSubstance(id)
 
     fun getIngestionsWithExperiencesFlow(
         fromInstant: Instant,

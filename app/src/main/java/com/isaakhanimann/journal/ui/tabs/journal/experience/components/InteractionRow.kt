@@ -43,7 +43,7 @@ fun InteractionRow(interaction: Interaction) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RectangleShape,
-        color = interaction.interactionType.color
+        color = com.isaakhanimann.journal.ui.theme.DomainColors.severity(interaction.interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)
     ) {
         Row(
             modifier = Modifier.padding(
@@ -55,7 +55,7 @@ fun InteractionRow(interaction: Interaction) {
             Text(
                 text = "${interaction.aName} and ${interaction.bName}",
                 textAlign = TextAlign.Center,
-                color = Color.Black,
+                color = com.isaakhanimann.journal.ui.theme.readable(com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current.background, com.isaakhanimann.journal.ui.theme.DomainColors.severity(interaction.interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)),
             )
             Spacer(modifier = Modifier.weight(1f))
             LazyRow {
@@ -63,7 +63,7 @@ fun InteractionRow(interaction: Interaction) {
                     Icon(
                         imageVector = Icons.Outlined.WarningAmber,
                         contentDescription = "Warning",
-                        tint = Color.Black,
+                        tint = com.isaakhanimann.journal.ui.theme.readable(com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current.background, com.isaakhanimann.journal.ui.theme.DomainColors.severity(interaction.interactionType, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current)),
                     )
                 }
             }

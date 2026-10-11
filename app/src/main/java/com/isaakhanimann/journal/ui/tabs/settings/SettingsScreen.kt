@@ -115,6 +115,11 @@ fun SettingsScreen(
     navigateToSubstanceColors: () -> Unit,
     navigateToCustomUnits: () -> Unit,
     navigateToDonate: () -> Unit,
+    navigateToAppearance: () -> Unit = {},
+    navigateToAbout: () -> Unit = {},
+    exportLegacyFile: (Uri) -> Unit = {},
+    importError: String? = null,
+    clearImportError: () -> Unit = {},
 ) {
     SettingsScreen(
         navigateToFAQ = navigateToFAQ,
@@ -122,8 +127,18 @@ fun SettingsScreen(
         navigateToSubstanceColors = navigateToSubstanceColors,
         navigateToCustomUnits = navigateToCustomUnits,
         navigateToDonate = navigateToDonate,
+        navigateToAppearance = navigateToAppearance,
+        navigateToAbout = navigateToAbout,
+        exportLegacyFile = viewModel::exportLegacyFile,
         deleteEverything = viewModel::deleteEverything,
         importFile = viewModel::importFile,
+        importError = viewModel.importError,
+        busy = viewModel.busy,
+        presentation = viewModel.presentationSettings.collectAsState().value,
+        saveNotificationEnabled = viewModel::saveNotificationEnabled,
+        saveLockScreenDetails = viewModel::saveLockScreenDetails,
+        saveWidgetDetails = viewModel::saveWidgetDetails,
+        clearImportError = viewModel::clearImportError,
         exportFile = viewModel::exportFile,
         snackbarHostState = viewModel.snackbarHostState,
         areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsState().value,
@@ -143,6 +158,16 @@ fun SettingsScreen(
     navigateToSubstanceColors: () -> Unit,
     navigateToCustomUnits: () -> Unit,
     navigateToDonate: () -> Unit,
+    navigateToAppearance: () -> Unit = {},
+    navigateToAbout: () -> Unit = {},
+    exportLegacyFile: (Uri) -> Unit = {},
+    importError: String? = null,
+    busy: Boolean = false,
+    presentation: com.isaakhanimann.journal.data.preferences.PresentationSettings = com.isaakhanimann.journal.data.preferences.PresentationSettings(),
+    saveNotificationEnabled: (Boolean) -> Unit = {},
+    saveLockScreenDetails: (Boolean) -> Unit = {},
+    saveWidgetDetails: (Boolean) -> Unit = {},
+    clearImportError: () -> Unit = {},
     deleteEverything: () -> Unit,
     importFile: (uri: Uri) -> Unit,
     exportFile: (uri: Uri) -> Unit,
@@ -170,6 +195,10 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
         ) {
             CardWithTitle(title = "UI", innerPaddingHorizontal = 0.dp) {
+                SettingsButton(imageVector = Icons.Outlined.Palette, text = "Appearance", onClick = navigateToAppearance)
+                HorizontalDivider()
+                SettingsButton(imageVector = Icons.Outlined.Info, text = "About and licenses", onClick = navigateToAbout)
+                HorizontalDivider()
                 SettingsButton(
                     imageVector = Icons.Outlined.Medication,
                     text = "Custom units"
@@ -268,12 +297,30 @@ fun SettingsScreen(
                     )
                 }
             }
+            if (busy) androidx.compose.material3.LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+            CardWithTitle(title = "Active experience") {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Ongoing notification", Modifier.weight(1f))
+                    Switch(presentation.enabled, saveNotificationEnabled)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Show details on lock screen", Modifier.weight(1f))
+                    Switch(presentation.lockScreenDetails, saveLockScreenDetails)
+                }
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Text("Show details in home-screen widget", Modifier.weight(1f))
+                    Switch(presentation.widgetDetails, saveWidgetDetails)
+                }
+                Text("Phases are estimates from reference durations. Notifications update while an experience has an ingestion in the past 12 hours.", style = MaterialTheme.typography.bodySmall)
+                val notificationContext = LocalContext.current
+                TextButton(onClick = { notificationContext.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, notificationContext.packageName)) }) { Text("Android notification settings") }
+            }
             CardWithTitle(title = "App data", innerPaddingHorizontal = 0.dp) {
                 var isShowingExportDialog by remember { mutableStateOf(false) }
-                SettingsButton(imageVector = Icons.Outlined.FileUpload, text = "Export File") {
+                SettingsButton(imageVector = Icons.Outlined.FileUpload, text = "Back up journal and photos") {
                     isShowingExportDialog = true
                 }
-                val jsonMIMEType = "application/json"
+                val jsonMIMEType = "application/zip"
                 val launcherExport =
                     rememberLauncherForActivityResult(
                         contract = ActivityResultContracts.CreateDocument(
@@ -298,9 +345,9 @@ fun SettingsScreen(
                                 onClick = {
                                     isShowingExportDialog = false
                                     launcherExport.launch(
-                                        "Journal ${
+                                        "PsyZine ${
                                             Instant.now().getStringOfPattern("dd MMM yyyy")
-                                        }.json"
+                                        }.psyzine"
                                     )
                                 }
                             ) {
@@ -315,6 +362,12 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+                val legacyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri ->
+                    uri?.let(exportLegacyFile)
+                }
+                SettingsButton(imageVector = Icons.Outlined.FileUpload, text = "Export legacy JSON (entries only)") {
+                    legacyLauncher.launch("PsyZine-entries.json")
                 }
                 HorizontalDivider()
                 var isShowingImportDialog by remember { mutableStateOf(false) }
@@ -340,7 +393,7 @@ fun SettingsScreen(
                             TextButton(
                                 onClick = {
                                     isShowingImportDialog = false
-                                    launcherImport.launch(jsonMIMEType)
+                                    launcherImport.launch("*/*")
                                 }
                             ) {
                                 Text("Import")
@@ -354,6 +407,12 @@ fun SettingsScreen(
                             }
                         }
                     )
+                }
+                if (importError != null) {
+                    AlertDialog(onDismissRequest = clearImportError,
+                        title = { Text("Import failed") },
+                        text = { Text(importError + "\n\nThe existing journal and photos were preserved.") },
+                        confirmButton = { TextButton(onClick = clearImportError) { Text("OK") } })
                 }
                 HorizontalDivider()
                 var isShowingDeleteDialog by remember { mutableStateOf(false) }
@@ -409,16 +468,16 @@ fun SettingsScreen(
                     imageVector = Icons.AutoMirrored.Outlined.ContactSupport,
                     text = "Question, bug report"
                 ) {
-                    uriHandler.openUri("https://t.me/+ss8uZhBF6g00MTY8")
+                    if (com.isaakhanimann.journal.BuildConfig.SOURCE_URL.isNotEmpty()) uriHandler.openUri(com.isaakhanimann.journal.BuildConfig.SOURCE_URL + "/issues") else navigateToAbout()
                 }
                 HorizontalDivider()
-                SettingsButton(imageVector = Icons.Outlined.VolunteerActivism, text = "Donate") {
+                SettingsButton(imageVector = Icons.Outlined.VolunteerActivism, text = "Support the original author") {
                     navigateToDonate()
                 }
             }
             CardWithTitle(title = "App", innerPaddingHorizontal = 0.dp) {
                 SettingsButton(imageVector = Icons.Outlined.Code, text = "Source Code") {
-                    uriHandler.openUri("https://github.com/isaakhanimann/psychonautwiki-journal-android")
+                    if (com.isaakhanimann.journal.BuildConfig.SOURCE_URL.isNotEmpty()) uriHandler.openUri(com.isaakhanimann.journal.BuildConfig.SOURCE_URL) else navigateToAbout()
                 }
                 HorizontalDivider()
                 val context = LocalContext.current
@@ -444,7 +503,7 @@ fun SettingsScreen(
     }
 }
 
-const val SHARE_APP_URL = "https://psychonautwiki.org/wiki/PsychonautWiki_Journal"
+val SHARE_APP_URL = "PsyZine " + com.isaakhanimann.journal.BuildConfig.SOURCE_URL
 
 
 @Composable

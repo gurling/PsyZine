@@ -18,7 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.components.ingestion
 
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,7 +31,7 @@ import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 
 @Composable
 fun VerticalLine(color: AdaptiveColor) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     Surface(
         shape = RoundedCornerShape(size = 2.dp),
         color = color.getComposeColor(isDarkTheme),

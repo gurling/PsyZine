@@ -82,6 +82,7 @@ import com.isaakhanimann.journal.ui.YOU
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.CardWithTitle
 import com.isaakhanimann.journal.ui.tabs.journal.experience.rating.FloatingDoneButton
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
+import com.isaakhanimann.journal.ui.utils.JournalActionErrorDialog
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 
@@ -91,6 +92,7 @@ fun FinishIngestionScreen(
     dismissAddIngestionScreens: () -> Unit,
     viewModel: FinishIngestionScreenViewModel = hiltViewModel()
 ) {
+    JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
     val localDateTime = viewModel.localDateTimeStartFlow.collectAsState().value
     FinishIngestionScreen(
         createSaveAndDismissAfter = {
@@ -102,7 +104,7 @@ fun FinishIngestionScreen(
         localDateTimeStart = localDateTime,
         localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsState().value,
         onChangeEndDateOrTime = viewModel::onChangeEndDateOrTime,
-        isLoadingColor = viewModel.isLoadingColor,
+        isLoadingColor = viewModel.isLoadingColor || viewModel.isSaving,
         isShowingColorPicker = viewModel.isShowingColorPicker,
         selectedColor = viewModel.selectedColor,
         onChangeColor = { viewModel.selectedColor = it },

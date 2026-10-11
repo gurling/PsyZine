@@ -21,7 +21,7 @@ package com.isaakhanimann.journal.ui.tabs.stats
 import android.graphics.Color
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,14 +34,16 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.nativeCanvas
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 
 @Composable
 fun BarChart(buckets: List<List<ColorCount>>, startDateText: String) {
     Column {
-        val isDarkTheme = isSystemInDarkTheme()
+        val isDarkTheme = LocalPsyZinePalette.current
         val tickColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.20f)
+        val labelColor = MaterialTheme.colorScheme.onSurfaceVariant.toArgb()
         val labelStyle = MaterialTheme.typography.labelMedium.fontSize
         val labelHeight = with(LocalDensity.current) { labelStyle.toPx() }
         Canvas(
@@ -52,9 +54,9 @@ fun BarChart(buckets: List<List<ColorCount>>, startDateText: String) {
         ) {
             val canvasHeightOuter = size.height
             if (canvasHeightOuter > 0) { // for unknown reason canvasHeight can be 0 and then the app crashes
-                val maxCount = buckets.maxOf { bucket ->
+                val maxCount = buckets.maxOfOrNull { bucket ->
                     bucket.sumOf { it.count }
-                }
+                }?.coerceAtLeast(1) ?: 1
                 val half = maxCount / 2
                 val halfLineHeight = half.toFloat() * canvasHeightOuter / maxCount
                 val halfLabelHeight = labelHeight / 2
@@ -68,7 +70,7 @@ fun BarChart(buckets: List<List<ColorCount>>, startDateText: String) {
                         canvasHeightOuter - halfLineHeight + halfLabelHeight,
                         Paint().apply {
                             textSize = labelHeight
-                            color = Color.GRAY
+                            color = labelColor
                             textAlign = Paint.Align.RIGHT
                         }
                     )
@@ -78,7 +80,7 @@ fun BarChart(buckets: List<List<ColorCount>>, startDateText: String) {
                         halfLabelHeight,
                         Paint().apply {
                             textSize = labelHeight
-                            color = Color.GRAY
+                            color = labelColor
                             textAlign = Paint.Align.RIGHT
                         }
                     )

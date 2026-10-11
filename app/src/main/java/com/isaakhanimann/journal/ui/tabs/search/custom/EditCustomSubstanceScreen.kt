@@ -39,6 +39,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.isaakhanimann.journal.ui.utils.JournalActionErrorDialog
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,11 +47,13 @@ fun EditCustomSubstanceScreen(
     navigateBack: () -> Unit,
     viewModel: EditCustomSubstanceViewModel = hiltViewModel()
 ) {
+    JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Edit custom substance") }, actions = {
                 var isShowingDeleteDialog by remember { mutableStateOf(false) }
                 IconButton(
+                    enabled = viewModel.id > 0 && !viewModel.isSaving,
                     onClick = { isShowingDeleteDialog = true },
                 ) {
                     Icon(
@@ -68,8 +71,7 @@ fun EditCustomSubstanceScreen(
                             TextButton(
                                 onClick = {
                                     isShowingDeleteDialog = false
-                                    viewModel.deleteCustomSubstance()
-                                    navigateBack()
+                                    viewModel.deleteCustomSubstance(navigateBack)
                                 }
                             ) {
                                 Text("Delete")
@@ -91,8 +93,7 @@ fun EditCustomSubstanceScreen(
                 ExtendedFloatingActionButton(
                     modifier = Modifier.imePadding(),
                     onClick = {
-                        viewModel.onDoneTap()
-                        navigateBack()
+                        viewModel.onDoneTap(navigateBack)
                     },
                     icon = {
                         Icon(

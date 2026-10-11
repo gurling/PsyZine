@@ -56,6 +56,9 @@ fun NavGraphBuilder.journalGraph(navController: NavHostController) {
                 }
             )
         }
+        composableWithTransitions<PhotoViewerRoute> {
+            com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoViewerScreen(navigateBack = { navController.popBackStack() })
+        }
         composableWithTransitions<EditExperienceRoute> {
             EditExperienceScreen(navigateBack = navController::popBackStack)
         }
@@ -81,6 +84,7 @@ fun NavGraphBuilder.journalGraph(navController: NavHostController) {
             val experienceRoute: ExperienceRoute = backStackEntry.toRoute()
             val experienceId = experienceRoute.experienceId
             ExperienceScreen(
+                navigateToPhoto = { index -> navController.navigate(PhotoViewerRoute(experienceId, index)) },
                 navigateToAddIngestionSearch = {
                     navController.navigate(AddIngestionRoute)
                 },
@@ -180,3 +184,4 @@ object SaferSniffingRouteOnJournalTab
 
 @Serializable
 object CalendarRoute
+@Serializable data class PhotoViewerRoute(val experienceId: Int, val index: Int = 0)

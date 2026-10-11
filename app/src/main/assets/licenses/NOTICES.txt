@@ -1,0 +1,18 @@
+PsyZine is GPL-3.0-or-later. Copyright 2022-2025 Isaak Hanimann and contributors.
+PsyZine modifications dated 2026-10-11. The full GPL is packaged as COPYING.
+Based on PsychonautWiki Journal baseline 8224449a62e26ffd448aade0a7079b005fdd9d37.
+PsyLog ports: https://codeberg.org/PsyLog/PsyLog-android at 0c29a70fa1ced6106c8379b2c02541699d61f966; copyright 2025–2026 PsyLog contributors, GPL-3.0-or-later.
+
+Palette sources: Catppuccin, Dracula, Gruvbox, Nord, Solarized, One Dark, Rose Pine (MIT); Tokyo Night (Apache-2.0). Licenses are packaged alongside this notice. See docs/theme-palettes.md for revisions.
+
+Libraries: AndroidX/Compose/Room/DataStore/Glance and Coil (Apache-2.0); Kotlin and kotlinx (Apache-2.0); Dagger/Hilt (Apache-2.0); Kizitonwose Calendar (MIT). Dependency notices are recorded in THIRD_PARTY_NOTICES.md.
+
+Reference information is attributed to PsychonautWiki, TripSit, and DIZ/saferparty.ch. Its rights are separate from the application code. Separate content licenses apply; attribution does not itself grant redistribution permission.
+
+Library source and licenses:
+AndroidX (Core 1.15.0, Splash 1.0.1, Activity 1.10.0, Lifecycle 2.8.7, Navigation 2.8.5, Room 2.6.1, DataStore 1.1.2, Compose BOM 2025.01.00, Glance 1.1.1, ExifInterface 1.4.2): Android Open Source Project, Apache-2.0, https://android.googlesource.com/platform/frameworks/support
+Kotlin 2.0.20, kotlinx-coroutines 1.9.0 and kotlinx-serialization 1.7.3: JetBrains and contributors, Apache-2.0, https://github.com/JetBrains/kotlin
+Dagger/Hilt 2.52: Google and contributors, Apache-2.0, https://github.com/google/dagger
+Coil 3.0.4: Coil contributors, Apache-2.0, https://github.com/coil-kt/coil/tree/3.0.4 (no network fetchers bundled)
+Calendar Compose 2.5.0: Kizito Nwose and contributors, MIT, https://github.com/kizitonwose/Calendar/tree/2.5.0
+Apache-2.0.txt and calendar-LICENSE contain their license terms. Gradle wrapper build tooling uses Apache-2.0. Palette license files retain their upstream notices.

@@ -45,13 +45,16 @@ import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.ui.tabs.journal.experience.rating.FloatingDoneButton
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.dose.RoaDosePreviewProvider
 import com.isaakhanimann.journal.ui.tabs.settings.customunits.add.EditCustomUnitSections
+import com.isaakhanimann.journal.ui.utils.JournalActionErrorDialog
 
 @Composable
 fun EditCustomUnitScreen(
     navigateBack: () -> Unit,
     viewModel: EditCustomUnitViewModel = hiltViewModel()
 ) {
+    JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
     EditCustomUnitScreenContent(
+        canSave = viewModel.canSave,
         substanceName = viewModel.substanceName,
         administrationRoute = viewModel.administrationRoute,
         numberOfIngestionsWithThisCustomUnit = viewModel.numberOfIngestionsWithThisCustomUnit,
@@ -150,7 +153,8 @@ private fun EditCustomUnitScreenContent(
     onChangeOfNote: (String) -> Unit,
     isArchived: Boolean,
     onChangeOfIsArchived: (Boolean) -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    canSave: Boolean = true,
 ) {
     Scaffold(
         topBar = {
@@ -158,7 +162,7 @@ private fun EditCustomUnitScreenContent(
                 title = { Text("$substanceName unit") },
                 actions = {
                     var isShowingDeleteDialog by remember { mutableStateOf(false) }
-                    IconButton(onClick = { isShowingDeleteDialog = true }) {
+                    IconButton(enabled = canSave, onClick = { isShowingDeleteDialog = true }) {
                         Icon(
                             Icons.Default.Delete,
                             contentDescription = "Delete custom unit"
@@ -196,10 +200,12 @@ private fun EditCustomUnitScreenContent(
             )
         },
         floatingActionButton = {
+            if (canSave) {
             FloatingDoneButton(
                 onDone = dismiss,
                 modifier = Modifier.imePadding(),
             )
+            }
         }
     ) { padding ->
         EditCustomUnitSections(

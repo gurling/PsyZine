@@ -20,7 +20,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.addingestion.search
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -303,7 +303,7 @@ fun SectionHeader(title: String) {
 
 @Composable
 fun ColorCircle(adaptiveColor: AdaptiveColor) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     Surface(
         shape = CircleShape,
         color = adaptiveColor.getComposeColor(isDarkTheme),

@@ -19,6 +19,8 @@
 package com.isaakhanimann.journal.ui.tabs.settings
 
 import android.net.Uri
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHostState
 import androidx.lifecycle.ViewModel
@@ -37,8 +39,9 @@ import javax.inject.Inject
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
     private val experienceRepository: ExperienceRepository,
-    private val fileSystemConnection: FileSystemConnection,
+    private val backup: com.isaakhanimann.journal.data.backup.JournalBackupRepository,
     private val userPreferences: UserPreferences,
+    private val presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences,
 ) : ViewModel() {
 
     fun saveDosageDotsAreHidden(value: Boolean) = viewModelScope.launch {
@@ -60,7 +63,7 @@ class SettingsViewModel @Inject constructor(
     )
 
     val areSubstanceHeightsIndependentFlow = userPreferences.areSubstanceHeightsIndependentFlow.stateIn(
-        initialValue = false,
+        initialValue = true,
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)
     )
@@ -71,135 +74,45 @@ class SettingsViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000)
     )
 
+    val presentationSettings = presentation.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), com.isaakhanimann.journal.data.preferences.PresentationSettings())
+    private fun savePresentation(block: suspend () -> Unit) = viewModelScope.launch {
+        try { block() }
+        catch (e: kotlinx.coroutines.CancellationException) { throw e }
+        catch (_: Exception) { snackbarHostState.showSnackbar("Preference could not be saved") }
+    }
+    fun saveNotificationEnabled(value: Boolean) = savePresentation { presentation.notificationEnabled(value) }
+    fun saveLockScreenDetails(value: Boolean) = savePresentation { presentation.lockScreenDetails(value) }
+    fun saveWidgetDetails(value: Boolean) = savePresentation { presentation.widgetDetails(value) }
+
     val snackbarHostState = SnackbarHostState()
 
-    fun importFile(uri: Uri) {
+    var importError by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    fun clearImportError() { importError = null }
+
+    var busy by androidx.compose.runtime.mutableStateOf(false)
+        private set
+
+    private fun operation(importing: Boolean = false, block: suspend () -> String) {
+        if (busy) return
+        busy = true
         viewModelScope.launch {
-            val text = fileSystemConnection.getTextFromUri(uri)
-            if (text == null) {
-                snackbarHostState.showSnackbar(
-                    message = "File not found",
-                    duration = SnackbarDuration.Short
-                )
-            } else {
-                try {
-                    val json = Json { ignoreUnknownKeys = true }
-                    val journalExport = json.decodeFromString<JournalExport>(text)
-                    experienceRepository.deleteEverything()
-                    experienceRepository.insertEverything(journalExport)
-                    snackbarHostState.showSnackbar(
-                        message = "Import successful",
-                        duration = SnackbarDuration.Short
-                    )
-                } catch (e: Exception) {
-                    println("Error when decoding: ${e.message}")
-                    snackbarHostState.showSnackbar(
-                        message = "Decoding file failed",
-                        duration = SnackbarDuration.Short
-                    )
+            if (importing) importError = null
+            val message = try { block() }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) {
+                if (importing) {
+                    importError = e.message ?: "Restore failed. Existing journal preserved."
+                    if (com.isaakhanimann.journal.BuildConfig.DEBUG) android.util.Log.d("JournalImport", "Import rejected: " + ((e as? com.isaakhanimann.journal.data.backup.importers.JournalImportException)?.code ?: e.javaClass.simpleName))
                 }
+                e.message ?: "Operation failed; existing journal preserved."
             }
+            finally { busy = false }
+            snackbarHostState.showSnackbar(message, duration = SnackbarDuration.Long)
         }
     }
-
-    fun exportFile(uri: Uri) {
-        viewModelScope.launch {
-            val experiencesWithIngestionsAndRatings =
-                experienceRepository.getAllExperiencesWithIngestionsTimedNotesAndRatingsSorted()
-            val experiencesSerializable = experiencesWithIngestionsAndRatings.map {
-                val location = it.experience.location
-                return@map ExperienceSerializable(
-                    title = it.experience.title,
-                    text = it.experience.text,
-                    creationDate = it.experience.creationDate,
-                    sortDate = it.experience.sortDate,
-                    isFavorite = it.experience.isFavorite,
-                    ingestions = it.ingestions.map { ingestion ->
-                        IngestionSerializable(
-                            substanceName = ingestion.substanceName,
-                            time = ingestion.time,
-                            endTime = ingestion.endTime,
-                            creationDate = ingestion.creationDate,
-                            administrationRoute = ingestion.administrationRoute,
-                            dose = ingestion.dose,
-                            estimatedDoseStandardDeviation = ingestion.estimatedDoseStandardDeviation,
-                            isDoseAnEstimate = ingestion.isDoseAnEstimate,
-                            units = ingestion.units,
-                            notes = ingestion.notes,
-                            stomachFullness = ingestion.stomachFullness,
-                            consumerName = ingestion.consumerName,
-                            customUnitId = ingestion.customUnitId
-                        )
-                    },
-                    location = if (location != null) {
-                        LocationSerializable(
-                            name = location.name,
-                            latitude = location.latitude,
-                            longitude = location.longitude
-                        )
-                    } else {
-                        null
-                    },
-                    ratings = it.ratings.map { rating ->
-                        RatingSerializable(
-                            option = rating.option,
-                            time = rating.time,
-                            creationDate = rating.creationDate
-                        )
-                    },
-                    timedNotes = it.timedNotes.map { timedNote ->
-                        TimedNoteSerializable(
-                            creationDate = timedNote.creationDate,
-                            time = timedNote.time,
-                            note = timedNote.note,
-                            color = timedNote.color,
-                            isPartOfTimeline = timedNote.isPartOfTimeline
-                        )
-                    }
-                )
-            }
-            val customUnitsSerializable = experienceRepository.getAllCustomUnitsSorted().map {
-                CustomUnitSerializable(
-                    id = it.id,
-                    substanceName = it.substanceName,
-                    name = it.name,
-                    creationDate = it.creationDate,
-                    administrationRoute = it.administrationRoute,
-                    dose = it.dose,
-                    estimatedDoseStandardDeviation = it.estimatedDoseStandardDeviation,
-                    isEstimate = it.isEstimate,
-                    isArchived = it.isArchived,
-                    unit = it.unit,
-                    unitPlural = it.unitPlural,
-                    originalUnit = it.originalUnit,
-                    note = it.note
-                )
-            }
-            val journalExport = JournalExport(
-                experiences = experiencesSerializable,
-                substanceCompanions = experienceRepository.getAllSubstanceCompanions(),
-                customSubstances = experienceRepository.getAllCustomSubstances(),
-                customUnits = customUnitsSerializable
-            )
-            try {
-                val jsonList = Json.encodeToString(journalExport)
-                fileSystemConnection.saveTextInUri(uri, text = jsonList)
-                snackbarHostState.showSnackbar(
-                    message = "Export successful",
-                    duration = SnackbarDuration.Short
-                )
-            } catch (_: Exception) {
-                snackbarHostState.showSnackbar(
-                    message = "Export failed",
-                    duration = SnackbarDuration.Short
-                )
-            }
-        }
-    }
-
-    fun deleteEverything() {
-        viewModelScope.launch {
-            experienceRepository.deleteEverything()
-        }
-    }
+    fun importFile(uri: Uri) = operation(importing = true) { backup.restore(uri) ?: "Journal restored" }
+    fun exportFile(uri: Uri) = operation { backup.export(uri); "Backup saved" }
+    fun exportLegacyFile(uri: Uri) = operation { backup.export(uri, legacy = true); "Entries-only JSON saved" }
+    fun deleteEverything() = operation { experienceRepository.deleteEverything(); "Journal deleted" }
 }

@@ -38,6 +38,8 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object AppModule {
+    @Provides @Singleton fun provideClock(): java.time.Clock = java.time.Clock.systemUTC()
+
 
     @Singleton
     @Provides
@@ -46,12 +48,16 @@ object AppModule {
 
     @Singleton
     @Provides
+    fun providePhotoAttachmentDao(db: AppDatabase): com.isaakhanimann.journal.data.room.attachments.PhotoAttachmentDao = db.photoAttachmentDao()
+
+    @Singleton
+    @Provides
     fun provideAppDatabase(@ApplicationContext context: Context): AppDatabase =
         Room.databaseBuilder(
             context,
             AppDatabase::class.java,
             "experiences_db"
-        ).build()
+        ).addMigrations(com.isaakhanimann.journal.data.room.migrations.Migration7To8).build()
 
     @Singleton
     @Provides

@@ -62,7 +62,7 @@ fun DoseGuideScreen(
                 title = { Text("Dosage guide") },
                 actions = {
                     TextButton(
-                        onClick = { uriHandler.openUri("https://psychonautwiki.org/wiki/Dosage") },
+                        onClick = { uriHandler.openUri("https://psy.st/wiki/Dosage") },
                     ) {
                         Text("Article")
                     }

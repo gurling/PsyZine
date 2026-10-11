@@ -90,7 +90,7 @@ fun IngestionRow(
             ) {
                 val text = buildAnnotatedString {
                     append(ingestionWithCompanionAndCustomUnit.doseDescription)
-                    withStyle(style = SpanStyle(color = Color.Gray)) {
+                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
                         if (customUnit == null) {
                             append(" " + ingestion.administrationRoute.displayText.lowercase())
                         } else {

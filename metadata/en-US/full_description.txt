@@ -1,6 +1,9 @@
-PsychonautWiki Journal can help you keep track of your substance use and give you insights on your consumption patterns.
+PsyZine is a free, open-source, independent journal based on PsychonautWiki Journal and PsyLog. Track experiences, medications and substance ingestions, timed notes, ratings, favorites, calendar entries, timelines, and statistics. Bundled reference information works offline.
 
-The substance info comes from PsychonautWiki with some additional info from Tripsit and saferparty.ch
+Choose from 13 terminal color palettes or follow system appearance. Attach multiple private photos to experiences using the device camera, Photo Picker, or files. Optimized local copies remain available when originals are removed; image location metadata is removed.
 
-The app is designed to work fully offline.
-The data you enter in the app never leaves your device.
+An optional ongoing notification and a home-screen widget show an active experience’s estimated timeline, elapsed time, dose, route, and phase. Lock-screen notification details are hidden by default; widget and notification visibility can be configured independently. Duration and phase estimates come from reference ranges and do not measure your condition.
+
+Portable .psyzine backups include your journal, photos, and appearance/presentation settings. Legacy JSON export is available without photos. Imports validate before replacing the journal, including PsyLog-compatible Android Journal exports. The journal database and photos are excluded from automatic Android cloud backup and device transfer. PsyZine has no analytics, advertisements, subscriptions, or in-app purchases.
+
+GPL-3.0-or-later. Copyright Isaak Hanimann, PsyLog contributors, and PsyZine contributors. Reference content is attributed separately to PsychonautWiki, TripSit, and DIZ/saferparty.ch. Public binary distribution requires verification of that content’s redistribution permissions.

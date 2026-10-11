@@ -19,7 +19,16 @@
 package com.isaakhanimann.journal.di
 
 import android.app.Application
+import kotlinx.coroutines.launch
 import dagger.hilt.android.HiltAndroidApp
 
 @HiltAndroidApp
-class JournalApplication : Application()
+class PsyZineApplication : Application() {
+    @javax.inject.Inject lateinit var reconciler: com.isaakhanimann.journal.data.attachments.AttachmentReconciler
+    override fun onCreate() {
+        super.onCreate()
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO).launch {
+            runCatching { reconciler.reconcile() }
+        }
+    }
+}

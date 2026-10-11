@@ -63,7 +63,7 @@ class TimelineScreenViewModel @Inject constructor(
 
     private val areSubstanceHeightsIndependentFlow =
         userPreferences.areSubstanceHeightsIndependentFlow.stateIn(
-            initialValue = false,
+            initialValue = true,
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)
         )
@@ -151,7 +151,7 @@ class TimelineScreenViewModel @Inject constructor(
             val ingestionElements = getIngestionElements(ingestionWithAssociatedData)
             val substances =
                 ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-            ExperienceViewModel.getDataForEffectTimelines(
+            com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(
                 ingestionElements = ingestionElements,
                 substances = substances
             )

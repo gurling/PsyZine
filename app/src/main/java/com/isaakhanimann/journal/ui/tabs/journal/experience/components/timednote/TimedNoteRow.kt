@@ -19,7 +19,7 @@
 package com.isaakhanimann.journal.ui.tabs.journal.experience.components.timednote
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -65,7 +65,7 @@ fun TimedNoteRow(
         horizontalArrangement = Arrangement.spacedBy(10.dp),
         modifier = modifier.height(intrinsicSize = IntrinsicSize.Min)
     ) {
-        val isDarkTheme = isSystemInDarkTheme()
+        val isDarkTheme = LocalPsyZinePalette.current
         val strokeWidth = 3.dp
         Canvas(modifier = Modifier
             .fillMaxHeight()

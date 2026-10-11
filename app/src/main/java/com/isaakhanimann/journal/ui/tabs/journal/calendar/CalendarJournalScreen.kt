@@ -20,7 +20,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.calendar
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -61,7 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.relations.ExperienceWithIngestionsCompanionsAndRatings
 import com.isaakhanimann.journal.ui.tabs.journal.components.ExperienceRow
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.kizitonwose.calendar.compose.VerticalCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
@@ -75,7 +75,7 @@ import java.time.YearMonth
 @Preview
 @Composable
 fun CalendarJournalScreenPreview() {
-    JournalTheme {
+    PsyZineTheme {
         CalendarJournalScreen(
             navigateToExperiencePopNothing = {}
         )
@@ -262,7 +262,7 @@ fun Day(
                 } else if (experienceInfos.experienceIds.isEmpty()) {
                     Text(
                         text = dayText,
-                        color = if (isSystemInDarkTheme()) Color.Gray else Color.LightGray
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 } else {
                     Text(
@@ -286,7 +286,7 @@ fun HorizontalColorRectangle(
     modifier: Modifier,
     colors: List<AdaptiveColor>
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     if (colors.size >= 2) {
         val brush = remember(colors) {
             val composeColors = colors.map { it.getComposeColor(isDarkTheme) }

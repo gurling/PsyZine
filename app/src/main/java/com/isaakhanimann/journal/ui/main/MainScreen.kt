@@ -31,6 +31,7 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.toRoute
 import com.isaakhanimann.journal.ui.main.navigation.graphs.journalGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.saferGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.searchGraph
@@ -41,12 +42,29 @@ import com.isaakhanimann.journal.ui.main.navigation.topLevelRoutes
 
 @Composable
 fun MainScreen(
-    viewModel: MainScreenViewModel = hiltViewModel()
+    viewModel: MainScreenViewModel = hiltViewModel(),
+    experienceRequest: ExperienceNavigationRequest? = null,
+    consumeExperienceRequest: () -> Unit = {}
 ) {
-    if (viewModel.isAcceptedFlow.collectAsState().value) {
+    val accepted = viewModel.isAcceptedFlow.collectAsState().value
+    if (accepted == null) return
+    if (accepted) {
         val navController = rememberNavController()
+        androidx.compose.runtime.LaunchedEffect(experienceRequest?.token) {
+            experienceRequest?.let {
+                val entry = navController.currentBackStackEntry
+                val editingSameEntry = entry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>() == true &&
+                    entry.toRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>().experienceId == it.experienceId
+                // Keep an editor for this entry in focus; otherwise push without discarding drafts.
+                if (!editingSameEntry && viewModel.canOpen(it)) {
+                    navController.navigate(com.isaakhanimann.journal.ui.main.navigation.graphs.ExperienceRoute(it.experienceId)) { launchSingleTop = true }
+                }
+                consumeExperienceRequest()
+            }
+        }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         NavigationSuiteScaffold(
+            layoutType = if (navBackStackEntry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
             navigationSuiteItems = {
                 val currentDestination = navBackStackEntry?.destination
                 topLevelRoutes.forEach { topLevelRoute ->
@@ -101,5 +119,10 @@ fun MainScreen(
         }
     } else {
         AcceptConditionsScreen(onTapAccept = viewModel::accept)
+        viewModel.acceptError?.let { message ->
+            androidx.compose.material3.AlertDialog(onDismissRequest = viewModel::clearAcceptError,
+                title = { Text("Preference could not be saved") }, text = { Text(message) },
+                confirmButton = { androidx.compose.material3.TextButton(onClick = viewModel::clearAcceptError) { Text("OK") } })
+        }
     }
 }

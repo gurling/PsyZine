@@ -21,7 +21,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -124,13 +125,14 @@ fun AllTimelines(
     timeDisplayOption: TimeDisplayOption,
     modifier: Modifier = Modifier,
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     val density = LocalDensity.current
     val axisLabelSize = MaterialTheme.typography.labelMedium.fontSize
-    val axisLabelTextPaint = remember(density) {
+    val ratingLineColor = MaterialTheme.colorScheme.onSurfaceVariant
+    val axisLabelTextPaint = remember(density, isDarkTheme) {
         Paint().apply {
             color =
-                if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                isDarkTheme.scheme.onSurface.toArgb()
             textAlign = Paint.Align.CENTER
             textSize = density.run { axisLabelSize.toPx() }
         }
@@ -139,10 +141,10 @@ fun AllTimelines(
     val dragTimeTextSize = MaterialTheme.typography.titleMedium
     val textMeasurer = rememberTextMeasurer()
     val ratingSize = MaterialTheme.typography.labelLarge.fontSize
-    val ratingTextPaint = remember(density) {
+    val ratingTextPaint = remember(density, isDarkTheme) {
         Paint().apply {
             color =
-                if (isDarkTheme) android.graphics.Color.WHITE else android.graphics.Color.BLACK
+                isDarkTheme.scheme.onSurface.toArgb()
             textAlign = Paint.Align.CENTER
             textSize = density.run { ratingSize.toPx() }
         }
@@ -200,7 +202,8 @@ fun AllTimelines(
                     pixelsPerSec = pixelsPerSec,
                     canvasHeightOuter = canvasHeightWithVerticalLine,
                     rating = dataForOneRating.option,
-                    textPaint = ratingTextPaint
+                    textPaint = ratingTextPaint,
+                    lineColor = ratingLineColor
                 )
             }
             model.timedNotes.forEach { dataForOneTimedNote ->
@@ -251,7 +254,7 @@ fun AllTimelines(
 private fun DrawScope.drawDragPointLineAndTimeLabel(
     dragPoint: Offset,
     canvasWidth: Float,
-    isDarkTheme: Boolean,
+    isDarkTheme: com.isaakhanimann.journal.ui.theme.ThemePalette,
     canvasHeightWithVerticalLine: Float,
     pixelsPerSec: Float,
     model: AllTimelinesModel,
@@ -264,8 +267,8 @@ private fun DrawScope.drawDragPointLineAndTimeLabel(
         x = dragPoint.x.coerceIn(0f, canvasWidth),
         y = dragPoint.y
     )
-    val dragLineColor = if (isDarkTheme) Color.White else Color.Black
-    val textColor = if (isDarkTheme) Color.Black else Color.White
+    val dragLineColor = isDarkTheme.scheme.onSurface
+    val textColor = isDarkTheme.scheme.surface
     drawVerticalDragLine(dragLineColor, horizontallyLimitedDragPoint, canvasHeightWithVerticalLine)
 
     drawDragTimeLabelWithBackground(
@@ -373,14 +376,14 @@ fun DrawScope.drawCurrentTime(
     timelineWidthInSeconds: Float,
     currentTime: Instant,
     pixelsPerSec: Float,
-    isDarkTheme: Boolean,
+    isDarkTheme: com.isaakhanimann.journal.ui.theme.ThemePalette,
     canvasHeightOuter: Float,
 ) {
     val endTime = startTime.plusSeconds(timelineWidthInSeconds.toLong())
     if (startTime.isBefore(currentTime) && endTime.isAfter(currentTime)) {
         val timeStartInSec = Duration.between(startTime, currentTime).seconds
         val timeStartX = timeStartInSec * pixelsPerSec
-        val color = if (isDarkTheme) Color.White else Color.Black
+        val color = isDarkTheme.scheme.onSurface
         drawLine(
             color = color,
             start = Offset(x = timeStartX, y = canvasHeightOuter),
@@ -436,7 +439,8 @@ fun DrawScope.drawRating(
     pixelsPerSec: Float,
     canvasHeightOuter: Float,
     rating: ShulginRatingOption,
-    textPaint: Paint
+    textPaint: Paint,
+    lineColor: Color
 ) {
     val timeStartInSec = Duration.between(startTime, ratingTime).seconds
     val timeStartX = timeStartInSec * pixelsPerSec
@@ -445,7 +449,7 @@ fun DrawScope.drawRating(
     val signHeight = lines.size * lineHeight
     val verticalLineHeight = (canvasHeightOuter - 2 * lineHeight - signHeight) / 2
     drawLine(
-        color = Color.Gray,
+        color = lineColor,
         start = Offset(x = timeStartX, y = 0f),
         end = Offset(x = timeStartX, y = verticalLineHeight),
         strokeWidth = 3.dp.toPx(),
@@ -464,7 +468,7 @@ fun DrawScope.drawRating(
         }
     }
     drawLine(
-        color = Color.Gray,
+        color = lineColor,
         start = Offset(x = timeStartX, y = y),
         end = Offset(x = timeStartX, y = canvasHeightOuter),
         strokeWidth = 4.dp.toPx(),
@@ -478,13 +482,13 @@ fun DrawScope.drawTimedNote(
     pixelsPerSec: Float,
     canvasHeightOuter: Float,
     color: AdaptiveColor,
-    isDarkTheme: Boolean
+    isDarkTheme: com.isaakhanimann.journal.ui.theme.ThemePalette
 ) {
     val timeStartInSec = Duration.between(startTime, noteTime).seconds
     val timeStartX = timeStartInSec * pixelsPerSec
     val strokeWidth = 3.dp.toPx()
     drawLine(
-        color = color.getComposeColor(isDarkTheme = isDarkTheme),
+        color = color.getComposeColor(palette = isDarkTheme),
         start = Offset(x = timeStartX, y = 0f),
         end = Offset(x = timeStartX, y = canvasHeightOuter),
         strokeWidth = strokeWidth,

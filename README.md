@@ -1,43 +1,51 @@
-# ⚠️ Project Archived
+# PsyZine for Android
 
-This repository has been archived.
-Active development continues in a private repository.
+PsyZine is an independent GPL-3.0-or-later journal based on PsychonautWiki Journal and PsyLog. It keeps the existing ingestion workflow, offline reference library, search, calendar, favorites, timed notes, ratings, timelines, custom substances/units, and statistics. PsyZine adds 13 persistent terminal palettes, private experience photos, photo-inclusive portable backups, and PsyLog’s active-experience notification and home-screen widget.
 
-While there were a few external contributions, I’m grateful to everyone who contributed and have received their consent to relicense the project from GPL-3 to a proprietary license.
-To make development sustainable, the app now includes a premium tier while keeping core features - including substance information and basic logging - free.
-Because of this partial monetization, future versions are closed-source to prevent redistribution of paid functionality.
+The PsyLog port is pinned to [`0c29a70fa1ced6106c8379b2c02541699d61f966`](https://codeberg.org/PsyLog/PsyLog-android/commit/0c29a70fa1ced6106c8379b2c02541699d61f966). The PsychonautWiki Journal baseline is [`8224449a62e26ffd448aade0a7079b005fdd9d37`](https://github.com/isaakhanimann/psychonautwiki-journal-android/tree/8224449a62e26ffd448aade0a7079b005fdd9d37). Features were ported individually. PsyLog’s unmerged delayed-release PR #6 is excluded.
 
-You can still explore this repository to learn from its earlier open-source implementation, but it will not receive further updates or support.
+## Build
 
-Copyright (C) 2022 Isaak Hanimann.
+Use JDK 17, Android SDK platform 35, build tools 35.0.0, and the checked-in Gradle 8.14 wrapper. AGP remains 8.7.3, Kotlin 2.0.20, Compose BOM 2025.01.00, Room 2.6.1, and Hilt 2.52. New runtime dependencies are Glance 1.1.1, Coil Compose 3.0.4 without network fetchers, ExifInterface 1.4.2, and Lifecycle Runtime Compose 2.8.7. Coil is pinned to the Kotlin 2.0.20 integration target; changing it requires checking the resolved Kotlin/Compose graph again.
 
-See the end of the file for license conditions.
+```bash
+sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+bash tools/build-apks.sh
+./gradlew :app:connectedDirectDebugAndroidTest
+```
 
-# PsychonautWiki Journal
+The direct release installs as `app.psyzine`, direct debug as `app.psyzine.debug`, Play release as `app.psyzine.play`, and Play debug as `app.psyzine.play.debug`. All variants use the retained internal Kotlin namespace and Room schema path. Versions start at `1.0.0` / code `1`. Keep the direct ID and independent signing certificate stable for upgrades. Never install a different signing key over an existing journal.
 
-PsychonautWiki Journal is an Android app to make recreational drug users safer. The aim is to provide features that are attractive to users as well as useful from a harm-reduction perspective.
-This app is built natively with [Jetpack Compose](https://developer.android.com/jetpack/compose).
+Source, issue and sharing links default to `https://github.com/gurling/PsyZine` through generated BuildConfig. A fork can override them with `-PpsyzineSourceUrl=https://github.com/OWNER/REPOSITORY`; an explicitly blank property shows a development notice in About. No upstream support address is presented as PsyZine support. The retained donation page explicitly supports the original author.
 
-![A presentation of the App](https://github.com/isaakhanimann/psychonautwiki-journal-android/blob/main/metadata/en-US/images/Google%20Pixel%204%20XL%20Presentation.png?raw=true)
+Optional Nix shells, adapted from PsyLog’s pinned flake, provide JDK 17 and SDK 35: `nix develop` for Android Studio/emulator/scrcpy/adb-sync, or `nix develop .#ci` for the smaller build shell. Use `./gradlew` in either shell. Nix evaluation has not been run in this environment.
 
-<a href='https://play.google.com/store/apps/details?id=com.isaakhanimann.journal&pcampaignid=pcampaignidMKT-Other-global-all-co-prtnr-py-PartBadge-Mar2515-1'><img alt='Get it on Google Play' src='https://play.google.com/intl/en_us/badges/static/images/badges/en_badge_web_generic.png' height='100' /></a>
-<a href='https://f-droid.org/en/packages/com.isaakhanimann.journal/'><img src="https://fdroid.gitlab.io/artwork/badge/get-it-on.png" height="100" /></a>
+## Journal, themes, and photos
 
-Or download the latest version from [GitHub releases](https://github.com/isaakhanimann/psychonautwiki-journal-android/releases/latest).
+Settings → Appearance applies a preview palette immediately and saves it in the existing preferences DataStore. Follow system uses Catppuccin Latte/Mocha; named variants remain fixed. Headings use restrained monospace, while journal and editor text remain proportional. Chart and domain colors resolve the original stored enum identities against the active palette.
 
-## License
+Photos belong to experiences. The editor supports the device camera, Photo Picker, and image files, up to 20 images per batch with no fixed total per experience. Images are copied privately, normalized for rotation/mirroring, resized to a maximum 2560-pixel long edge, and re-encoded without image location metadata. Opaque photos use JPEG quality 85 and transparent photos use PNG. Failed images have retry/remove controls; completed images remain staged. Save commits entry fields and attachment records together after durable file promotion. Discard preserves saved attachments. Draft recovery and startup reconciliation handle interrupted operations. See [data migration and backups](docs/data-migration.md).
 
-    This file is part of PsychonautWiki Journal.
-    
-    PsychonautWiki Journal is free software: you can redistribute it and/or modify
-    it under the terms of the GNU General Public License as published by
-    the Free Software Foundation, either version 3 of the License, or (at
-    your option) any later version.
-    
-    PsychonautWiki Journal is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
-    
-    You should have received a copy of the GNU General Public License
-    along with PsychonautWiki Journal.  If not, see https://www.gnu.org/licenses/gpl-3.0.en.html.
+## Active experience
+
+An active experience is the most recent entry, by sort date and ID, with an ingestion after the previous 12-hour boundary and at or before now. Future-only entries are excluded. Shared calculation supplies the timeline and per-ingestion name, dose, route, color, and estimated phase to notifications and widgets. Partial reference duration data falls back to an estimated dotted total when a more specific timeline cannot be drawn. Existing saved height preferences are retained; new installations default to independent substance heights.
+
+The ongoing notification has a compact summary, expanded timeline and ingestion rows, an elapsed-time chronometer, and a tap destination. One update job refreshes approximately every 30 seconds while active and also reacts to journal and preference changes. It starts from a visible activity after onboarding and permission, resumes on app launch, and stops when no qualifying entry remains or notifications are disabled. Android may suspend/stop work; the app does not promise exact background scheduling. Lock-screen details are redacted by default. Settings also controls widget details and opens Android’s notification settings.
+
+The Glance widget is resizable, uses the selected PsyZine palette, supports an empty/error state, and opens the corresponding entry. It observes fresh data inside active Glance sessions, receives active-service updates, and has Android’s normal 30-minute periodic update when the service is off. Lists and bitmap allocations are bounded; additional records remain accessible in the full journal. Phases and timelines are reference estimates, not measurements of a person’s condition.
+
+## Verification and release
+
+[Feature parity checklist](docs/psylog-parity.md) records all verified PsyLog behavior and the defects corrected during the port. [Verification](docs/verification.md) separates passing host/source checks from device checks still required. The current environment cannot start Gradle’s socket-based services or an emulator; no installable APK, lint result, minified release, physical camera result, or signed-release smoke test is claimed.
+
+CI builds both distributions, checks permissions and IDs, runs unit tests/lint, and runs Android instrumentation on API 26, 29, 30, 32, 33, and 35. Dispatch the optional newer-API job for 36/37 when the selected AOSP image is available. Physical camera, process-death, reboot, TalkBack/large-text/keyboard, and tablet checks remain manual acceptance steps. Synthetic palette captures are produced by instrumentation for visual review; [screenshot instructions](docs/screenshots.md) describe release listing captures.
+
+Ordinary builds produce signed testing APKs; release versions are labeled `1.0.0-dev` unless production signing is configured. `tools/build-apks.sh` runs actual Gradle builds/tests/lint and creates verified APKs, sizes and checksums only on success. Read [build and publication results](docs/build-publication.md) for signing setup, expected paths, current execution failures and GitHub transport status. Development and production certificates cannot upgrade each other in place.
+
+The signed-release workflow uses only independent `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, and `PSYZINE_KEY_PASSWORD` secrets in the `release` environment. It signs through Gradle, verifies signatures and alignment with Android SDK tools, and packages corresponding source and SHA-256 checksums. Keep a secure offline copy of the signing key. Signing/publication requires `CONTENT_RIGHTS_VERIFIED=true` after the bundled reference-content redistribution review; attribution alone does not establish permission. The workflow is configured but has not run. The specified SSH origin is configured locally. A private development key has been generated outside version control. Production credentials and publication remain unavailable in this restricted environment.
+
+## License and privacy
+
+Copyright © 2022–2025 Isaak Hanimann and upstream contributors; © 2025–2026 PsyLog contributors. PsyZine modifications are dated 11 October 2026. PsyZine is free software under GNU GPL version 3 or, at your option, a later version, and is distributed without any warranty. See [COPYING](COPYING), [NOTICE](NOTICE.md), and [third-party notices](THIRD_PARTY_NOTICES.md). Full GPL, palette, dependency, and privacy notices are packaged offline in Settings → About and licenses.
+
+The application has no analytics, ads, accounts, cloud synchronization, or network fetcher. Database/photos/staging are excluded from Android cloud backup and device transfer; preferences remain eligible, including entry-workflow timestamps. Explicit backups may be written to the provider you select and are not encrypted by PsyZine. External reference links open only when tapped. See [privacy policy](PRIVACY.md). Reference content has separate provenance from PsychonautWiki, TripSit, and DIZ/saferparty.ch.

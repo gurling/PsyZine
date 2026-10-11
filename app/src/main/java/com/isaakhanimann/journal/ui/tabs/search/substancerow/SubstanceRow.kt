@@ -90,7 +90,7 @@ fun CategoryChipStatic(categoryModel: CategoryModel) {
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .clip(shape = CircleShape)
-            .background(color = categoryModel.color.copy(alpha = 0.2f))
+            .background(color = com.isaakhanimann.journal.ui.theme.DomainColors.category(categoryModel.name, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current).copy(alpha = 0.2f))
             .padding(vertical = 2.dp, horizontal = 8.dp)
 
     ) {

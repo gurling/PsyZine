@@ -19,7 +19,7 @@
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose.customunit
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -248,7 +248,7 @@ fun ChooseDoseCustomUnitScreen(
                     }
                     Text(
                         text = customUnitCalculationText ?: "",
-                        color = currentDoseClass?.getComposeColor(isSystemInDarkTheme())
+                        color = currentDoseClass?.getComposeColor(LocalPsyZinePalette.current)
                             ?: Color.Unspecified,
                         style = MaterialTheme.typography.labelLarge
                     )

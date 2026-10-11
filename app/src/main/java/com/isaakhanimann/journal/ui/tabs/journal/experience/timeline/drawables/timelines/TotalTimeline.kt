@@ -106,3 +106,31 @@ fun RoaDuration.toTotalTimeline(
         null
     }
 }
+
+// Adapted from PsyLog abb9323c; GPL-3.0-or-later, copyright PsyLog contributors.
+// estimate total duration from whatever phases are available -
+// sums all non-null phase durations into a synthetic total range
+fun RoaDuration.toEstimatedTotalTimeline(
+    totalWeight: Float,
+    ingestionTimeRelativeToStartInSeconds: Float,
+    nonNormalisedHeight: Float,
+): TotalTimeline? {
+    val phases = listOfNotNull(onset, comeup, peak, offset, afterglow)
+    if (phases.isEmpty()) return null
+    if (phases.any { it.minInSec != null && it.maxInSec != null && it.minInSec > it.maxInSec }) return null
+    val mins = phases.mapNotNull { it.minInSec }
+    val maxs = phases.mapNotNull { it.maxInSec }
+    if (mins.isEmpty() || maxs.isEmpty()) return null
+    if (mins.any { !it.isFinite() || it < 0 } || maxs.any { !it.isFinite() || it < 0 }) return null
+    if (!mins.sum().isFinite() || !maxs.sum().isFinite() || maxs.sum() <= 0 || mins.sum() > maxs.sum()) return null
+    val estimatedTotal = FullDurationRange(
+        minInSeconds = mins.sum(),
+        maxInSeconds = maxs.sum()
+    )
+    return TotalTimeline(
+        total = estimatedTotal,
+        totalWeight = totalWeight,
+        ingestionTimeRelativeToStartInSeconds = ingestionTimeRelativeToStartInSeconds,
+        nonNormalisedHeight = nonNormalisedHeight,
+    )
+}

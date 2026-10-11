@@ -1,0 +1,2 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content><include domain="file" path="datastore/" /><exclude domain="database" path="." /><exclude domain="file" path="attachments/" /><exclude domain="file" path="staging/" /></full-backup-content>

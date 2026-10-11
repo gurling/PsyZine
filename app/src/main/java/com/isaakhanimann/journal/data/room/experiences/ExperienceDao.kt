@@ -25,6 +25,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 import com.isaakhanimann.journal.data.room.experiences.entities.Experience
@@ -47,6 +49,10 @@ import java.time.Instant
 
 @Dao
 interface ExperienceDao {
+
+    @RawQuery(observedEntities = [Experience::class, Ingestion::class, SubstanceCompanion::class, CustomUnit::class,
+        com.isaakhanimann.journal.data.room.attachments.JournalState::class])
+    fun observeActiveChanges(query: SupportSQLiteQuery): Flow<Int>
 
     @Query("SELECT * FROM experience ORDER BY creationDate DESC")
     fun getSortedExperiencesFlow(): Flow<List<Experience>>
@@ -124,6 +130,9 @@ interface ExperienceDao {
 
     @Query("SELECT * FROM customsubstance WHERE id = :id")
     fun getCustomSubstanceFlow(id: Int): Flow<CustomSubstance?>
+
+    @Query("SELECT * FROM CustomSubstance WHERE id = :id")
+    suspend fun getCustomSubstance(id: Int): CustomSubstance?
 
     @Query("SELECT * FROM customsubstance WHERE name = :name")
     suspend fun getCustomSubstance(name: String): CustomSubstance?
@@ -213,10 +222,10 @@ interface ExperienceDao {
     @Query("UPDATE customunit SET originalUnit = 'mg Psilocybin' WHERE substanceName = 'Psilocybin mushrooms' AND originalUnit = 'mg'")
     suspend fun migrateMushroomsCustomUnits()
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert
     suspend fun insert(experience: Experience): Long
 
-    @Update(onConflict = OnConflictStrategy.REPLACE)
+    @Update
     suspend fun update(experience: Experience)
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
@@ -242,10 +251,7 @@ interface ExperienceDao {
 
     @Transaction
     suspend fun deleteExperienceWithIngestions(experienceWithIngestions: ExperienceWithIngestions) {
-        delete(experience = experienceWithIngestions.experience)
-        experienceWithIngestions.ingestions.forEach {
-            delete(it)
-        }
+        deleteEverythingOfExperience(experienceWithIngestions.experience.id)
     }
 
     @Transaction
@@ -270,9 +276,19 @@ interface ExperienceDao {
     }
 
     @Transaction
+    suspend fun deleteEverythingAndInvalidate(generation: String) {
+        deleteEverything()
+        setJournalGeneration(generation)
+    }
+
+    @Query("INSERT OR REPLACE INTO journal_state (id, generation) VALUES (1, :generation)")
+    suspend fun setJournalGeneration(generation: String)
+
+    @Transaction
     suspend fun deleteEverythingOfExperience(experienceId: Int) {
         deleteIngestions(experienceId)
         deleteRatings(experienceId)
+        deleteTimedNotes(experienceId)
         deleteExperience(experienceId)
     }
 
@@ -335,9 +351,24 @@ interface ExperienceDao {
         experience: Experience,
         substanceCompanion: SubstanceCompanion
     ) {
-        insert(ingestion)
-        insert(experience)
+        val id = insert(experience.copy(id = 0)).toInt()
+        insert(ingestion.copy(experienceId = id))
         insert(substanceCompanion)
+    }
+
+    @Query("DELETE FROM timednote WHERE experienceId = :experienceId")
+    suspend fun deleteTimedNotes(experienceId: Int)
+
+    @Query("UPDATE experience SET title = :title, text = :text, name = :location, latitude = CASE WHEN :location IS NULL THEN NULL ELSE latitude END, longitude = CASE WHEN :location IS NULL THEN NULL ELSE longitude END WHERE id = :id")
+    suspend fun updateEditableFields(id: Int, title: String, text: String, location: String?): Int
+
+    @Query("UPDATE experience SET isFavorite = :favorite WHERE id = :id")
+    suspend fun updateFavorite(id: Int, favorite: Boolean)
+
+    @Transaction
+    suspend fun replaceEverything(journalExport: JournalExport) {
+        deleteEverything()
+        insertEverything(journalExport)
     }
 
     @Transaction
@@ -491,4 +522,8 @@ interface ExperienceDao {
 
     @Query("SELECT * FROM timednote WHERE experienceId =:experienceId")
     suspend fun getTimedNotes(experienceId: Int): List<TimedNote>
+
+    @Transaction
+    @Query("SELECT * FROM experience WHERE id IN (SELECT DISTINCT experienceId FROM ingestion WHERE time > :since AND time <= :now) ORDER BY sortDate DESC, id DESC LIMIT 1")
+    suspend fun getMostRecentActiveExperience(since: Instant, now: Instant): ExperienceWithIngestionsCompanionsAndRatings?
 }

@@ -25,6 +25,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.isaakhanimann.journal.data.room.JournalSessionGuard
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.entities.Experience
@@ -38,7 +39,7 @@ import com.isaakhanimann.journal.ui.utils.getInstant
 import com.isaakhanimann.journal.ui.utils.getLocalDateTime
 import com.isaakhanimann.journal.ui.utils.getStringOfPattern
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -48,7 +49,6 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
@@ -66,8 +66,15 @@ enum class IngestionTimePickerOption {
 class FinishIngestionScreenViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     userPreferences: UserPreferences,
+    private val sessionGuard: JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    private var generation: String? = null
+    var isSaving by mutableStateOf(false)
+        private set
+    var saveError by mutableStateOf<String?>(null)
+        private set
+    fun dismissSaveError() { saveError = null }
     var substanceName by mutableStateOf("")
     val localDateTimeStartFlow = MutableStateFlow(LocalDateTime.now())
     val localDateTimeEndFlow = MutableStateFlow(LocalDateTime.now().plusMinutes(30))
@@ -149,11 +156,6 @@ class FinishIngestionScreenViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000)
         )
 
-    private val newExperienceIdToUseFlow: Flow<Int> = sortedExperiencesFlow.map { experiences ->
-        val previousMax = experiences.maxOfOrNull { it.experience.id } ?: 1
-        return@map previousMax + 1
-    }
-
     init {
         val finishIngestionRoute = state.toRoute<FinishIngestionRoute>()
         substanceName = finishIngestionRoute.substanceName
@@ -170,36 +172,43 @@ class FinishIngestionScreenViewModel @Inject constructor(
         }
         isEstimate = finishIngestionRoute.isEstimate
         viewModelScope.launch {
-            val lastIngestionTimeOfExperience =
-                userPreferences.lastIngestionTimeOfExperienceFlow.first()
-            val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first()
-            if (clonedIngestionTime != null) {
-                localDateTimeStartFlow.emit(clonedIngestionTime.getLocalDateTime())
-                localDateTimeEndFlow.emit(clonedIngestionTime.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
-                updateTitleBasedOnTime(clonedIngestionTime)
-            } else if (lastIngestionTimeOfExperience != null) {
-                val wasLastIngestionOfExperienceMoreThan20HoursAgo =
-                    lastIngestionTimeOfExperience < Instant.now().minus(20, ChronoUnit.HOURS)
-                if (wasLastIngestionOfExperienceMoreThan20HoursAgo) {
-                    localDateTimeStartFlow.emit(lastIngestionTimeOfExperience.getLocalDateTime())
-                    localDateTimeEndFlow.emit(lastIngestionTimeOfExperience.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
-                    updateTitleBasedOnTime(lastIngestionTimeOfExperience)
+            try {
+                generation = state.get<String>("journalGeneration") ?: sessionGuard.currentGeneration().also { state["journalGeneration"] = it }
+                val lastIngestionTimeOfExperience =
+                    userPreferences.lastIngestionTimeOfExperienceFlow.first()
+                val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first()
+                if (clonedIngestionTime != null) {
+                    localDateTimeStartFlow.emit(clonedIngestionTime.getLocalDateTime())
+                    localDateTimeEndFlow.emit(clonedIngestionTime.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
+                    updateTitleBasedOnTime(clonedIngestionTime)
+                } else if (lastIngestionTimeOfExperience != null) {
+                    val wasLastIngestionOfExperienceMoreThan20HoursAgo =
+                        lastIngestionTimeOfExperience < Instant.now().minus(20, ChronoUnit.HOURS)
+                    if (wasLastIngestionOfExperienceMoreThan20HoursAgo) {
+                        localDateTimeStartFlow.emit(lastIngestionTimeOfExperience.getLocalDateTime())
+                        localDateTimeEndFlow.emit(lastIngestionTimeOfExperience.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
+                        updateTitleBasedOnTime(lastIngestionTimeOfExperience)
+                    }
                 }
+                updateExperiencesBasedOnSelectedTime()
+                val allCompanions = experienceRepo.getAllSubstanceCompanionsFlow().first()
+                val thisCompanion = allCompanions.firstOrNull { it.substanceName == substanceName }
+                substanceCompanion = thisCompanion
+                if (thisCompanion == null) {
+                    isShowingColorPicker = true
+                    val alreadyUsedColors = allCompanions.map { it.color }
+                    val otherColors = AdaptiveColor.entries.filter { !alreadyUsedColors.contains(it) }
+                    selectedColor = otherColors.filter { it.isPreferred }.randomOrNull()
+                        ?: otherColors.randomOrNull() ?: AdaptiveColor.entries.random()
+                } else {
+                    selectedColor = thisCompanion.color
+                }
+                isLoadingColor = false
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not load the journal. Close this screen and try again."
             }
-            updateExperiencesBasedOnSelectedTime()
-            val allCompanions = experienceRepo.getAllSubstanceCompanionsFlow().first()
-            val thisCompanion = allCompanions.firstOrNull { it.substanceName == substanceName }
-            substanceCompanion = thisCompanion
-            if (thisCompanion == null) {
-                isShowingColorPicker = true
-                val alreadyUsedColors = allCompanions.map { it.color }
-                val otherColors = AdaptiveColor.entries.filter { !alreadyUsedColors.contains(it) }
-                selectedColor = otherColors.filter { it.isPreferred }.randomOrNull()
-                    ?: otherColors.randomOrNull() ?: AdaptiveColor.entries.random()
-            } else {
-                selectedColor = thisCompanion.color
-            }
-            isLoadingColor = false
         }
     }
 
@@ -263,26 +272,34 @@ class FinishIngestionScreenViewModel @Inject constructor(
     }
 
     fun createSaveAndDismissAfter(dismiss: () -> Unit) {
+        if (isSaving || isLoadingColor) return
+        isSaving = true
         viewModelScope.launch {
-            createAndSaveIngestion()
-            withContext(Dispatchers.Main) {
+            try {
+                sessionGuard.withSession(generation) { createAndSaveIngestion() }
                 dismiss()
-            }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not save this ingestion. Try again."
+            } finally { isSaving = false }
         }
     }
 
     private suspend fun createAndSaveIngestion() {
+        check(customUnitId == null || experienceRepo.getCustomUnit(customUnitId) != null) {
+            "This custom unit was deleted. Close this screen and choose a dose again."
+        }
         val substanceCompanion = SubstanceCompanion(
             substanceName,
             color = selectedColor
         )
         val oldIdToUse = selectedExperienceFlow.firstOrNull()?.experience?.id
         if (oldIdToUse == null) {
-            val newIdToUse = newExperienceIdToUseFlow.firstOrNull() ?: 1
             val ingestionTime =
                 localDateTimeStartFlow.first().atZone(ZoneId.systemDefault()).toInstant()
             val newExperience = Experience(
-                id = newIdToUse,
+                id = 0,
                 title = enteredTitle,
                 text = "",
                 creationDate = Instant.now(),
@@ -296,6 +313,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
                 substanceCompanion = substanceCompanion
             )
         } else {
+            check(experienceRepo.getExperience(oldIdToUse) != null) { "This experience was deleted. Close this screen and reopen it." }
             val newIngestion = createNewIngestion(oldIdToUse)
             experienceRepo.insertIngestionAndCompanion(
                 ingestion = newIngestion,

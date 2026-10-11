@@ -50,7 +50,7 @@ fun CategoryPreview() {
         category = Category(
             name = "psychedelic",
             description = "Psychedelics are drugs which alter the perception, causing a number of mental effects which manifest in many forms including altered states of consciousness, visual or tactile effects.",
-            url = "https://psychonautwiki.org/wiki/Psychedelics",
+            url = "https://psy.st/wiki/Psychedelics",
             color = Color.Red
         ),
     )

@@ -1,160 +1,85 @@
-/*
- * Copyright (c) 2022-2023. Isaak Hanimann.
- * This file is part of PsychonautWiki Journal.
- *
- * PsychonautWiki Journal is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or (at
- * your option) any later version.
- *
- * PsychonautWiki Journal is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with PsychonautWiki Journal.  If not, see https://www.gnu.org/licenses/gpl-3.0.en.html.
- */
-
+// PsyZine, 2026-10-11. GPL-3.0-or-later.
 package com.isaakhanimann.journal.ui.tabs.journal.experience.edit
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Done
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardCapitalization
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoTile
 
-
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun EditExperienceScreen(
-    navigateBack: () -> Unit,
-    viewModel: EditExperienceViewModel = hiltViewModel()
-) {
-    EditExperienceScreen(
-        enteredTitle = viewModel.enteredTitle,
-        onChangeOfEnteredTitle = { viewModel.enteredTitle = it },
-        isEnteredTitleOk = viewModel.isEnteredTitleOk,
-        onDoneTap = {
-            viewModel.onDoneTap()
-            navigateBack()
-        },
-        text = viewModel.enteredText,
-        onTextChange = { viewModel.enteredText = it },
-        location = viewModel.enteredLocation,
-        onLocationChange = { viewModel.enteredLocation = it }
-    )
-}
-
-@Preview
-@Composable
-fun EditExperienceScreenPreview() {
-    EditExperienceScreen(
-        enteredTitle = "Day at the Lake",
-        onChangeOfEnteredTitle = { },
-        isEnteredTitleOk = true,
-        onDoneTap = {},
-        text = "Here are some sample notes",
-        onTextChange = {},
-        location = "Zurich",
-        onLocationChange = {}
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun EditExperienceScreen(
-    enteredTitle: String,
-    onChangeOfEnteredTitle: (String) -> Unit,
-    isEnteredTitleOk: Boolean,
-    onDoneTap: () -> Unit,
-    text: String,
-    onTextChange: (String) -> Unit,
-    location: String,
-    onLocationChange: (String) -> Unit
-) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Edit experience") },
-                actions = {
-                    if (isEnteredTitleOk) {
-                        IconButton(onClick = onDoneTap) {
-                            Icon(
-                                Icons.Filled.Done,
-                                contentDescription = "Done icon"
-                            )
+fun EditExperienceScreen(navigateBack: () -> Unit, viewModel: EditExperienceViewModel = hiltViewModel()) {
+    var confirmDiscard by remember { mutableStateOf(false) }
+    val back = { if (viewModel.dirty) confirmDiscard = true else viewModel.discard(navigateBack) }
+    BackHandler(enabled = !viewModel.saving) { back() }
+    // Always intercept back during save so committing bytes cannot outlive this editor unexpectedly.
+    BackHandler(enabled = viewModel.saving) {}
+    val camera = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { viewModel.cameraResult(it) }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(20)) { viewModel.acquire(it) }
+    val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { viewModel.acquire(it) }
+    Scaffold(topBar = {
+        TopAppBar(title = { Text("Edit experience") }, navigationIcon = {
+            IconButton(onClick = { back() }, enabled = !viewModel.saving) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close editor") }
+        }, actions = { TextButton(onClick = { viewModel.save(navigateBack) }, enabled = viewModel.canSave) { Text(if (viewModel.saving) "Saving…" else "Save") } })
+    }) { padding ->
+        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (viewModel.loading) CircularProgressIndicator()
+            viewModel.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+            OutlinedTextField(viewModel.enteredTitle, viewModel::editTitle, label = { Text("Title") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), singleLine = true)
+            OutlinedTextField(viewModel.enteredText, viewModel::editText, label = { Text("Notes") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), minLines = 4)
+            OutlinedTextField(viewModel.enteredLocation, viewModel::editLocation, label = { Text("Location name") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth())
+            Text("Photos", style = MaterialTheme.typography.titleLarge)
+            Text("Private copies · location metadata removed", style = MaterialTheme.typography.bodySmall)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(onClick = { viewModel.prepareCamera(camera::launch) }, enabled = viewModel.canSave) { Text("Take photo") }
+                OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = viewModel.canSave) { Text("Choose photos") }
+                OutlinedButton(onClick = { files.launch(arrayOf("image/*")) }, enabled = viewModel.canSave) { Text("Choose files") }
+            }
+            if (viewModel.importing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(viewModel.progress) }
+            val draft = viewModel.draft
+            if (draft != null) {
+                if (draft.pendingCamera != null) {
+                    Text("A camera capture is pending.")
+                    Row { TextButton(onClick = viewModel::recoverCamera) { Text("Recover photo") }; TextButton(onClick = viewModel::cancelCamera) { Text("Cancel capture") } }
+                }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    viewModel.savedPhotos.forEachIndexed { index, photo -> key(photo.id) {
+                        Column {
+                            PhotoTile(photo.id, viewModel.attachments.file(photo), "Saved photo ${index + 1}", viewModel.attachments.processor) {}
+                            val removed = photo.id in draft.removedIds
+                            TextButton(onClick = { if (removed) viewModel.undoRemove(photo.id) else viewModel.removeSaved(photo.id) }, enabled = !viewModel.saving) { Text(if (removed) "Undo removal" else "Remove photo ${index + 1}") }
                         }
+                    } }
+                    draft.photos.forEachIndexed { index, photo -> key(photo.id) {
+                        Column {
+                            PhotoTile(photo.id, viewModel.attachments.file(draft, photo), "New photo ${index + 1}", viewModel.attachments.processor) {}
+                            TextButton(onClick = { viewModel.removeStaged(photo.id) }, enabled = !viewModel.saving) { Text("Remove new photo ${index + 1}") }
+                        }
+                    } }
+                }
+                draft.failed.forEachIndexed { index, failure ->
+                    Text("Photo ${index + 1}: ${failure.message}", color = MaterialTheme.colorScheme.error)
+                    Row {
+                        TextButton(onClick = { viewModel.retry(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Retry") }
+                        TextButton(onClick = { viewModel.removeFailure(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Remove failed photo") }
                     }
                 }
-            )
-        }
-    ) { padding ->
-        Column(
-            modifier = Modifier
-                .padding(padding)
-                .padding(10.dp)
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            val focusManager = LocalFocusManager.current
-            OutlinedTextField(
-                value = enteredTitle,
-                onValueChange = onChangeOfEnteredTitle,
-                singleLine = true,
-                label = { Text(text = "Title") },
-                isError = !isEnteredTitleOk,
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Sentences
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = location,
-                onValueChange = onLocationChange,
-                singleLine = true,
-                label = { Text(text = "Location") },
-                keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    imeAction = ImeAction.Done,
-                    capitalization = KeyboardCapitalization.Words
-                ),
-                modifier = Modifier.fillMaxWidth()
-            )
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                label = { Text(text = "Notes") },
-                keyboardOptions = KeyboardOptions.Default.copy(
-                    imeAction = ImeAction.Default,
-                    capitalization = KeyboardCapitalization.Sentences
-                ),
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
-            )
+            }
         }
     }
+    if (confirmDiscard) AlertDialog(onDismissRequest = { confirmDiscard = false }, title = { Text("Discard changes?") },
+        text = { Text("New photos and edits will be discarded. Saved photos remain attached.") },
+        confirmButton = { TextButton(onClick = { confirmDiscard = false; viewModel.discard(navigateBack) }) { Text("Discard") } },
+        dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text("Keep editing") } })
 }

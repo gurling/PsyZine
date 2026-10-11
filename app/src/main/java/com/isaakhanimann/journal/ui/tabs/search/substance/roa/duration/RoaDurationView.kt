@@ -30,14 +30,14 @@ import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
 import com.isaakhanimann.journal.data.substances.classes.roa.DurationRange
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDuration
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 
 @Preview(showBackground = true)
 @Composable
 fun RoaDurationPreview(
     @PreviewParameter(RoaDurationPreviewProvider::class) roaDuration: RoaDuration
 ) {
-    JournalTheme {
+    PsyZineTheme {
         RoaDurationView(roaDuration = roaDuration)
     }
 }

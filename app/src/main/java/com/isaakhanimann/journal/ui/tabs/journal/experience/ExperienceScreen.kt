@@ -100,7 +100,7 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.models.ConsumerWithI
 import com.isaakhanimann.journal.ui.tabs.journal.experience.models.CumulativeDose
 import com.isaakhanimann.journal.ui.tabs.journal.experience.models.OneExperienceScreenModel
 import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.AllTimelines
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 import kotlinx.coroutines.delay
@@ -110,6 +110,7 @@ import java.time.temporal.ChronoUnit
 @Composable
 fun ExperienceScreen(
     viewModel: ExperienceViewModel = hiltViewModel(),
+    navigateToPhoto: (Int) -> Unit = {},
     navigateToAddIngestionSearch: () -> Unit,
     navigateToEditExperienceScreen: () -> Unit,
     navigateToExplainTimeline: () -> Unit,
@@ -142,6 +143,13 @@ fun ExperienceScreen(
         dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsState().value
     )
     ExperienceScreen(
+        photosContent = {
+            com.isaakhanimann.journal.ui.tabs.journal.experience.components.CardWithTitle(title = "Photos") {
+                val photos = viewModel.photos.collectAsState().value
+                com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoGrid(photos, viewModel.attachments::file, viewModel.attachments.processor, navigateToPhoto)
+                TextButton(onClick = navigateToEditExperienceScreen) { Text("Add photos") }
+            }
+        },
         oneExperienceScreenModel = oneExperienceScreenModel,
         timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsState().value,
         isOralDisclaimerHidden = viewModel.isOralTimelineDisclaimerHidden.collectAsState().value,
@@ -177,7 +185,7 @@ fun ExperienceScreenPreview(
         limit = 1
     ) oneExperienceScreenModel: OneExperienceScreenModel
 ) {
-    JournalTheme {
+    PsyZineTheme {
         ExperienceScreen(
             oneExperienceScreenModel = oneExperienceScreenModel,
             timelineDisplayOption = TimelineDisplayOption.Loading,
@@ -227,6 +235,7 @@ fun ExperienceScreen(
     navigateToTimelineScreen: (consumerName: String) -> Unit,
     areDosageDotsHidden: Boolean,
     isTimelineHidden: Boolean,
+    photosContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -307,6 +316,7 @@ fun ExperienceScreen(
                     oneExperienceScreenModel = oneExperienceScreenModel
                 )
             }
+            photosContent()
             oneExperienceScreenModel.consumersWithIngestions.forEach { consumerWithIngestions ->
                 ConsumerSection(
                     verticalCardPadding = verticalCardPadding,

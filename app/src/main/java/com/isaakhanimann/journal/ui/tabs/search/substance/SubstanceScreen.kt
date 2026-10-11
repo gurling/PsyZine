@@ -22,7 +22,7 @@ import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -82,7 +82,7 @@ import com.isaakhanimann.journal.ui.tabs.search.substance.roa.ToleranceSection
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.dose.RoaDoseView
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.duration.RoaDurationView
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.theme.verticalPaddingCards
 import com.isaakhanimann.journal.ui.utils.getShortTimeText
@@ -120,7 +120,7 @@ fun SubstanceScreen(
 fun SubstanceScreenPreview(
     @PreviewParameter(SubstanceWithCategoriesPreviewProvider::class) substanceWithCategories: SubstanceWithCategories
 ) {
-    JournalTheme {
+    PsyZineTheme {
         SubstanceScreen(
             timelineDisplayOption = TimelineDisplayOption.Loading,
             ingestionTime = LocalDateTime.now(),
@@ -539,7 +539,7 @@ fun SubstanceScreen(
 
 @Composable
 fun RouteColorCircle(administrationRoute: AdministrationRoute) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     Surface(
         shape = CircleShape,
         color = administrationRoute.color.getComposeColor(isDarkTheme),
@@ -586,7 +586,7 @@ fun CategoryChipFromSubstanceScreen(
             .clickable {
                 navigateToCategoryScreen(category.name)
             }
-            .background(color = category.color.copy(alpha = 0.2f))
+            .background(color = com.isaakhanimann.journal.ui.theme.DomainColors.category(category.name, com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette.current).copy(alpha = 0.2f))
             .height(48.dp)
             .padding(horizontal = 12.dp)
 

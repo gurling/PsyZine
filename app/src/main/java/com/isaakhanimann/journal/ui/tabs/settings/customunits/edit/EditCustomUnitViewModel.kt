@@ -25,6 +25,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.isaakhanimann.journal.data.room.JournalSessionGuard
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
@@ -34,19 +35,26 @@ import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepositor
 import com.isaakhanimann.journal.ui.main.navigation.graphs.EditCustomUnitRoute
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 @HiltViewModel
 class EditCustomUnitViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     substanceRepository: SubstanceRepository,
+    private val sessionGuard: JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
 
     private var customUnit: CustomUnit? = null
+    private var generation: String? = null
+    var isSaving by mutableStateOf(false)
+        private set
+    var saveError by mutableStateOf<String?>(null)
+        private set
+    val canSave get() = customUnit != null && !isSaving
+    fun dismissSaveError() { saveError = null }
 
     var roaDose: RoaDose? = null
 
@@ -111,33 +119,45 @@ class EditCustomUnitViewModel @Inject constructor(
     }
 
     fun updateAndDismissAfter(dismiss: () -> Unit) {
+        if (!canSave) return
+        isSaving = true
         viewModelScope.launch {
-            customUnit?.let {
-                it.dose = dose
-                it.name = name
-                it.isEstimate = isEstimate
-                it.originalUnit = originalUnit
-                it.unitPlural = unitPlural
-                it.estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseStandardDeviation else null
-                it.isArchived = isArchived
-                it.unit = unit
-                it.note = note
-                experienceRepo.update(it)
-            }
-            withContext(Dispatchers.Main) {
+            try {
+                sessionGuard.withSession(generation) {
+                    val it = checkNotNull(customUnit)
+                    check(experienceRepo.getCustomUnit(it.id) != null) { "This custom unit was deleted. Close this screen." }
+                    it.dose = dose
+                    it.name = name
+                    it.isEstimate = isEstimate
+                    it.originalUnit = originalUnit
+                    it.unitPlural = unitPlural
+                    it.estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseStandardDeviation else null
+                    it.isArchived = isArchived
+                    it.unit = unit
+                    it.note = note
+                    experienceRepo.update(it)
+                }
                 dismiss()
-            }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not save this unit. Try again."
+            } finally { isSaving = false }
         }
     }
 
     fun deleteCustomUnit(dismiss: () -> Unit) {
+        if (!canSave) return
+        isSaving = true
         viewModelScope.launch {
-            customUnit?.let {
-                experienceRepo.delete(customUnit = it)
-            }
-            withContext(Dispatchers.Main) {
+            try {
+                sessionGuard.withSession(generation) { experienceRepo.delete(customUnit = checkNotNull(customUnit)) }
                 dismiss()
-            }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not delete this unit. Try again."
+            } finally { isSaving = false }
         }
     }
 
@@ -145,26 +165,34 @@ class EditCustomUnitViewModel @Inject constructor(
         val customUnitRoute: EditCustomUnitRoute = state.toRoute()
         val customUnitId = customUnitRoute.customUnitId
         viewModelScope.launch {
-            val customUnitWithIngestions = experienceRepo.getCustomUnitWithIngestions(customUnitId)
-            val customUnit = customUnitWithIngestions?.customUnit
-            this@EditCustomUnitViewModel.customUnit = customUnit
-            if (customUnit != null) {
-                substanceName = customUnit.substanceName
-                administrationRoute = customUnit.administrationRoute
-                val substance = substanceRepository.getSubstance(customUnit.substanceName)
-                roaDose = substance?.getRoa(customUnit.administrationRoute)?.roaDose
-                originalUnit = customUnit.originalUnit
-                name = customUnit.name
-                val pluralizableUnit = customUnit.getPluralizableUnit()
-                unit = customUnit.unit
-                unitPlural = pluralizableUnit.plural
-                doseText = customUnit.dose?.toReadableString() ?: ""
-                estimatedDoseDeviationText = customUnit.estimatedDoseStandardDeviation?.toReadableString() ?: ""
-                isEstimate = customUnit.isEstimate
-                isArchived = customUnit.isArchived
-                note = customUnit.note
+            try {
+                generation = state.get<String>("journalGeneration") ?: sessionGuard.currentGeneration().also { state["journalGeneration"] = it }
+                val customUnitWithIngestions = sessionGuard.withSession(generation) { experienceRepo.getCustomUnitWithIngestions(customUnitId) }
+                val customUnit = customUnitWithIngestions?.customUnit
+                this@EditCustomUnitViewModel.customUnit = customUnit
+                if (customUnit != null) {
+                    substanceName = customUnit.substanceName
+                    administrationRoute = customUnit.administrationRoute
+                    val substance = substanceRepository.getSubstance(customUnit.substanceName)
+                    roaDose = substance?.getRoa(customUnit.administrationRoute)?.roaDose
+                    originalUnit = customUnit.originalUnit
+                    name = customUnit.name
+                    val pluralizableUnit = customUnit.getPluralizableUnit()
+                    unit = customUnit.unit
+                    unitPlural = pluralizableUnit.plural
+                    doseText = customUnit.dose?.toReadableString() ?: ""
+                    estimatedDoseDeviationText = customUnit.estimatedDoseStandardDeviation?.toReadableString() ?: ""
+                    isEstimate = customUnit.isEstimate
+                    isArchived = customUnit.isArchived
+                    note = customUnit.note
+                }
+                numberOfIngestionsWithThisCustomUnit = customUnitWithIngestions?.ingestions?.size
+                if (customUnit == null) saveError = "This custom unit was deleted. Close this screen."
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                saveError = if (e is IllegalStateException) e.message else "Could not load this unit. Close this screen and try again."
             }
-            numberOfIngestionsWithThisCustomUnit = customUnitWithIngestions?.ingestions?.size
         }
     }
 }

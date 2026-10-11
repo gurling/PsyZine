@@ -19,7 +19,7 @@
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
@@ -53,7 +53,7 @@ fun CurrentDoseClassInfoPreview(@PreviewParameter(RoaDosePreviewProvider::class)
 
 @Composable
 fun CurrentDoseClassInfo(currentDoseClass: DoseClass, roaDose: RoaDose) {
-    val doseColor = currentDoseClass.getComposeColor(isSystemInDarkTheme())
+    val doseColor = currentDoseClass.getComposeColor(LocalPsyZinePalette.current)
     var isShowingDoseClassDialog by remember { mutableStateOf(false) }
     TextButton(
         onClick = {

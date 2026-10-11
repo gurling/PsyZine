@@ -24,10 +24,9 @@ import org.junit.Test
 
 class TestParse {
 
-    @Test
-    fun noCrash() {
-        val substances = SubstanceParser().parseSubstanceFile(string = "error")
-        assertTrue(substances.substances.isEmpty())
+    @Test(expected = org.json.JSONException::class)
+    fun malformedBundledFileFailsExplicitly() {
+        SubstanceParser().parseSubstanceFile(string = "error")
     }
 
     @Test
@@ -54,6 +53,8 @@ class TestParse {
   }
 }"""
         val result = SubstanceParser().extractSubstanceString(string = text)
-        assertTrue(result == "[{\"name\":\"Armodafinil\",\"roas\":[{\"name\":\"oral\"}]}]")
+        val substance = org.json.JSONArray(result).getJSONObject(0)
+        org.junit.Assert.assertEquals("Armodafinil", substance.getString("name"))
+        org.junit.Assert.assertEquals("oral", substance.getJSONArray("roas").getJSONObject(0).getString("name"))
     }
 }

@@ -87,7 +87,7 @@ import com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose.StandardDevia
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.IngestionTimePickerOption
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.TimePointOrRangePicker
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.CardWithTitle
-import com.isaakhanimann.journal.ui.theme.JournalTheme
+import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import kotlinx.coroutines.launch
 import java.time.LocalDateTime
@@ -144,7 +144,7 @@ fun EditIngestionScreen(
 @Preview(uiMode = Configuration.UI_MODE_NIGHT_YES)
 @Composable
 fun EditIngestionScreenPreview() {
-    JournalTheme {
+    PsyZineTheme {
         EditIngestionScreen(
             note = "This is my note",
             onNoteChange = {},

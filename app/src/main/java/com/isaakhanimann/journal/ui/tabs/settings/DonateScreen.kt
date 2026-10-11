@@ -49,7 +49,7 @@ import androidx.compose.ui.unit.dp
 fun DonateScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Donate") })
+            TopAppBar(title = { Text("Support the original author") })
         }
     ) { padding ->
         Column(
@@ -59,6 +59,7 @@ fun DonateScreen() {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
+            Text("Donations on this page support Isaak Hanimann, the original author of PsychonautWiki Journal.")
             Spacer(modifier = Modifier.height(5.dp))
             val uriHandler = LocalUriHandler.current
             DonateButton(

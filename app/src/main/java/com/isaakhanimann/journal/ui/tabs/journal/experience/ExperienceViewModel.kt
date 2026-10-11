@@ -66,6 +66,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ExperienceViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
+    val attachments: com.isaakhanimann.journal.data.attachments.AttachmentRepository,
     private val substanceRepo: SubstanceRepository,
     private val interactionChecker: InteractionChecker,
     private val userPreferences: UserPreferences,
@@ -75,7 +76,7 @@ class ExperienceViewModel @Inject constructor(
 
     private val areSubstanceHeightsIndependentFlow =
         userPreferences.areSubstanceHeightsIndependentFlow.stateIn(
-            initialValue = false,
+            initialValue = true,
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)
         )
@@ -133,14 +134,12 @@ class ExperienceViewModel @Inject constructor(
 
     fun saveIsFavorite(isFavorite: Boolean) {
         viewModelScope.launch {
+            experienceRepo.updateFavorite(experienceId, isFavorite)
             localIsFavoriteFlow.emit(isFavorite)
-            val experience = experienceFlow.firstOrNull()
-            if (experience != null) {
-                experience.isFavorite = isFavorite
-                experienceRepo.update(experience)
-            }
         }
     }
+
+    val photos = attachments.observe(experienceId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val ingestionsWithCompanionsFlow =
         experienceRepo.getIngestionsWithCompanionsFlow(experienceId)
@@ -255,7 +254,7 @@ class ExperienceViewModel @Inject constructor(
                 getIngestionElements(sortedIngestionsWith = sortedIngestionsWith)
             val substances =
                 ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-            val dataForEffectLines = getDataForEffectTimelines(ingestionElements, substances)
+            val dataForEffectLines = com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(ingestionElements, substances)
             val timelineDisplayOption = if (isTimelineHidden) {
                 TimelineDisplayOption.Hidden
             } else {
@@ -298,7 +297,7 @@ class ExperienceViewModel @Inject constructor(
     val dataForEffectTimelinesFlow = ingestionElementsFlow.map { ingestionElements ->
         val substances =
             ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-        getDataForEffectTimelines(ingestionElements = ingestionElements, substances = substances)
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(ingestionElements = ingestionElements, substances = substances)
     }.stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
@@ -437,37 +436,6 @@ class ExperienceViewModel @Inject constructor(
         )
 
     companion object {
-
-        fun getDataForEffectTimelines(
-            ingestionElements: List<IngestionElement>,
-            substances: List<Substance>
-        ) =
-            ingestionElements.map { oneElement ->
-                val horizontalWeight = if (oneElement.numDots == null) {
-                    0.5f
-                } else if (oneElement.numDots > 4) {
-                    1f
-                } else {
-                    oneElement.numDots.toFloat() / 4f
-                }
-                val ingestion = oneElement.ingestionWithCompanionAndCustomUnit.ingestion
-                DataForOneEffectLine(
-                    substanceName = ingestion.substanceName,
-                    route = ingestion.administrationRoute,
-                    roaDuration = oneElement.roaDuration,
-                    height = getStrengthRelativeToCommonDose(
-                        ingestion = oneElement.ingestionWithCompanionAndCustomUnit,
-                        allIngestions = ingestionElements.map { it.ingestionWithCompanionAndCustomUnit },
-                        roaDose = substances.firstOrNull { it.name == ingestion.substanceName }
-                            ?.getRoa(ingestion.administrationRoute)?.roaDose
-                    ).toFloat(),
-                    horizontalWeight = horizontalWeight,
-                    color = oneElement.ingestionWithCompanionAndCustomUnit.substanceCompanion?.color
-                        ?: AdaptiveColor.RED,
-                    startTime = ingestion.time,
-                    endTime = ingestion.endTime
-                )
-            }
 
         fun getCumulativeDoses(ingestions: List<IngestionWithAssociatedData>): List<CumulativeDose> {
             return ingestions.groupBy { it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName }

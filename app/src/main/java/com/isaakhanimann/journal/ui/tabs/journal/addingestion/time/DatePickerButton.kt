@@ -18,54 +18,38 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.time
 
-import android.app.DatePickerDialog
-import android.widget.DatePicker
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Event
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.semantics.clearAndSetSemantics
-import com.isaakhanimann.journal.R
 import java.time.LocalDateTime
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DatePickerButton(
-    localDateTime: LocalDateTime,
-    onChange: (LocalDateTime) -> Unit,
-    dateString: String,
-    modifier: Modifier = Modifier
-) {
-    val context = LocalContext.current
-    val dialogTheme =
-        if (isSystemInDarkTheme()) R.style.DialogThemeDark else R.style.DialogThemeLight
-    val datePickerDialog = DatePickerDialog(
-        context,
-        dialogTheme,
-        { _: DatePicker, newYear: Int, newMonth: Int, newDay: Int ->
-            onChange(
-                LocalDateTime.now()
-                    .withYear(newYear)
-                    .withMonth(newMonth + 1)
-                    .withDayOfMonth(newDay)
-                    .withHour(localDateTime.hour)
-                    .withMinute(localDateTime.minute)
-            )
-        }, localDateTime.year, localDateTime.monthValue - 1, localDateTime.dayOfMonth
-    )
-    OutlinedButton(onClick = datePickerDialog::show, modifier = modifier.clearAndSetSemantics {  }) {
-        Icon(
-            Icons.Outlined.Event,
-            contentDescription = "Open calendar"
-        )
-        Spacer(Modifier.size(ButtonDefaults.IconSpacing))
-        Text(dateString)
+fun DatePickerButton(localDateTime: LocalDateTime, onChange: (LocalDateTime) -> Unit,
+    dateString: String, modifier: Modifier = Modifier) {
+    var open by remember { mutableStateOf(false) }
+    OutlinedButton(onClick = { open = true }, modifier = modifier) {
+        Icon(Icons.Outlined.Event, contentDescription = "Choose date")
+        Spacer(Modifier.size(ButtonDefaults.IconSpacing)); Text(dateString)
+    }
+    if (open) {
+        // Material date selection is UTC midnight; convert to LocalDate without local timezone shifts.
+        val picker = rememberDatePickerState(initialSelectedDateMillis = localDateTime.toLocalDate().atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
+        DatePickerDialog(onDismissRequest = { open = false }, confirmButton = {
+            TextButton(onClick = {
+                picker.selectedDateMillis?.let {
+                    val date = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()
+                    onChange(LocalDateTime.of(date, localDateTime.toLocalTime()))
+                }
+                open = false
+            }, enabled = picker.selectedDateMillis != null) { Text("OK") }
+        }, dismissButton = { TextButton(onClick = { open = false }) { Text("Cancel") } }) {
+            DatePicker(state = picker)
+        }
     }
 }

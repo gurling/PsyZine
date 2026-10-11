@@ -39,6 +39,8 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
     ) {
         composableWithTransitions<SettingsScreenRoute> {
             SettingsScreen(
+                navigateToAppearance = { navController.navigate(AppearanceRoute) },
+                navigateToAbout = { navController.navigate(AboutRoute) },
                 navigateToFAQ = {
                     navController.navigate(FAQRoute)
                 },
@@ -56,6 +58,8 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
                 },
             )
         }
+        composableWithTransitions<AppearanceRoute> { com.isaakhanimann.journal.ui.tabs.settings.appearance.AppearanceScreen() }
+        composableWithTransitions<AboutRoute> { com.isaakhanimann.journal.ui.tabs.settings.about.AboutScreen() }
         composableWithTransitions<FAQRoute> { FAQScreen() }
         composableWithTransitions<DonateRoute> { DonateScreen() }
         composableWithTransitions<CombinationSettingsRoute> { CombinationSettingsScreen() }
@@ -108,3 +112,6 @@ object CustomUnitsRoute
 
 @Serializable
 data class EditCustomUnitRoute(val customUnitId: Int)
+
+@Serializable object AppearanceRoute
+@Serializable object AboutRoute

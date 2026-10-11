@@ -1,1 +1,1 @@
-Keep track of substance usage to gain insights on consumption patterns
+Offline experience journal with themes, photos and an active timeline widget

@@ -19,7 +19,7 @@
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.time
 
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.isSystemInDarkTheme
+import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -76,7 +76,7 @@ fun ColorPicker(
     alreadyUsedColors: List<AdaptiveColor>,
     otherColors: List<AdaptiveColor>
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     var isColorPickerVisible by remember {
         mutableStateOf(false)
     }
@@ -174,7 +174,7 @@ fun CircleColorButtons(
     colors: List<AdaptiveColor>,
     onTapOnColor: (AdaptiveColor) -> Unit
 ) {
-    val isDarkTheme = isSystemInDarkTheme()
+    val isDarkTheme = LocalPsyZinePalette.current
     val spacing = 5.dp
     FlowRow(
         horizontalArrangement = Arrangement.spacedBy(spacing),

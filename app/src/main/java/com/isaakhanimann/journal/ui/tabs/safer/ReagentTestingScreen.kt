@@ -53,7 +53,7 @@ fun ReagentTestingScreen() {
                 title = { Text("Reagent testing") },
                 actions = {
                     TextButton(
-                        onClick = { uriHandler.openUri("https://psychonautwiki.org/wiki/Reagent_testing_kits") },
+                        onClick = { uriHandler.openUri("https://psy.st/wiki/Reagent_testing_kits") },
                     ) {
                         Text("Article")
                     }

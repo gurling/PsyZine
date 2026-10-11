@@ -9,3 +9,47 @@
 .cxx
 local.properties
 release
+# Local assistant configuration, not application source
+CLAUDE.md
+.claude/
+# Private release credentials
+*.jks
+*.keystore
+keystore.properties
+# Generated outputs and local tooling, at any module depth
+**/build/
+artifacts/
+build-logs/
+.local/
+.kotlin/
+.gradle-user-home/
+*.apk
+*.aab
+*.apks
+*.idsig
+*.hprof
+*.log
+*.bundle
+*.zip
+*.tar.gz
+# Machine configuration, tokens, backups and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+*.psyzine
+experiences_db*
+user_preferences.preferences_pb
+signing.properties
+credentials.json
+service-account*.json
+**/__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+*.swp
+*.swo
