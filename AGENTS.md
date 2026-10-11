@@ -14,7 +14,7 @@ Run commands from `android/`. Use JDK 17, Android SDK 35 and build-tools 35.0.0;
 - `./gradlew :app:testDirectDebugUnitTest :app:testPlayDebugUnitTest`: run both flavor unit suites.
 - `./gradlew :app:lintDirectDebug :app:lintPlayDebug`: run Android lint.
 - `./gradlew :app:connectedDirectDebugAndroidTest`: run instrumentation on a connected device/emulator.
-- `bash tools/build-apks.sh`: build all four Direct/Play Debug/Release variants, test, lint and verify signed APKs.
+- `bash tools/build-apks.sh`: build all five testing variants, including Direct Compatible Release, test, lint and verify pinned signed APKs.
 - `adb install -r app/build/outputs/apk/direct/debug/app-direct-debug.apk`: install locally.
 
 Socket-restricted environments may prevent Gradle and ADB startup. Record failures explicitly; standalone compilation does not establish APK build success.

@@ -1,0 +1,7 @@
+{
+  "id": "app.psyzine.debug",
+  "url": "https://github.com/gurling/PsyZine",
+  "author": "gurling",
+  "name": "PsyZine",
+  "additionalSettings": "{\"includePrereleases\":true,\"filterReleaseTitlesByRegEx\":\"^PsyZine Compatibility \",\"apkFilterRegEx\":\"^PsyZine-Direct-Compatible-Release-v[0-9]+\\\\.[0-9]+\\\\.[0-9]+-compat\\\\.[0-9]+\\\\.apk$\",\"versionDetection\":false,\"releaseTitleAsVersion\":false}"
+}

@@ -30,6 +30,26 @@ All 23 instrumentation tests passed on each CI emulator at API 26/29/30/32/33/35
 
 Nix evaluation, API 36 emulation, physical-camera acquisition, reboot/process recovery, tablet/accessibility and genuine private-version export fixtures remain unverified. Production signing credentials and reference-content redistribution clearance remain outstanding. Testing pre-releases are development signed and do not claim production readiness. See the manual matrix below before claiming complete feature parity.
 
+## Compatibility remediation checks
+
+The previous execution record above predates the compatibility channel. It does not verify the new candidate, upgrade harness or publication workflow. Current source adds all-five-variant build/lint verification, three JVM suites, negative policy checks, decoded Obtainium selection checks, two independent clean CI builds and emulator-only consecutive-upgrade acceptance. Local execution on 11 October 2026: all five signed APK builds passed; Direct Debug, Play Debug and Direct Compatible Release each passed 44 JVM tests (132 total), with zero failures/errors/skips. All five lint tasks passed with zero errors (existing warnings: 80 per debug variant and 62 per release variant). SDK tools verified package/version/debuggable flags, ZIP integrity, signatures, pins, privacy permissions and 16KiB alignment. The candidate is code2, version `1.0.1-compat.2`, non-debuggable and signed with the retained certificate. A fresh read-only pull of the Pixel's installed APK confirmed the same package/certificate and installed code1; no phone app/data was changed.
+
+All 23 host release-policy/publication tests pass. Workflow `actionlint`, shell syntax/ShellCheck, Python compilation and `git diff --check` pass. The decoded Obtainium link selects exactly one candidate from the built asset set; it was also checked against all 36 assets in the three live historical releases. No compatibility release is yet published. The recorded local build reports explicitly disallow publication because the source was dirty when those builds ran.
+
+The reviewed code1 baseline, same-certificate test APK and code3 follow-up candidate all build successfully. The latest harness adds provider-independent filename/save controls for the API matrix. SDK verification confirms retained signing and expected identities/versions for every fixture; the code3 candidate is an emulator fixture only. Actual Gradle configuration also rejects a disposable certificate in compatibility mode. This host has no usable installed emulator system image and no `/dev/kvm`, so the API26/29/30/32/33/35 upgrade runs and full new instrumentation matrix have not run locally. The protected CI jobs must execute after an approved source push/environment setup. Two independent clean CI builds, historical APK download preflight, release re-download checks and consecutive Obtainium phone updates remain unverified. No workflow configuration alone is counted as passing runtime evidence. Owner-approved key re-protection is now complete: exact private-key/certificate equality and an in-memory signing challenge pass, original containers remain unchanged, and the complete five-variant build/test/lint verification also passes with the protected PKCS12. Two encrypted recovery archives round-trip exactly in memory and their copies at the owner-selected workstation/ADATA paths have matching SHA-256 and permissions 600. The workstation copy is not offline storage; drive disconnection and separate recovery-password custody remain owner checks. GitHub secret upload, source push/publication and the compatibility phone upgrade remain pending their explicit approval/owner gates. No local GitHub CLI authentication is configured.
+
+```bash
+python3 -m unittest discover -s tools/tests -v
+bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+python3 tools/verify-obtainium.py --assets-dir artifacts/apks
+bash tools/build-upgrade-fixtures.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+bash tools/verify-in-place-upgrade.sh emulator-5554 artifacts/upgrade/baseline-code1.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
+```
+
+The harness checks both the emulator serial and `ro.kernel.qemu` before any install. Instrumentation also checks emulator identity and explicit fixture opt-in before seeding, requires an empty code1 journal and never reseeds. It refuses physical devices and preserves any existing emulator installation by refusing to proceed. It snapshots all journal tables/IDs, ordered photo hashes and preferences; stores an AES-GCM fixture with an Android Keystore secret; checks unchanged UID, exact snapshots and decryption after `adb install -r`; opens the retained journal/photo viewer and exports a photo-inclusive backup on both subsequent versions. No uninstall, clearing or downgrade flags are used. Run on fresh API26/29/30/32/33/35 emulators. The special tests are skipped by ordinary suites without explicit opt-in.
+
+For the owner-approved phone check only, compare the installed base APK from `pm path app.psyzine.debug` with the verified candidate using `apksigner verify --verbose --print-certs --min-sdk-version 26`. Require certificate `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`, package `app.psyzine.debug`, candidate code2, version `1.0.1-compat.2`, `debuggable=false` and `zipalign -c -P 16 4`. Obtain separate explicit approval before an Obtainium phone upgrade, then perform owner-supervised data/photo/settings verification and a later consecutive update. Agent-run phone tests continue to install only Direct Debug. No phone writes are required for implementing this source plan.
+
 ## Standard build and automated checks
 
 On a host allowing Gradle/adb sockets, use JDK 17 and SDK 35:
@@ -41,6 +61,7 @@ sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 ./gradlew :app:assembleDirectRelease :app:lintDirectRelease
 ./gradlew :app:assemblePlayDebug :app:testPlayDebugUnitTest :app:lintPlayDebug
 ./gradlew :app:assemblePlayRelease :app:lintPlayRelease
+./gradlew :app:assembleDirectCompatibleRelease :app:testDirectCompatibleReleaseUnitTest :app:lintDirectCompatibleRelease
 ./gradlew :app:dependencies --configuration directDebugRuntimeClasspath
 ./gradlew :app:dependencyInsight --dependency coil-compose --configuration directDebugRuntimeClasspath
 ./gradlew :app:dependencyInsight --dependency glance-appwidget --configuration directDebugRuntimeClasspath
@@ -56,7 +77,7 @@ apkanalyzer manifest application-id app/build/outputs/apk/direct/debug/app-direc
 apkanalyzer manifest permissions app/build/outputs/apk/direct/debug/app-direct-debug.apk
 ```
 
-Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.debug`. Release IDs omit `.debug`. Provider authority follows each variant's actual application ID. The `.github/workflows/android-checks.yml` workflow runs these variant checks and AOSP instrumentation on API 26, 29, 30, 32, 33 and 35. Dispatch its optional newer-API job separately for 36 and 37 when AOSP x86_64 images are available. A missing image is a recorded matrix gap, not a pass.
+Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.debug`. Ordinary release IDs omit `.debug`; Direct Compatible Release deliberately retains it and is non-debuggable. Provider authority follows each variant's actual application ID. The `.github/workflows/android-checks.yml` workflow runs these variant checks and AOSP instrumentation on API 26, 29, 30, 32, 33 and 35. Dispatch its optional newer-API job separately for 36 and 37 when AOSP x86_64 images are available. A missing image is a recorded matrix gap, not a pass.
 
 ## Automated Android coverage
 
@@ -86,7 +107,7 @@ Use synthetic journals/photos only. Retain a pristine export and record APK SHA,
 
 All standard builds/lint, Android matrix results, physical-camera/process-recovery/reboot checks, visual/accessibility review, backup failure preservation and minified signed-upgrade smoke tests must pass before claiming verified feature parity. Review and resolve reference-content permissions, configure the real fork URL and independent signing secrets, retain the key securely and check full offline notices. Current source implementation is not a substitute for these gates.
 
-The release workflow checks `CONTENT_RIGHTS_VERIFIED=true`, builds/lints/tests all variants, signs release APKs through Gradle using independent PsyZine secrets, verifies with `apksigner`/`zipalign`, and distributes corresponding source plus checksums. After producing a candidate:
+The production release workflow checks `CONTENT_RIGHTS_VERIFIED=true`, builds/lints/tests its selected variants, signs release APKs through Gradle using independent PsyZine secrets, verifies with `apksigner`/`zipalign`, and distributes corresponding source plus checksums. After producing a candidate:
 
 ```bash
 apksigner verify --verbose --print-certs PsyZine-v1.0.0.apk

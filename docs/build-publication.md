@@ -12,48 +12,60 @@ Source commits have been pushed without force to the requested SSH origin and ve
 
 The required release evidence is the successful complete [Actions run](https://github.com/gurling/PsyZine/actions) and its actual [testing pre-release assets](https://github.com/gurling/PsyZine/releases), rather than this document or the workflow configuration. The pre-release job runs only after both the build job and every required emulator job succeed. Production signing credentials, reference-content clearance and full manual acceptance remain outstanding. Development publication does not establish production readiness or resolve third-party content rights.
 
-## Build all installable variants
+## Compatibility candidate and version policy
 
-Install JDK 17, Android SDK platform 35, build-tools 35.0.0 and Android command-line tools. Set `JAVA_HOME` and `ANDROID_HOME` to those installations. If the default Gradle cache is unwritable, set `GRADLE_USER_HOME` to a writable directory. Use an environment that permits Gradle's local sockets and dependency downloads:
+The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The version source is `version.properties`: initially code `2`, name `1.0.1`. The compatibility APK name/version is `1.0.1-compat.2`, tag `v1.0.1-compat.2`, release title `PsyZine Compatibility 1.0.1-compat.2`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.1-compat.2.apk`. Publication requires a code greater than every previously published code for every affected package; missing historical metadata or download failures block publication for review. Two clean builds of one candidate share a code; they produce only one release. Increment the code in source before the next publication.
+
+`config/signing-policy.json` pins all four package IDs to this retained identity. Published historical CI certificates differed; matching package IDs alone cannot update those installations. No key rotation is proposed. The original local key files must remain unchanged.
+
+## Build and inspect the five testing variants
+
+Use JDK17, SDK35/build-tools35.0.0 and the wrapper. Set `JAVA_HOME`, `ANDROID_HOME` and a writable `GRADLE_USER_HOME`. An existing `.local/signing/psyzine-development.jks` can be used locally, or set all four protected-container variables below. Missing/unreadable keys, incomplete credentials and wrong certificates fail without replacement generation.
 
 ```bash
-sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+python3 tools/verify-obtainium.py --assets-dir artifacts/apks
 ```
 
-This runs the actual wrapper, builds Direct/Play Debug/Release, runs both flavor unit suites and all four lint tasks, then verifies every APK. A failed Gradle task prevents publication of the downloadable artifact set. `verify-apks.py` also requires successful task evidence, nonempty passing JUnit XML and zero-error lint XML; it does not substitute source compilation for Gradle.
-
-Verification checks ZIP integrity, dex/manifest presence, application IDs, version code 1, version 1.0.0 or the explicitly labeled 1.0.0-dev release, min/target SDK 26/35, forbidden permissions, APK signatures with SDK `apksigner`, and 16 KiB native-library alignment with `zipalign`. It records certificate digests, byte sizes and SHA-256 checksums. Direct/Play certificates must agree for each build type. Actual device installation remains a separate test.
-
-Verified development output names:
-
-| Variant | Gradle output | Downloadable development-signed copy | Application ID |
+| Variant | Gradle APK path under `app/build/outputs/apk/` | Application ID | Version |
 | --- | --- | --- | --- |
-| Direct Debug | `app/build/outputs/apk/direct/debug/app-direct-debug.apk` | `artifacts/apks/PsyZine-Direct-Debug-v1.0.0.apk` | `app.psyzine.debug` |
-| Direct Release | `app/build/outputs/apk/direct/release/app-direct-release.apk` | `artifacts/apks/PsyZine-Direct-Release-v1.0.0-dev.apk` | `app.psyzine` |
-| Play Debug | `app/build/outputs/apk/play/debug/app-play-debug.apk` | `artifacts/apks/PsyZine-Play-Debug-v1.0.0.apk` | `app.psyzine.play.debug` |
-| Play Release | `app/build/outputs/apk/play/release/app-play-release.apk` | `artifacts/apks/PsyZine-Play-Release-v1.0.0-dev.apk` | `app.psyzine.play` |
+| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.1` |
+| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.1-dev` |
+| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.1` |
+| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.1-dev` |
+| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.1-compat.2` |
 
-`artifacts/apks/BUILD_RESULTS.json`, `BUILD_RESULTS.md`, signature reports and `SHA256SUMS` accompany the APKs. Production release copies use version 1.0.0 without `-dev`. Source URLs default to the actual fork; `-PpsyzineSourceUrl=https://github.com/OWNER/REPO` overrides them for a fork.
+The compatible build uses release minification/resource shrinking, `debuggable=false`, and `release` dependency fallbacks. Namespace, FileProvider authority, schema history, storage and all 13 themes remain intact. It cannot coexist with Direct Debug because they deliberately share the installed identity.
 
-## Signing and upgrades
+Packaging requires successful Gradle task evidence, nonempty passing XML for all three unit suites, zero-error lint for all five variants, expected versions/IDs/debuggable flags, SDK26/35, privacy permission checks, SDK signature verification, one retained signer and 16KiB alignment. `BUILD_RESULTS.json` records signing mode and publication eligibility explicitly. `SHA256SUMS` also covers metadata/signature reports. Installation is a separate check.
 
-Ordinary release builds use development signing and version suffix `-dev`, while retaining their installation IDs. The build script generates/reuses `.local/signing/psyzine-development.jks` (ignored, owner-only), with alias `androiddebugkey` and the standard development-only password `android`. Set `PSYZINE_DEVELOPMENT_KEYSTORE` to use a different external location. This is not a production signing credential. The local development key signs all four verified APKs. Each CI run uses its own key unless a stable development key is configured.
+Untrusted CI uses `PSYZINE_SIGNING_MODE=unpublished`, an explicit disposable `PSYZINE_DEVELOPMENT_KEYSTORE` path and `prepare-development-signing.sh --unpublished-ci`. The disposable key is generated only at that separate path and never for publishable builds. No persistent secrets are provided to ordinary checks or pull requests. Disposable results are marked `publicationAllowed=false` and are rejected by the publication gate.
 
-For production signing set all four environment variables: `PSYZINE_RELEASE_KEYSTORE_FILE`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`. The keystore must already exist outside version control. Partial configuration fails rather than silently falling back. Gradle signs both release distributions with that key and uses version 1.0.0. Never commit keys, credential files or passwords.
+## Protected compatibility signing and approvals
 
-An update requires the same application ID and signing certificate. A development-signed release cannot upgrade a production installation with a different certificate, or later be upgraded in place to a differently signed production release. Export test data before switching signing identities; use isolated test installations. Retain the local development key for repeatable local testing. CI generates a fresh ephemeral development key unless the optional `PSYZINE_DEVELOPMENT_KEYSTORE_BASE64` secret supplies a stable key with the standard alias/password. Without that secret, APKs from different CI runs may require reinstalling. Production signing continuity requires secure retention of the independent production key.
+Before any key re-protection/upload, obtain owner approval. Copy the existing private key and certificate into a strongly password-protected container without generating a key or changing the certificate, verify the fingerprint before/after, and retain two encrypted offline backups. Do not modify the original containers. Offline backup completion is an owner check; this agent cannot attest to it.
 
-## Continuous integration
+Configure a trusted GitHub Actions **compatibility** environment restricted to reviewed `main` code, with required owner reviewers and prevention of self-review. Store these environment secrets:
 
-`Android checks` runs on push, pull request and manual dispatch. It builds/tests/lints all four signed variants, verifies them, uploads `PsyZine-development-APKs-<commit>` with checksums/results and corresponding source, and separately uploads build/test/lint logs. The workflow summary shows APK IDs, byte sizes and SHA-256 values only after actual successful Gradle execution and verification. Fork pull requests do not receive repository secrets; they can use ephemeral development signing. The production key is never used by this workflow.
+- `PSYZINE_COMPAT_KEYSTORE_BASE64`
+- `PSYZINE_COMPAT_KEY_ALIAS`
+- `PSYZINE_COMPAT_STORE_PASSWORD`
+- `PSYZINE_COMPAT_KEY_PASSWORD`
 
-The AOSP instrumentation matrix covers API 26/29/30/32/33/35; dispatch 36/37 separately once their images are available. Reports and synthetic palette captures are separate per-device artifacts. Camera hardware, reboot/process recovery, tablet and accessibility checks follow [verification.md](verification.md).
+An approved owner can run `tools/reprotect-signing-key.py --approved-copy --source .local/signing/psyzine-development.jks --destination .local/signing/psyzine-compat.p12` after setting the three `PSYZINE_COMPAT_*` alias/password variables. Use a randomly generated password of at least 24 characters; PKCS12 requires matching store/key passwords. The helper checks the source/copy certificate and original container hash, uses an exclusive destination, and never generates a key. After explicit owner approval, this helper created `.local/signing/psyzine-compat.p12` on 11 October 2026. The retained certificate, exact private key and a signing challenge were verified in memory; both original containers remained unchanged. Protected-container credentials are retained in ignored owner-only `.local/signing/compatibility-credentials.json` and were not printed. Two independently AES-256-encrypted recovery archives in `.local/signing/offline-backups/` were fully decrypted and compared in memory. On owner instruction, archive 1 was copied to `/home/izzy/codex/PsyZine/signing-backups/` and archive 2 to `/media/ADATA-2TB/Backups/android-app-signing-backups/`, each with owner-only permissions and matching SHA-256. The first location is on the workstation; the ADATA copy becomes offline when the drive is disconnected. Separate recovery-password custody and offline storage remain owner checks. The recovery password is in ignored owner-only `.local/signing/backup-recovery-password.txt`, separate from the copied archives. GitHub secret upload has not occurred.
 
-`PsyZine signed release` decodes the independent production key into an owner-only runner-temp file, uses Gradle signing, verifies the production candidate, packages corresponding source/checksums and publishes only on a matching version tag. It uses the release environment's `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, and `PSYZINE_KEY_PASSWORD` secrets. The existing reference-content publication gate `CONTENT_RIGHTS_VERIFIED=true` remains. Signing keys are removed after the job.
+Local protected-container signing uses `PSYZINE_COMPAT_KEYSTORE_FILE` (path), plus the same alias and password variables. The workflow restores an owner-only runner-temp file, checks its public pin and PrivateKeyEntry, and Gradle verifies private-key access. Missing secrets, wrong passwords or certificate mismatches stop the build. Runner files are removed at job completion; the persistent secret is retained. Never commit credentials or print them.
 
-For authorized pushes to `main`, a successful complete `Android checks` run creates a testing pre-release with all four APKs, signature reports, SHA-256 checksums, build results and the corresponding source archive. Download links are on https://github.com/gurling/PsyZine/releases. Failed build or emulator jobs prevent this publication.
+The request to implement this source plan does not authorize secret upload, push, release publication or a phone upgrade. Signing-identity changes, production keys, destructive migration and key rotation remain outside scope. Re-protection/upload and the final owner-supervised phone upgrade require separate approval as specified in the plan.
 
-## Reproduce and verify publication
+## CI and explicitly approved publication
 
-Use the existing configured SSH origin. Push the reviewed feature-branch commit to `main` only with explicit authorization and without force. Verify the remote hash, every required Actions job and the actual release assets. Download the published files and run `sha256sum --check SHA256SUMS`; inspect their signing certificates before installation. A missing or failed workflow is not completion.
+`Android checks` runs unpublished build/test/lint plus ordinary instrumentation on API26/29/30/32/33/35 for pushes, PRs and dispatch. Extra APIs36/37 remain optional. Pushes to `main` no longer automatically publish.
+
+An approved dispatch with `publish_compatibility=true` on `main` additionally uses the protected environment to run two independent clean five-variant builds and six emulator-only code1 → candidate → next-code upgrade jobs. The code1 fixture comes from reviewed full commit `574831afb7ecd4c75ffab3f37b4c775f245e3596`, with only emulator test harness/dependency/signing overrides. The follow-up code3 is an unpublished fixture. Successful ordinary checks, the complete instrumentation matrix, both builds and all upgrade jobs are prerequisites for publication.
+
+`verify-publication.py` checks downloaded candidate checksums and real manifests/certificates, compares both builds' identities/commit, downloads every previously published release APK/report/checksum, verifies their actual version metadata, rejects stale codes and existing candidate tags, and records historical evidence. Network/auth failures stop the job. `verify-obtainium.py` decodes the actual README deep link and checks it selects exactly one compatible APK among all five variants and supplementary assets. The publisher includes matching GPL source and re-downloads the actual release assets for checksum/signature/selection checks. Obtainium's actual consecutive phone updates remain a separate owner acceptance check.
+
+Production uses the existing **release** environment and `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`; credentials are unchanged. `PSYZINE_SIGNING_MODE=production` is explicit. Pre-release tags are excluded; versions/filenames are dynamic. The `CONTENT_RIGHTS_VERIFIED=true` gate is retained and package certificate pins still apply. A different production certificate cannot silently replace this existing identity; separately approve any policy/migration change. Manual dispatch builds a candidate; only a matching stable version tag publishes.
+
+Before requesting a source push, show the branch/destination, commits, change summary and checks. Do not push or publish until explicitly approved. No release has been published by the source implementation itself. See [verification.md](verification.md) for current execution results and gaps.

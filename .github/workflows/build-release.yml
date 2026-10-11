@@ -3,17 +3,27 @@ name: PsyZine signed release
 on:
   workflow_dispatch:
   push:
-    tags: ['v*.*.*']
+    tags: ['v*.*.*', '!v*-*']
 
 permissions:
   contents: read
 
+concurrency:
+  group: psyzine-publication
+  cancel-in-progress: false
+
 jobs:
   release:
+    if: github.event_name == 'workflow_dispatch' || !contains(github.ref_name, '-')
     runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
+    env:
+      PSYZINE_SIGNING_MODE: production
+      PSYZINE_KEY_ALIAS: ${{ secrets.PSYZINE_KEY_ALIAS }}
+      PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
+      PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -25,59 +35,62 @@ jobs:
           java-version: '17'
           cache: gradle
       - uses: android-actions/setup-android@v4
-      - name: Install pinned SDK
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - name: Check publication prerequisites
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Check production publication prerequisites
         env:
           CONTENT_RIGHTS_VERIFIED: ${{ vars.CONTENT_RIGHTS_VERIFIED }}
         run: |
-          test "$CONTENT_RIGHTS_VERIFIED" = true || { echo "Reference-content redistribution review must be recorded before signing or publication."; exit 1; }
+          set -euo pipefail
+          test "$CONTENT_RIGHTS_VERIFIED" = true || { echo 'Reference-content review must be recorded before signing or publication.'; exit 1; }
+          version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[1])')"
           if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-            test "$GITHUB_REF_NAME" = v1.0.0 || { echo "Release tag must match the application version."; exit 1; }
+            [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ && "$GITHUB_REF_NAME" == "v$version" ]]
           fi
-      - name: Prepare independent production key
+      - name: Set runner signing path
+        run: echo "PSYZINE_RELEASE_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-production.jks" >> "$GITHUB_ENV"
+      - name: Restore mandatory existing production container
         env:
           PSYZINE_KEYSTORE_BASE64: ${{ secrets.PSYZINE_KEYSTORE_BASE64 }}
-          PSYZINE_KEY_ALIAS: ${{ secrets.PSYZINE_KEY_ALIAS }}
-          PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
-          PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
         run: |
           set -euo pipefail
-          test -n "$PSYZINE_KEYSTORE_BASE64"
+          for name in PSYZINE_KEYSTORE_BASE64 PSYZINE_KEY_ALIAS PSYZINE_STORE_PASSWORD PSYZINE_KEY_PASSWORD; do
+            [[ -n "${!name:-}" ]] || { echo "Missing production input: $name"; exit 1; }
+          done
           umask 077
-          printf '%s' "$PSYZINE_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/psyzine.jks"
-      - name: Build and check production APKs with Gradle signing
-        env:
-          PSYZINE_RELEASE_KEYSTORE_FILE: ${{ runner.temp }}/psyzine.jks
-          PSYZINE_KEY_ALIAS: ${{ secrets.PSYZINE_KEY_ALIAS }}
-          PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
-          PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
-          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-development.jks
+          printf '%s' "$PSYZINE_KEYSTORE_BASE64" | base64 --decode > "$PSYZINE_RELEASE_KEYSTORE_FILE"
+      - name: Build and verify pinned production APKs
         run: bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
-      - name: Verify production candidate
+      - name: Package matching source
         run: |
-          set -euo pipefail
-          tools="$ANDROID_HOME/build-tools/35.0.0"
-          cp artifacts/apks/PsyZine-Direct-Release-v1.0.0.apk PsyZine-v1.0.0.apk
-          "$tools/apksigner" verify --verbose --print-certs PsyZine-v1.0.0.apk
-          "$tools/zipalign" -c -P 16 4 PsyZine-v1.0.0.apk
-      - name: Package corresponding source and checksums
+          git archive --format=tar.gz --prefix=PsyZine/ HEAD > "artifacts/apks/PsyZine-source-$GITHUB_SHA.tar.gz"
+          cd artifacts/apks
+          sha256sum "PsyZine-source-$GITHUB_SHA.tar.gz" >> SHA256SUMS
+      - name: Check historical version codes and downloaded artifact policy
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Production tags already exist when triggered. Gate checks versions, not tag creation.
         run: |
-          git archive --format=tar.gz --prefix=PsyZine-v1.0.0/ HEAD > PsyZine-v1.0.0-source.tar.gz
-          sha256sum PsyZine-v1.0.0.apk PsyZine-v1.0.0-source.tar.gz > SHA256SUMS
+          python3 - <<'PY'
+          import os, runpy, sys
+          from pathlib import Path
+          sys.path.insert(0, 'tools')
+          from release_policy import check_history
+          gate = runpy.run_path('tools/verify-publication.py')
+          candidate = gate['verify_candidate'](Path('artifacts/apks'), 'production')
+          check_history(candidate, gate['historical_metadata'](os.environ['GITHUB_REPOSITORY'], Path('artifacts/publication')))
+          PY
       - uses: actions/upload-artifact@v7
         with:
-          name: PsyZine-v1.0.0
-          path: |
-            PsyZine-v1.0.0.apk
-            PsyZine-v1.0.0-source.tar.gz
-            SHA256SUMS
+          name: PsyZine-production-candidate-${{ github.sha }}
+          path: artifacts/apks/
           if-no-files-found: error
-      - name: Publish tagged source and APK
+      - name: Publish approved production tag
         if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" PsyZine-v1.0.0.apk PsyZine-v1.0.0-source.tar.gz SHA256SUMS --verify-tag --title "PsyZine 1.0.0" --notes "Independent GPL-3.0-or-later release. Corresponding source and build instructions are included. See NOTICE.md, THIRD_PARTY_NOTICES.md and PRIVACY.md in the source archive."
-      - name: Remove ephemeral signing files
+        run: |
+          version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[1])')"
+          gh release create "$GITHUB_REF_NAME" artifacts/apks/* --verify-tag --title "PsyZine $version" --notes 'GPL-3.0-or-later release with matching source and checksums. See NOTICE.md, THIRD_PARTY_NOTICES.md and PRIVACY.md. Signing identity is subject to the existing package certificate policy.'
+      - name: Remove runner signing container
         if: always()
-        run: rm -f "$RUNNER_TEMP/psyzine.jks" "$RUNNER_TEMP/psyzine-development.jks"
+        run: rm -f "$PSYZINE_RELEASE_KEYSTORE_FILE"

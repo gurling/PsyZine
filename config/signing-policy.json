@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "applicationIds": {
+    "app.psyzine": "7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5",
+    "app.psyzine.debug": "7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5",
+    "app.psyzine.play": "7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5",
+    "app.psyzine.play.debug": "7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5"
+  }
+}

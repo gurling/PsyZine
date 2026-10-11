@@ -1,3 +1,8 @@
+import java.util.Properties
+import java.security.KeyStore
+import java.security.MessageDigest
+import groovy.json.JsonSlurper
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -6,6 +11,55 @@ plugins {
     id("androidx.room")
     kotlin("plugin.serialization") version "2.0.20"
     id("kotlin-kapt") // this needs to be on bottom
+}
+
+// One version source for Gradle, packaging, tags and publication checks.
+val psyzineVersion = Properties().apply {
+    rootProject.file("version.properties").inputStream().use { load(it) }
+}
+val psyzineVersionCode = providers.gradleProperty("psyzineVersionCode").orNull?.toInt()
+    ?: psyzineVersion.getProperty("versionCode").toInt()
+val psyzineVersionName = psyzineVersion.getProperty("versionName")
+require(psyzineVersionCode in 1..2100000000)
+require(psyzineVersionName.matches(Regex("[0-9]+\\.[0-9]+\\.[0-9]+")))
+val signingMode = providers.environmentVariable("PSYZINE_SIGNING_MODE").orElse("compatibility").get()
+require(signingMode in listOf("compatibility", "unpublished", "production"))
+fun env(name: String) = providers.environmentVariable(name).orNull?.takeIf(String::isNotBlank)
+val compatNames = listOf("PSYZINE_COMPAT_KEYSTORE_FILE", "PSYZINE_COMPAT_KEY_ALIAS",
+    "PSYZINE_COMPAT_STORE_PASSWORD", "PSYZINE_COMPAT_KEY_PASSWORD")
+val productionNames = listOf("PSYZINE_RELEASE_KEYSTORE_FILE", "PSYZINE_KEY_ALIAS",
+    "PSYZINE_STORE_PASSWORD", "PSYZINE_KEY_PASSWORD")
+for (names in listOf(compatNames, productionNames)) {
+    require(names.all { env(it) == null } || names.all { env(it) != null }) {
+        "Incomplete PsyZine signing credentials; configure all four variables."
+    }
+}
+require(signingMode == "production" || productionNames.all { env(it) == null }) {
+    "Production credentials require explicit PSYZINE_SIGNING_MODE=production."
+}
+val signingValues = when {
+    signingMode == "production" -> productionNames.map { requireNotNull(env(it)) { "Missing production signing input: $it" } }
+    signingMode == "compatibility" && env(compatNames.first()) != null -> compatNames.map { checkNotNull(env(it)) }
+    else -> listOf(env("PSYZINE_DEVELOPMENT_KEYSTORE")
+        ?: rootProject.file(".local/signing/psyzine-development.jks").path, "androiddebugkey", "android", "android")
+}
+require(signingMode != "unpublished" || env("PSYZINE_DEVELOPMENT_KEYSTORE") != null) {
+    "Unpublished checks require an explicit disposable keystore path."
+}
+val retainedStore = rootProject.file(signingValues[0])
+require(retainedStore.isFile) { "Signing keystore is unavailable; automatic replacement is forbidden." }
+val signingStore = KeyStore.getInstance(retainedStore, signingValues[2].toCharArray())
+require(signingStore.isKeyEntry(signingValues[1]) &&
+    signingStore.getKey(signingValues[1], signingValues[3].toCharArray()) != null) {
+    "Signing private key is unavailable."
+}
+val signingDigest = MessageDigest.getInstance("SHA-256")
+    .digest(signingStore.getCertificate(signingValues[1]).encoded).joinToString("") { "%02x".format(it) }
+if (signingMode != "unpublished") {
+    val policy = JsonSlurper().parse(rootProject.file("config/signing-policy.json")) as Map<*, *>
+    val pins = policy["applicationIds"] as Map<*, *>
+    require(pins.keys == setOf("app.psyzine", "app.psyzine.debug", "app.psyzine.play", "app.psyzine.play.debug"))
+    require(pins.values.all { it == signingDigest }) { "Signing certificate does not match the retained package identities." }
 }
 
 android {
@@ -17,8 +71,8 @@ android {
         applicationId = "app.psyzine"
         minSdk = 26
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = psyzineVersionCode
+        versionName = psyzineVersionName
         val sourceUrl = providers.gradleProperty("psyzineSourceUrl").orElse("https://github.com/gurling/PsyZine").get()
         require(sourceUrl.isEmpty() || sourceUrl.matches(Regex("https://github.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")))
         buildConfigField("String", "SOURCE_URL", "\"$sourceUrl\"")
@@ -41,48 +95,32 @@ android {
         }
     }
 
-    // Production credentials come from the environment and never enter source control.
-    // Ordinary builds use the debug certificate and explicitly label release versions -dev.
-    val signingInputs = listOf("PSYZINE_RELEASE_KEYSTORE_FILE", "PSYZINE_KEY_ALIAS",
-        "PSYZINE_STORE_PASSWORD", "PSYZINE_KEY_PASSWORD").associateWith {
-        providers.environmentVariable(it).orNull?.takeIf(String::isNotBlank)
-    }
-    require(signingInputs.values.all { it == null } || signingInputs.values.all { it != null }) {
-        "Set all four PsyZine production-signing variables, or leave all unset for development signing."
-    }
-    val productionSigning = signingInputs.values.all { it != null }
     signingConfigs {
-        providers.environmentVariable("PSYZINE_DEVELOPMENT_KEYSTORE").orNull?.let { path ->
-            getByName("debug") {
-                storeFile = file(path)
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-        }
-        if (productionSigning) {
-            create("psyzineProduction") {
-                storeFile = file(checkNotNull(signingInputs["PSYZINE_RELEASE_KEYSTORE_FILE"]))
-                require(checkNotNull(storeFile).isFile) { "PsyZine production keystore is unavailable." }
-                storePassword = signingInputs["PSYZINE_STORE_PASSWORD"]
-                keyAlias = signingInputs["PSYZINE_KEY_ALIAS"]
-                keyPassword = signingInputs["PSYZINE_KEY_PASSWORD"]
-            }
+        // Never fall back to Android's automatically generated debug certificate.
+        getByName("debug") {
+            storeFile = retainedStore
+            storeType = signingStore.type
+            keyAlias = signingValues[1]
+            storePassword = signingValues[2]
+            keyPassword = signingValues[3]
         }
     }
-
     buildTypes {
         debug { applicationIdSuffix = ".debug" }
         release {
-            signingConfig = signingConfigs.getByName(if (productionSigning) "psyzineProduction" else "debug")
-            if (!productionSigning) versionNameSuffix = "-dev"
+            signingConfig = signingConfigs.getByName("debug")
+            if (signingMode != "production") versionNameSuffix = "-dev"
             isMinifyEnabled = true
             isShrinkResources = true
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
-            )
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             ndk.debugSymbolLevel = "FULL"
+        }
+        create("compatibleRelease") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-compat.$psyzineVersionCode"
+            isDebuggable = false
+            matchingFallbacks += listOf("release")
         }
     }
     compileOptions {
@@ -99,6 +137,12 @@ android {
     testOptions {
         // Launch transitions can reject injected taps before the window is opaque.
         animationsDisabled = true
+    }
+}
+
+androidComponents {
+    beforeVariants(selector().withBuildType("compatibleRelease")) { variant ->
+        if (variant.productFlavors.any { it.second == "play" }) variant.enable = false
     }
 }
 
@@ -126,6 +170,7 @@ dependencies {
     testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation("androidx.test.uiautomator:uiautomator:2.3.0")
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)
