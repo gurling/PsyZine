@@ -36,7 +36,11 @@ object TimelineModelFactory {
                     color = oneElement.ingestionWithCompanionAndCustomUnit.substanceCompanion?.color
                         ?: AdaptiveColor.RED,
                     startTime = ingestion.time,
-                    endTime = ingestion.endTime
+                    endTime = ingestion.endTime,
+                    doseInMilligrams = doseToMilligrams(
+                        oneElement.ingestionWithCompanionAndCustomUnit.pureDose,
+                        oneElement.ingestionWithCompanionAndCustomUnit.originalUnit
+                    )
                 )
             }
 

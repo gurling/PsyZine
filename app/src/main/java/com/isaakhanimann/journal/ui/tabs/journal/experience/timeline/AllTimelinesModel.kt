@@ -38,6 +38,7 @@ class AllTimelinesModel(
     val widthInSeconds: Float
     val groupDrawables: List<GroupDrawable>
     val axisDrawable: AxisDrawable
+    val cursorModel = TimelineCursorModel(dataForLines)
 
     data class RoaGroup(
         val color: AdaptiveColor,

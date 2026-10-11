@@ -28,19 +28,17 @@ fun readable(color: Color, background: Color, ratio: Double = 4.5): Color {
 @Immutable
 data class ThemePalette(
     val id: ThemeId, val dark: Boolean, val background: Color, val foreground: Color,
-    val panel: Color, val muted: Color, val accents: List<Color>, val source: String, val license: String, val sourceRevision: String
+    val panel: Color, val muted: Color, val accents: List<Color>, val source: String, val license: String, val sourceRevision: String,
+    val raised: Color = lerp(panel, foreground, .12f)
 ) {
     // Domain labels and Material action text also appear on raised cards. Use
     // the least contrasting neutral surface, rather than only the window base.
     private val contrastSurface: Color get() {
-        val high = lerp(background, panel, .85f)
-        return if (dark) listOf(background, high).maxBy { it.luminance() }
-        else listOf(background, high).minBy { it.luminance() }
+        return if (dark) listOf(background, panel, raised).maxBy { it.luminance() }
+        else listOf(background, panel, raised).minBy { it.luminance() }
     }
     fun accent(index: Int) = readable(accents[Math.floorMod(index, accents.size)], contrastSurface)
     val scheme: ColorScheme get() {
-        val surface = lerp(background, panel, .55f)
-        val high = lerp(background, panel, .85f)
         val body = readable(foreground, contrastSurface)
         val subdued = readable(muted, contrastSurface)
         val primary = accent(1)
@@ -60,10 +58,12 @@ data class ThemePalette(
             error = error, onError = readable(background, error),
             errorContainer = ec, onErrorContainer = readable(error, ec),
             background = background, onBackground = readable(foreground, background),
-            surface = background, onSurface = body, surfaceVariant = high, onSurfaceVariant = subdued,
-            surfaceDim = surface, surfaceBright = high,
-            surfaceContainerLowest = background, surfaceContainerLow = lerp(background, panel, .25f),
-            surfaceContainer = surface, surfaceContainerHigh = high, surfaceContainerHighest = high,
+            surface = background, onSurface = body, surfaceVariant = raised, onSurfaceVariant = subdued,
+            surfaceDim = if (dark) panel else raised, surfaceBright = if (dark) raised else background,
+            // Elevated cards use Low; navigation uses Container; filled cards use Highest.
+            // Keep cards solid and separate navigation, popovers and controls from the page.
+            surfaceContainerLowest = background, surfaceContainerLow = panel,
+            surfaceContainer = raised, surfaceContainerHigh = raised, surfaceContainerHighest = panel,
             outline = readable(muted, contrastSurface, 3.0), outlineVariant = readable(muted, contrastSurface, 3.0),
             inverseSurface = foreground, inverseOnSurface = readable(background, foreground),
             inversePrimary = readable(primary, foreground), surfaceTint = primary, scrim = Color.Black
@@ -84,7 +84,16 @@ object ThemePalettes {
     )
     private fun palette(id: ThemeId, dark: Boolean, hex: String, source: String, license: String): ThemePalette {
         val colors = hex.split(" ").map { Color(0xff000000L or it.toLong(16)) }
-        return ThemePalette(id, dark, colors[0], colors[1], colors[2], colors[3], colors.drop(4), source, license, revisions.getValue(source))
+        val raised = when (id) {
+            ThemeId.LATTE -> Color(0xffccd0da)
+            ThemeId.FRAPPE -> Color(0xff414559)
+            ThemeId.MACCHIATO -> Color(0xff363a4f)
+            ThemeId.MOCHA -> Color(0xff313244)
+            ThemeId.NORD -> Color(0xff434c5e)
+            ThemeId.ONE_DARK -> Color(0xff3e4451)
+            else -> lerp(colors[2], colors[1], .12f)
+        }
+        return ThemePalette(id, dark, colors[0], colors[1], colors[2], colors[3], colors.drop(4), source, license, revisions.getValue(source), raised)
     }
     val all = listOf(
         palette(ThemeId.LATTE, false, "eff1f5 4c4f69 e6e9ef 6c6f85 1e66f5 8839ef 179299 40a02b df8e1d fe640b d20f39 ea76cb", "https://github.com/catppuccin/catppuccin", "MIT"),

@@ -20,7 +20,31 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline
 
 import android.graphics.Paint
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import kotlin.math.min
+import kotlin.math.max
+import androidx.compose.ui.platform.testTag
+import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
+import kotlin.math.roundToInt
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -32,7 +56,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.Color
@@ -43,15 +66,9 @@ import androidx.compose.ui.graphics.drawscope.inset
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.TextMeasurer
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.drawText
-import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.unit.toSize
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
@@ -66,7 +83,6 @@ import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import kotlin.math.max
 
 
 @Preview(showBackground = true)
@@ -138,8 +154,6 @@ fun AllTimelines(
         }
     }
 
-    val dragTimeTextSize = MaterialTheme.typography.titleMedium
-    val textMeasurer = rememberTextMeasurer()
     val ratingSize = MaterialTheme.typography.labelLarge.fontSize
     val ratingTextPaint = remember(density, isDarkTheme) {
         Paint().apply {
@@ -162,200 +176,159 @@ fun AllTimelines(
             currentTime = Instant.now()
         }
     }
-    var dragPoint by remember { mutableStateOf<Offset?>(null) }
-    val verticalDistanceFromFinger = LocalDensity.current.run { 60.dp.toPx() }
+    var dragPoint by remember(model) { mutableStateOf<Offset?>(null) }
+    var hoverPoint by remember(model) { mutableStateOf<Offset?>(null) }
+    var canvasWidthPx by remember { mutableStateOf(0) }
+    var visibleLeft by remember { mutableStateOf(0f) }
+    var visibleRight by remember { mutableStateOf(0f) }
+    val cursorPoint = dragPoint ?: hoverPoint
 
-    Canvas(modifier = modifier.pointerInput(Unit) {
-        detectHorizontalDragGestures(
-            onHorizontalDrag = { change, _ ->
-                change.consume()
-                dragPoint = change.position
-            },
-            onDragEnd = {
-                dragPoint = null
-            },
-            onDragCancel = {
-                dragPoint = null
+    Box(modifier = modifier.onSizeChanged { canvasWidthPx = it.width }.onGloballyPositioned {
+        val origin = it.localToWindow(Offset.Zero)
+        val visible = it.boundsInWindow()
+        visibleLeft = (visible.left - origin.x).coerceAtLeast(0f)
+        visibleRight = (visible.right - origin.x).coerceAtMost(it.size.width.toFloat())
+    }.pointerInput(model) {
+        awaitPointerEventScope {
+            while (true) {
+                val event = awaitPointerEvent()
+                when (event.type) {
+                    PointerEventType.Enter, PointerEventType.Move -> {
+                        if (event.changes.none { it.pressed }) hoverPoint = event.changes.firstOrNull()?.position
+                    }
+                    PointerEventType.Exit -> hoverPoint = null
+                }
             }
-        )
+        }
     }) {
-        val canvasWithLabelsHeight = size.height
-        val labelsHeight = axisLabelSize.toPx()
-        val canvasWidth = size.width
-        val pixelsPerSec = canvasWidth / model.widthInSeconds
+        Canvas(modifier = Modifier.matchParentSize().testTag("timeline_canvas").pointerInput(model) {
+            awaitEachGesture {
+                val down = awaitFirstDown(requireUnconsumed = false)
+                dragPoint = down.position
+                try {
+                    val drag = awaitHorizontalTouchSlopOrCancellation(down.id) { change, _ ->
+                        change.consume()
+                        dragPoint = change.position
+                    }
+                    if (drag != null) horizontalDrag(drag.id) { change ->
+                        change.consume()
+                        dragPoint = change.position
+                    }
+                } finally {
+                    dragPoint = null
+                }
+            }
+        }) {
+            val canvasWithLabelsHeight = size.height
+            val labelsHeight = axisLabelSize.toPx()
+            val canvasWidth = size.width
+            val pixelsPerSec = canvasWidth / model.widthInSeconds
 
-        inset(left = 0f, top = 0f, right = 0f, bottom = labelsHeight + strokeWidth) {
-            val canvasHeightWithVerticalLine = size.height
-            model.groupDrawables.forEach { group ->
-                group.drawTimeLine(
-                    drawScope = this,
-                    canvasHeight = canvasHeightWithVerticalLine,
-                    pixelsPerSec = pixelsPerSec,
-                    color = group.color.getComposeColor(isDarkTheme),
-                    density = density
-                )
+            inset(left = 0f, top = 0f, right = 0f, bottom = labelsHeight + strokeWidth) {
+                val canvasHeightWithVerticalLine = size.height
+                model.groupDrawables.forEach { group ->
+                    group.drawTimeLine(
+                        drawScope = this,
+                        canvasHeight = canvasHeightWithVerticalLine,
+                        pixelsPerSec = pixelsPerSec,
+                        color = group.color.getComposeColor(isDarkTheme),
+                        density = density
+                    )
+                }
+                model.dataForRatings.forEach { dataForOneRating ->
+                    drawRating(
+                        startTime = model.startTime,
+                        ratingTime = dataForOneRating.time,
+                        pixelsPerSec = pixelsPerSec,
+                        canvasHeightOuter = canvasHeightWithVerticalLine,
+                        rating = dataForOneRating.option,
+                        textPaint = ratingTextPaint,
+                        lineColor = ratingLineColor
+                    )
+                }
+                model.timedNotes.forEach { dataForOneTimedNote ->
+                    drawTimedNote(
+                        startTime = model.startTime,
+                        noteTime = dataForOneTimedNote.time,
+                        color = dataForOneTimedNote.color,
+                        pixelsPerSec = pixelsPerSec,
+                        canvasHeightOuter = canvasHeightWithVerticalLine,
+                        isDarkTheme = isDarkTheme
+                    )
+                }
+                if (isShowingCurrentTime) {
+                    drawCurrentTime(
+                        startTime = model.startTime,
+                        timelineWidthInSeconds = model.widthInSeconds,
+                        currentTime = currentTime,
+                        pixelsPerSec = pixelsPerSec,
+                        isDarkTheme = isDarkTheme,
+                        canvasHeightOuter = canvasHeightWithVerticalLine,
+                    )
+                }
+                cursorPoint?.let {
+                    drawVerticalDragLine(
+                        isDarkTheme.scheme.onSurface,
+                        Offset(it.x.coerceIn(0f, canvasWidth), it.y),
+                        canvasHeightWithVerticalLine
+                    )
+                }
             }
-            model.dataForRatings.forEach { dataForOneRating ->
-                drawRating(
-                    startTime = model.startTime,
-                    ratingTime = dataForOneRating.time,
-                    pixelsPerSec = pixelsPerSec,
-                    canvasHeightOuter = canvasHeightWithVerticalLine,
-                    rating = dataForOneRating.option,
-                    textPaint = ratingTextPaint,
-                    lineColor = ratingLineColor
-                )
-            }
-            model.timedNotes.forEach { dataForOneTimedNote ->
-                drawTimedNote(
-                    startTime = model.startTime,
-                    noteTime = dataForOneTimedNote.time,
-                    color = dataForOneTimedNote.color,
-                    pixelsPerSec = pixelsPerSec,
-                    canvasHeightOuter = canvasHeightWithVerticalLine,
-                    isDarkTheme = isDarkTheme
-                )
-            }
-            if (isShowingCurrentTime) {
-                drawCurrentTime(
-                    startTime = model.startTime,
-                    timelineWidthInSeconds = model.widthInSeconds,
-                    currentTime = currentTime,
-                    pixelsPerSec = pixelsPerSec,
-                    isDarkTheme = isDarkTheme,
-                    canvasHeightOuter = canvasHeightWithVerticalLine,
-                )
-            }
-            dragPoint?.let {
-                drawDragPointLineAndTimeLabel(
-                    it,
-                    canvasWidth,
-                    isDarkTheme,
-                    canvasHeightWithVerticalLine,
-                    pixelsPerSec,
-                    model,
-                    verticalDistanceFromFinger,
-                    textMeasurer,
-                    dragTimeTextSize,
-                    timeDisplayOption
-                )
+            drawAxis(
+                axisDrawable = model.axisDrawable,
+                pixelsPerSec = pixelsPerSec,
+                canvasWidth = canvasWidth,
+                canvasHeight = canvasWithLabelsHeight,
+                textPaint = axisLabelTextPaint
+            )
+        }
+        cursorPoint?.takeIf { canvasWidthPx > 0 }?.let { point ->
+            val seconds = point.x.coerceIn(0f, canvasWidthPx.toFloat()) / canvasWidthPx * model.widthInSeconds
+            val time = model.startTime.plusMillis((seconds * 1000).toLong())
+            val readouts = model.cursorModel.at(time)
+            val margin = with(density) { 8.dp.toPx() }
+            val right = visibleRight.takeIf { it > visibleLeft } ?: canvasWidthPx.toFloat()
+            val panelWidth = min(with(density) { 260.dp.toPx() }, right - visibleLeft - 2 * margin).coerceAtLeast(1f)
+            val panelX = (point.x - panelWidth / 2).coerceIn(
+                visibleLeft + margin, max(visibleLeft + margin, right - margin - panelWidth))
+            Surface(
+                modifier = Modifier.offset { IntOffset(panelX.roundToInt(), margin.roundToInt()) }
+                    .width(with(density) { panelWidth.toDp() }).heightIn(max = 140.dp).testTag("timeline_readout"),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                shape = RoundedCornerShape(12.dp),
+                shadowElevation = 4.dp
+            ) {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(10.dp)) {
+                    Text(cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
+                        style = MaterialTheme.typography.labelLarge)
+                    readouts.forEach { readout ->
+                        Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.startTime.getShortTimeText()}",
+                            style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                        val percentage = readout.peakFraction?.let { "${(it * 100).roundToInt()}% of peak" }
+                            ?: "Peak percentage unavailable"
+                        val equivalent = readout.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" }
+                            ?: "mg equivalent unavailable"
+                        Text("$percentage · $equivalent", style = MaterialTheme.typography.bodySmall)
+                    }
+                    Text("Per-ingestion timeline estimate", style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                }
             }
         }
-        drawAxis(
-            axisDrawable = model.axisDrawable,
-            pixelsPerSec = pixelsPerSec,
-            canvasWidth = canvasWidth,
-            canvasHeight = canvasWithLabelsHeight,
-            textPaint = axisLabelTextPaint
-        )
     }
 }
 
-private fun DrawScope.drawDragPointLineAndTimeLabel(
-    dragPoint: Offset,
-    canvasWidth: Float,
-    isDarkTheme: com.isaakhanimann.journal.ui.theme.ThemePalette,
-    canvasHeightWithVerticalLine: Float,
-    pixelsPerSec: Float,
-    model: AllTimelinesModel,
-    dragPointToTextVerticalDistance: Float,
-    textMeasurer: TextMeasurer,
-    dragTimeTextSize: TextStyle,
-    timeDisplayOption: TimeDisplayOption,
-) {
-    val horizontallyLimitedDragPoint = Offset(
-        x = dragPoint.x.coerceIn(0f, canvasWidth),
-        y = dragPoint.y
-    )
-    val dragLineColor = isDarkTheme.scheme.onSurface
-    val textColor = isDarkTheme.scheme.surface
-    drawVerticalDragLine(dragLineColor, horizontallyLimitedDragPoint, canvasHeightWithVerticalLine)
-
-    drawDragTimeLabelWithBackground(
-        horizontallyLimitedDragPoint,
-        pixelsPerSec,
-        model,
-        dragPointToTextVerticalDistance,
-        textMeasurer,
-        canvasWidth,
-        canvasHeightWithVerticalLine,
-        dragLineColor,
-        dragTimeTextSize,
-        textColor,
-        timeDisplayOption
-    )
-}
-
-private fun DrawScope.drawDragTimeLabelWithBackground(
-    horizontallyLimitedDragPoint: Offset,
-    pixelsPerSec: Float,
-    model: AllTimelinesModel,
-    dragPointToTextVerticalDistance: Float,
-    textMeasurer: TextMeasurer,
-    canvasWidth: Float,
-    canvasHeightWithVerticalLine: Float,
-    dragLineColor: Color,
-    dragTimeTextSize: TextStyle,
-    textColor: Color,
-    timeDisplayOption: TimeDisplayOption,
-) {
-    val secondsAtDragPoint = horizontallyLimitedDragPoint.x / pixelsPerSec
-    val timeAtDragPoint = model.startTime.plusSeconds(secondsAtDragPoint.toLong())
-    val textHeight = max(0f, horizontallyLimitedDragPoint.y - dragPointToTextVerticalDistance)
-    val timeLabel = when (timeDisplayOption) {
-        TimeDisplayOption.RELATIVE_TO_NOW -> {
-            val now = Instant.now()
-            val isInPast = timeAtDragPoint < now
-            if (isInPast) {
-                getDurationText(fromInstant = timeAtDragPoint, toInstant = now) + " ago"
-            } else {
-                "in " + getDurationText(fromInstant = timeAtDragPoint, toInstant = now)
-            }
+private fun cursorTimeLabel(time: Instant, start: Instant, now: Instant, option: TimeDisplayOption): String =
+    when (option) {
+        TimeDisplayOption.RELATIVE_TO_NOW -> if (time < now) {
+            getDurationText(fromInstant = time, toInstant = now) + " ago"
+        } else {
+            "in " + getDurationText(fromInstant = now, toInstant = time)
         }
-
-        TimeDisplayOption.RELATIVE_TO_START -> {
-            getDurationText(
-                fromInstant = model.startTime,
-                toInstant = timeAtDragPoint
-            ) + " in"
-        }
-
-        TimeDisplayOption.TIME_BETWEEN -> timeAtDragPoint.getShortTimeText()
-        TimeDisplayOption.REGULAR -> timeAtDragPoint.getShortTimeText()
+        TimeDisplayOption.RELATIVE_TO_START -> getDurationText(fromInstant = start, toInstant = time) + " in"
+        TimeDisplayOption.TIME_BETWEEN, TimeDisplayOption.REGULAR -> time.getShortTimeText()
     }
-    val measuredText =
-        textMeasurer.measure(
-            timeLabel,
-            style = TextStyle(fontSize = 18.sp)
-        )
-    val textSize = measuredText.size
-    val rectSize = textSize.toSize().times(1.35f)
-    val rectTopLeft = Offset(
-        x = (horizontallyLimitedDragPoint.x - rectSize.width / 2).coerceIn(
-            0f,
-            canvasWidth - rectSize.width
-        ),
-        y = (textHeight - rectSize.height / 2).coerceIn(
-            0f,
-            canvasHeightWithVerticalLine - rectSize.height
-        )
-    )
-    drawRoundRect(
-        color = dragLineColor,
-        size = rectSize,
-        topLeft = rectTopLeft,
-        cornerRadius = CornerRadius(x = 15f, y = 15f)
-    )
-    drawText(
-        textMeasurer,
-        text = timeLabel,
-        topLeft = Offset(
-            x = rectTopLeft.x + (rectSize.width - textSize.width) / 2,
-            y = rectTopLeft.y + (rectSize.height - textSize.height) / 2
-        ),
-        style = dragTimeTextSize.copy(color = textColor),
-    )
-}
+
 
 private fun DrawScope.drawVerticalDragLine(
     dragLineColor: Color,

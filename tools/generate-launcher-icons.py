@@ -52,6 +52,15 @@ def main():
         ROOT / 'app/src/main/ic_launcher-playstore.png', **save_options)
     source.resize((512, 512), Image.Resampling.LANCZOS).save(
         ROOT / 'metadata/en-US/images/icon.png', **save_options)
+    onboarding = RES / 'drawable-nodpi'
+    onboarding.mkdir(exist_ok=True)
+    source.resize((512, 512), Image.Resampling.LANCZOS).save(
+        onboarding / 'onboarding_eye_open.png', **save_options)
+    with Image.open(ROOT / 'artwork/psyzine-eye-closed.png') as closed:
+        if closed.width != closed.height:
+            raise SystemExit('Use square closed-eye artwork; never crop or stretch it.')
+        closed.convert('RGBA').resize((512, 512), Image.Resampling.LANCZOS).save(
+            onboarding / 'onboarding_eye_closed.png', optimize=True)
 
 
 if __name__ == '__main__':

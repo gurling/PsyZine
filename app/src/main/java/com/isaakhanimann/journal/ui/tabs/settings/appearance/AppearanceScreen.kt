@@ -34,7 +34,7 @@ fun AppearanceScreen(viewModel: AppearanceViewModel = hiltViewModel()) {
 fun ThemePreviewCard(id: ThemeId, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     PsyZineTheme(id) {
         Card(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).semantics { this.selected = selected },
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)) {
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text((if (selected) "✓ " else "") + id.label, style = MaterialTheme.typography.titleLarge)
                 Text("Saturday · 18:45", style = MaterialTheme.typography.labelSmall)

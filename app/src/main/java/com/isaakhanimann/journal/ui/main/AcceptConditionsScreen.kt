@@ -26,6 +26,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -36,7 +37,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,17 +70,17 @@ fun AcceptConditionsScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            var checkedState0 by remember { mutableStateOf(false) }
-            var checkedState1 by remember { mutableStateOf(false) }
-            var checkedState2 by remember { mutableStateOf(false) }
-            var checkedState3 by remember { mutableStateOf(false) }
+            var checkedState0 by rememberSaveable { mutableStateOf(false) }
+            var checkedState1 by rememberSaveable { mutableStateOf(false) }
+            var checkedState2 by rememberSaveable { mutableStateOf(false) }
+            var checkedState3 by rememberSaveable { mutableStateOf(false) }
             val allIsChecked =
                 checkedState0 && checkedState1 && checkedState2 && checkedState3
             val painter =
-                if (allIsChecked) painterResource(R.drawable.eye_open) else painterResource(R.drawable.eye_closed)
+                if (allIsChecked) painterResource(R.drawable.onboarding_eye_open) else painterResource(R.drawable.onboarding_eye_closed)
             Image(
                 painter = painter,
-                contentDescription = "PsychonautWiki eye",
+                contentDescription = if (allIsChecked) "PsyZine eye open" else "PsyZine eye closed",
                 modifier = Modifier
                     .clip(RoundedCornerShape(30.dp))
                     .clickable {
@@ -89,6 +90,7 @@ fun AcceptConditionsScreen(
                         checkedState3 = true
                     }
                     .fillMaxWidth(0.4f)
+                    .aspectRatio(1f)
                     .padding(bottom = 20.dp)
             )
             Column(

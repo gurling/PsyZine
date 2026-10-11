@@ -178,6 +178,17 @@ jobs:
           Application and launcher labels are PsyZine across all four variants.
           Add Direct Debug to Obtainium through the repository README.
 
+          Changes in this build:
+          - Onboarding uses the supplied closed-eye artwork until every acknowledgement
+            is checked, then displays the open-eye app artwork.
+          - Touch, drag or hover over the journal graph to inspect estimated percentage
+            of peak and the dose scaled to that percentage in mg. Unknown timing or
+            non-mass units display unavailable values; these are model estimates,
+            not measured drug levels or dosing guidance.
+          - Solid cards and distinct raised navigation/popover surfaces improve
+            contrast across all 13 themes, including the Frappé reference palette.
+          - Added onboarding, cursor interaction and rendered theme regression tests.
+
           All four APK variants, both JVM test suites, Android lint, APK signatures,
           package integrity, application IDs and checksums passed. The required
           Android emulator instrumentation matrix also passed. See BUILD_RESULTS.json

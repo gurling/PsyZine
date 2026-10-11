@@ -6,6 +6,8 @@ cd -- "$project_dir"
 collect_visual_captures() {
     mkdir -p screenshots
     adb pull /sdcard/Android/data/app.psyzine.debug/files/parity-screenshots screenshots/ || true
+    adb pull /sdcard/Android/data/app.psyzine.debug/files/contrast-screenshots screenshots/ || true
+    adb pull /sdcard/Android/data/app.psyzine.debug/files/onboarding-timeline-screenshots screenshots/ || true
 }
 # Capture before the emulator runner shuts down; preserve the Gradle exit status.
 trap collect_visual_captures EXIT

@@ -81,6 +81,16 @@ data class FullTimelines(
 
     private val finalPoints: List<FinalPoint>
 
+    /** Samples the same piecewise-linear curve used by drawTimeLine, before normalization. */
+    fun heightAt(secondsRelativeToGraphStart: Float): Float {
+        val segment = finalPoints.zipWithNext().firstOrNull { (start, end) ->
+            secondsRelativeToGraphStart >= start.x && secondsRelativeToGraphStart < end.x
+        } ?: return 0f
+        val (start, end) = segment
+        val fraction = (secondsRelativeToGraphStart - start.x) / (end.x - start.x)
+        return start.y + fraction * (end.y - start.y)
+    }
+
     override var referenceHeight: Float = 1f
 
     override val nonNormalisedHeight: Float

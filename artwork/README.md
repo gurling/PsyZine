@@ -13,3 +13,7 @@ extends behind Android's launcher masks. Android's themed-icon option tints the
 derived monochrome layer; ordinary icons retain the supplied colors.
 
 Shared `main` resources apply to both Direct and Play, Debug and Release variants.
+
+`psyzine-eye-closed.png` preserves the uploaded closed-eye counterpart byte for byte.
+Onboarding uses 512px, uncropped copies of both artworks in `drawable-nodpi/`,
+showing the open eye only when all four acknowledgements are checked.
