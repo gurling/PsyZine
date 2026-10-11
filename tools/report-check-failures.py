@@ -28,4 +28,4 @@ for report in Path('app/build/reports').glob('lint-results-*.xml'):
 
 log = Path('build-logs/gradle-build.log')
 if log.exists():
-    error('Failed Gradle build: final log output\n' + '\n'.join(log.read_text().splitlines()[-80:]))
+    error('Build job failed; final Gradle log output\n' + '\n'.join(log.read_text().splitlines()[-80:]))

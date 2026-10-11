@@ -23,6 +23,7 @@ keystore.properties
 **/build/
 artifacts/
 build-logs/
+screenshots/
 .local/
 .kotlin/
 .gradle-user-home/
