@@ -64,6 +64,9 @@ jobs:
             app/build/test-results/
             app/build/outputs/logs/
             build-logs/
+      - name: Report failed checks
+        if: failure()
+        run: python3 tools/report-check-failures.py
       - name: Remove ephemeral development key
         if: always()
         run: rm -f "$RUNNER_TEMP/psyzine-development.jks"
@@ -106,6 +109,9 @@ jobs:
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             screenshots/
+      - name: Report failed device tests
+        if: failure()
+        run: python3 tools/report-check-failures.py
 
   newer-android:
     if: github.event_name == 'workflow_dispatch' && inputs.extra_api != ''
@@ -133,6 +139,10 @@ jobs:
           target: default
           disable-animations: true
           script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon
+
+      - name: Report failed newer-API tests
+        if: failure()
+        run: python3 tools/report-check-failures.py
 
   development-prerelease:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

@@ -17,9 +17,9 @@ import kotlinx.coroutines.CancellationException
 fun PhotoTile(id: String, file: File, label: String, processor: ImageProcessor, onClick: () -> Unit) {
     var error by remember(id, file) { mutableStateOf(false) }
     val thumbnail by produceState<File?>(null, id, file) {
-        try { value = processor.thumbnail(id, file) }
+        value = try { processor.thumbnail(id, file) }
         catch (e: CancellationException) { throw e }
-        catch (_: Exception) { error = true }
+        catch (_: Exception) { error = true; null }
     }
     Card(onClick = onClick, modifier = Modifier.size(104.dp)) {
         if (error) Text("Photo unavailable", Modifier.padding(8.dp), color = MaterialTheme.colorScheme.error)

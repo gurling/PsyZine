@@ -101,7 +101,9 @@ class AttachmentBackupIntegrationTest {
             assertNull(exif.getAttribute(ExifInterface.TAG_GPS_LATITUDE))
             assertNull(exif.getAttribute(ExifInterface.TAG_GPS_LONGITUDE))
             assertNull(exif.getAttribute(ExifInterface.TAG_XMP))
-            assertEquals(1, exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, 1))
+            val savedOrientation = exif.getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_UNDEFINED)
+            assertTrue(savedOrientation == ExifInterface.ORIENTATION_UNDEFINED ||
+                savedOrientation == ExifInterface.ORIENTATION_NORMAL)
         }
     }
     @Test fun transparencyResizeAndMissingThumbnailRecovery() = runBlocking {

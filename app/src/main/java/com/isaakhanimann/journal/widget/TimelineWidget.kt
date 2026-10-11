@@ -77,7 +77,7 @@ class TimelineWidget : GlanceAppWidget() {
             val density = context.resources.displayMetrics.density
             val widthPx = ((size.width.value - 24) * density).toInt().coerceIn(1, 1024)
             val bitmap = renderTimelineBitmap(it, widthPx, (60 * density).toInt().coerceIn(1, 512), palette, Density(density), data.updatedAt)
-            Image(BitmapImageProvider(bitmap), context.getString(R.string.timeline_description),
+            Image(ImageProvider(bitmap), context.getString(R.string.timeline_description),
                 modifier = GlanceModifier.fillMaxWidth().height(60.dp), contentScale = ContentScale.Fit)
         }
     }
