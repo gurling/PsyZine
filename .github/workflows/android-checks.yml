@@ -42,7 +42,7 @@ jobs:
       - name: Build, test, lint and verify all signed APK variants
         env:
           PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-development.jks
-        run: bash tools/build-apks.sh -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
+        run: bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
       - name: Package corresponding source
         run: |
           git archive --format=tar.gz --prefix=PsyZine/ HEAD > "artifacts/apks/PsyZine-source-$GITHUB_SHA.tar.gz"
@@ -97,7 +97,7 @@ jobs:
           arch: x86_64
           target: default
           disable-animations: true
-          script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon
+          script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
       - name: Collect visual captures
         if: always()
         run: adb pull /sdcard/Android/data/app.psyzine.debug/files/parity-screenshots screenshots || true
@@ -138,7 +138,7 @@ jobs:
           arch: x86_64
           target: default
           disable-animations: true
-          script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon
+          script: ./gradlew :app:connectedDirectDebugAndroidTest --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true
 
       - name: Report failed newer-API tests
         if: failure()

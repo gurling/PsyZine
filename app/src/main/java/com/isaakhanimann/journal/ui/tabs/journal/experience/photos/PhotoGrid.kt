@@ -16,10 +16,11 @@ import kotlinx.coroutines.CancellationException
 @Composable
 fun PhotoTile(id: String, file: File, label: String, processor: ImageProcessor, onClick: () -> Unit) {
     var error by remember(id, file) { mutableStateOf(false) }
-    val thumbnail by produceState<File?>(null, id, file) {
-        value = try { processor.thumbnail(id, file) }
+    var thumbnail by remember(id, file) { mutableStateOf<File?>(null) }
+    LaunchedEffect(id, file) {
+        try { thumbnail = processor.thumbnail(id, file) }
         catch (e: CancellationException) { throw e }
-        catch (_: Exception) { error = true; null }
+        catch (_: Exception) { error = true }
     }
     Card(onClick = onClick, modifier = Modifier.size(104.dp)) {
         if (error) Text("Photo unavailable", Modifier.padding(8.dp), color = MaterialTheme.colorScheme.error)

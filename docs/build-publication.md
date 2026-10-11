@@ -4,25 +4,13 @@ Repository: https://github.com/gurling/PsyZine. The Android project is the repos
 
 ## Recorded execution result — 11 October 2026
 
-Actual Gradle 8.14 execution was attempted for all four APK variants, both flavor unit suites and all four lint tasks, using JDK 17. The first native-library error came from the read-only default `/home/izzy/.gradle` cache. Moving `GRADLE_USER_HOME` to a writable directory resolved that error. The wrapper also lacked its executable bit; this is now corrected and committed with the scripts. The checked-in wrapper was then executed using its checksum-verified official distribution cache.
+The former socket restriction no longer reproduces: IPv4 sockets, the actual Gradle wrapper, ADB and authenticated SSH now work. All four Direct/Play Debug/Release APKs were built with JDK 17, Gradle 8.14, SDK 35 and explicitly pinned build-tools 35.0.0. Both flavor JVM suites passed (35 tests each). All four lint tasks passed with zero errors; dependency/unused-resource warnings remain. Minification, resource linking, manifest merging, APK signatures, ZIP integrity, application IDs and alignment were checked. All four local APKs installed and launched on an isolated Pixel test installation.
 
-Both the Gradle binary and the real wrapper stop before project evaluation:
+Android instrumentation passed all 23 tests on each CI emulator at API 26/29/30/32/33/35 in [run 38136387190](https://github.com/gurling/PsyZine/actions/runs/38136387190). That run's separate build job failed, so it did not publish a release; the updated workflow limits workers, compiles Kotlin in process, and exposes final build-log errors. A full idle Pixel/API 37 run passed 22/23 tests; the editor's injected-save-failure check timed out. This physical-device failure remains unresolved and is not counted as a pass. Room migrations, photo/backup tests and the other UI checks passed in that run. Thirteen synthetic palette captures were generated; complete visual acceptance remains separate.
 
-```text
-Could not create service of type FileLockContentionHandler.
-Could not determine a usable wildcard IP for this machine.
-java.net.SocketException: Operation not permitted (Socket creation failed)
-```
+Source commits have been pushed without force to the requested SSH origin and verified through GitHub's API. The repository was not empty: its initial license commit and upstream history were preserved. Work remains on a local feature branch, pushed explicitly to remote `main` under the user's publication authorization. No Git remotes or credentials were changed. The broken system SSH configuration is bypassed per command with `ssh -F /dev/null -o BatchMode=yes -o StrictHostKeyChecking=yes`; known-host verification remains enabled. Git commits use a per-command GPG-signing override because the configured keybox directory is read-only.
 
-The sandbox denies INET socket creation, including Gradle's local file-lock communication. This is an execution-policy restriction, not an Android compilation result. No source, packaging, dependency-resolution or lint pass is inferred. The all-variant attempt is retained in the ignored `build-logs/gradle-build.log`. No APK was generated; APK sizes/checksums and installation results are unavailable. The packaging command was checked to reject failed Gradle evidence and create no downloadable APK output.
-
-Git origin and main tracking are configured exactly as requested, preserving upstream. The public GitHub API confirms `gurling/PsyZine` exists with default branch `main`. A subsequent check found its license-only initialization commit `e42537dd1d1dae20c0f2c63b66db0f8c8a208b94`. Its GPL license, tree and signed commit were retrieved through the public HTTPS API, verified against their exact Git object hashes, and merged locally with both histories retained. This makes the local branch a descendant of the observed remote branch; no force push is needed. SSH initially rejected invalid permissions on the system SSH configuration. Using `ssh -F /dev/null` bypassed that broken configuration without changing host-key verification. Resolving GitHub's address through HTTPS then exposed the underlying `socket: Operation not permitted` failure. SSH authentication and push cannot proceed in this execution environment. No HTTPS GitHub credential or authenticated browser is available. An Actions dispatch attempt returned HTTP 401, and the public Actions API reported no runs. The actual `git push -u origin main` attempt failed at socket creation before authentication. The remote initialization commit is verified, but none of the PsyZine implementation commits is published. The latest Actions API check reports zero runs; no successful workflow or downloadable workflow artifact exists.
-
-Git's configured GPG signing also failed because its keybox service needs writes under the read-only `/home/izzy/.gnupg`. The local initialization commit uses a per-command `commit.gpgsign=false` override; global signing preferences and private GPG keys are untouched. This Git signature limitation is separate from APK signing.
-
-An actual `adb devices -l` attempt also failed: the daemon could not install its TCP listener (`Operation not permitted`), and `/dev/bus/usb` was unavailable. No device installation or instrumentation execution is claimed.
-
-Completed work is committed locally; its hash and any failed push are reported separately. A Git bundle and corresponding source archive can carry the committed project to a host where SSH and Gradle sockets are permitted. This record does not claim publication has completed.
+The required release evidence is the successful complete [Actions run](https://github.com/gurling/PsyZine/actions) and its actual [testing pre-release assets](https://github.com/gurling/PsyZine/releases), rather than this document or the workflow configuration. The pre-release job runs only after both the build job and every required emulator job succeed. Production signing credentials, reference-content clearance and full manual acceptance remain outstanding. Development publication does not establish production readiness or resolve third-party content rights.
 
 ## Build all installable variants
 
@@ -30,14 +18,14 @@ Install JDK 17, Android SDK platform 35, build-tools 35.0.0 and Android command-
 
 ```bash
 sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-bash tools/build-apks.sh
+bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
 ```
 
 This runs the actual wrapper, builds Direct/Play Debug/Release, runs both flavor unit suites and all four lint tasks, then verifies every APK. A failed Gradle task prevents publication of the downloadable artifact set. `verify-apks.py` also requires successful task evidence, nonempty passing JUnit XML and zero-error lint XML; it does not substitute source compilation for Gradle.
 
 Verification checks ZIP integrity, dex/manifest presence, application IDs, version code 1, version 1.0.0 or the explicitly labeled 1.0.0-dev release, min/target SDK 26/35, forbidden permissions, APK signatures with SDK `apksigner`, and 16 KiB native-library alignment with `zipalign`. It records certificate digests, byte sizes and SHA-256 checksums. Direct/Play certificates must agree for each build type. Actual device installation remains a separate test.
 
-Expected outputs **after a successful build**, not artifacts already produced here:
+Verified development output names:
 
 | Variant | Gradle output | Downloadable development-signed copy | Application ID |
 | --- | --- | --- | --- |
@@ -50,7 +38,7 @@ Expected outputs **after a successful build**, not artifacts already produced he
 
 ## Signing and upgrades
 
-Ordinary release builds use development signing and version suffix `-dev`, while retaining their installation IDs. The build script generates/reuses `.local/signing/psyzine-development.jks` (ignored, owner-only), with alias `androiddebugkey` and the standard development-only password `android`. Set `PSYZINE_DEVELOPMENT_KEYSTORE` to use a different external location. This is not a production signing credential. A valid development certificate was generated and checked with `keytool`; it has not signed an APK in this environment.
+Ordinary release builds use development signing and version suffix `-dev`, while retaining their installation IDs. The build script generates/reuses `.local/signing/psyzine-development.jks` (ignored, owner-only), with alias `androiddebugkey` and the standard development-only password `android`. Set `PSYZINE_DEVELOPMENT_KEYSTORE` to use a different external location. This is not a production signing credential. The local development key signs all four verified APKs. Each CI run uses its own key unless a stable development key is configured.
 
 For production signing set all four environment variables: `PSYZINE_RELEASE_KEYSTORE_FILE`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`. The keystore must already exist outside version control. Partial configuration fails rather than silently falling back. Gradle signs both release distributions with that key and uses version 1.0.0. Never commit keys, credential files or passwords.
 
@@ -64,16 +52,8 @@ The AOSP instrumentation matrix covers API 26/29/30/32/33/35; dispatch 36/37 sep
 
 `PsyZine signed release` decodes the independent production key into an owner-only runner-temp file, uses Gradle signing, verifies the production candidate, packages corresponding source/checksums and publishes only on a matching version tag. It uses the release environment's `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, and `PSYZINE_KEY_PASSWORD` secrets. The existing reference-content publication gate `CONTENT_RIGHTS_VERIFIED=true` remains. Signing keys are removed after the job.
 
-Workflow status and actual downloadable artifacts, once a push succeeds, are under https://github.com/gurling/PsyZine/actions. No successful run exists at the recorded execution time.
+For authorized pushes to `main`, a successful complete `Android checks` run creates a testing pre-release with all four APKs, signature reports, SHA-256 checksums, build results and the corresponding source archive. Download links are on https://github.com/gurling/PsyZine/releases. Failed build or emulator jobs prevent this publication.
 
-## Complete the blocked transport on an unrestricted host
+## Reproduce and verify publication
 
-The checkout already uses main, the specified SSH origin, and retained upstream. Push the committed tree without rewriting history:
-
-```bash
-cd /home/izzy/codex/PsyZine/android
-git push -u origin main
-git ls-remote origin refs/heads/main
-```
-
-If the host has the same broken system SSH configuration, use `GIT_SSH_COMMAND='ssh -F /dev/null -o StrictHostKeyChecking=yes'` after confirming GitHub's host key is in `known_hosts`. Do not disable host-key verification. Verify the remote hash equals local HEAD, monitor the actual `Android checks` run, resolve any real Gradle/lint/runtime failures, then download and verify its APK artifact checksums. A failed or absent workflow is not completion.
+Use the existing configured SSH origin. Push the reviewed feature-branch commit to `main` only with explicit authorization and without force. Verify the remote hash, every required Actions job and the actual release assets. Download the published files and run `sha256sum --check SHA256SUMS`; inspect their signing certificates before installation. A missing or failed workflow is not completion.

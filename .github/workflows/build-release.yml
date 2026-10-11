@@ -53,7 +53,7 @@ jobs:
           PSYZINE_STORE_PASSWORD: ${{ secrets.PSYZINE_STORE_PASSWORD }}
           PSYZINE_KEY_PASSWORD: ${{ secrets.PSYZINE_KEY_PASSWORD }}
           PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-development.jks
-        run: bash tools/build-apks.sh -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
+        run: bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
       - name: Verify production candidate
         run: |
           set -euo pipefail

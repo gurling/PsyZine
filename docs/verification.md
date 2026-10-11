@@ -4,38 +4,31 @@ Record date: 11 October 2026. PsyLog target: `0c29a70fa1ced6106c8379b2c02541699d
 
 The host/source results below were obtained during implementation, before the later build/signing/publication changes. They are not an APK build. See [the current actual Gradle and GitHub execution record](build-publication.md).
 
-## Results obtained during implementation
+## Earlier host-only implementation results
 
 | Check | Result and scope |
 | --- | --- |
 | Main Kotlin compilation | All 296 main Kotlin files compile using Kotlin 2.0.20, JVM 17, the Compose compiler and serialization plugins, SDK 35 `android.jar`, and a manually assembled cached dependency classpath. Generated resource-name and BuildConfig stubs were used. This is source compilation, not an AGP APK build or Hilt component-generation check. |
-| JVM unit tests | 35 tests pass under JUnit 4.13.2 with real JSON-java, covering existing parsing/date/route/number behavior, 13 theme roles and domain contrast on raised surfaces, persistent preferences, timeline phases/fallbacks, newer JSON conversion, and backup path/stream limits. They were compiled/run directly; Gradle unit tasks could not start. |
+| JVM unit tests | 35 tests pass under JUnit 4.13.2 with real JSON-java, covering existing parsing/date/route/number behavior, 13 theme roles and domain contrast on raised surfaces, persistent preferences, timeline phases/fallbacks, newer JSON conversion, and backup path/stream limits. They were compiled/run directly; Gradle unit tasks could not start at that earlier stage. |
 | Room annotation processing | Actual Room 2.6.1 KAPT processing passes; schema 8, DAO implementations, database implementation and automatic migrations 1→7 are generated. KAPT reports its normal Kotlin-2 fallback to language 1.9. No destructive migration fallback was added. |
 | SQLite upgrade validation | All seven starting schemas pass: generated automatic migration SQL plus manual 7→8 preserve original columns/IDs, match version-8 table shapes, cascade attachment deletion, and prevent reuse of deleted experience IDs. This uses host SQLite, not Android's SQLite or MigrationTestHelper execution. |
 | Original schemas | Schemas 1–7 are byte-for-byte unchanged from PsyZine HEAD and structurally identical to pinned PsyLog. |
-| Android test source compilation | All 23 instrumentation test methods compile with the Compose compiler and Android/test dependencies. **None has executed on Android.** |
+| Android test source compilation | All 23 instrumentation test methods compile with the Compose compiler and Android/test dependencies. At that earlier stage none had executed on Android. |
 | Resource compilation | Android build-tools 35.0.0 `aapt2 compile` succeeds for all app resources. No resource linking or merged-manifest validation is claimed. All 22 source XML files parse. |
 | Privacy source checks | Source manifest declares only foreground-service, special-use foreground-service and notification permissions. FileProvider is non-exported and exposes only `staging/camera/`. Legacy, Android 12+ cloud and device-transfer rules exclude databases, attachments and staging while retaining DataStore preferences. Transitive merged permissions remain a build check. |
 | Reference data | Bundled JSON exactly matches pinned PsyLog: 289 substances / 21 categories. Only mirror URLs changed from the original baseline; no delayed-release administration data was added. |
-| Build configuration | Gradle 8.14 distribution checksum verified against the downloaded official ZIP; both workflow YAML files parse. Nix, Gradle dependency resolution, actual variant builds and workflows have not run. |
-| Patch hygiene | `git diff --check` passes. Existing uncommitted work was preserved; no reset, commit, push, signing key or release was created. |
+| Build configuration | Gradle 8.14 distribution checksum verified against the downloaded official ZIP; both workflow YAML files parse. At that earlier stage Nix, Gradle dependency resolution, actual variant builds and workflows had not run. |
+| Patch hygiene | `git diff --check` passes. Existing uncommitted work was preserved; no reset was used. This historical source-check stage preceded signing and publication work. |
 
 The direct compiler checks used temporary tools/classpaths in `/tmp`; they do not certify Gradle's resolved dependency graph. Coil 3.0.4 and Glance 1.1.1 APIs compile with the retained Kotlin/Compose toolchain. The standard checks below remain authoritative for dependency resolution, AGP/Hilt integration and installation.
 
-## Environment blockers
+## Actual Android verification — 11 October 2026
 
-Java 17 and `adb` were initially available, but the system Java installation lacked `javac` and there was no complete SDK/emulator. A full JDK 17, SDK-35 API JAR, command-line tools and build-tools 35 were obtained for source checks. Gradle 8.9 and then the pinned 8.14 both failed before project evaluation because the sandbox cannot create required sockets:
+The prior Gradle/ADB socket restriction no longer reproduces. Actual wrapper builds now pass for Direct Debug, Direct Release, Play Debug and Play Release, including resource linking, Hilt/Room processing and release minification. Both flavor unit suites pass (35 each); all four lint tasks have zero errors. SDK tools verify ZIP integrity, IDs, min/target SDK, signatures, alignment and forbidden permissions. All four local development APKs installed and launched on a Pixel.
 
-```text
-Gradle could not start your build.
-Could not create service of type FileLockContentionHandler.
-Could not determine a usable wildcard IP for this machine.
-Caused by: java.net.SocketException: Operation not permitted
-```
+All 23 instrumentation tests passed on each CI emulator at API 26/29/30/32/33/35 in [run 38136387190](https://github.com/gurling/PsyZine/actions/runs/38136387190). Its separate build job failed and prevented publication; check the latest complete run and actual release links in [build-publication.md](build-publication.md). The clean idle Pixel/API 37 run passed 22/23: `ExperienceEditorUiTest` timed out waiting for the injected save error. This remains a physical-device verification gap. Migration, attachment, backup, presentation and the other UI tests passed. Thirteen synthetic palette PNGs were generated, without claiming complete visual acceptance.
 
-`--no-daemon` and an in-process Gradle invocation did not bypass the restriction. Consequently debug/release APK compilation, lint, manifest merging, the resolved runtime dependency graph, instrumentation execution, emulator/adb operations, visual captures, minification and signing remain **unverified**. No installable APK or production-ready claim is made. Nix is unavailable. No physical camera or tablet is connected.
-
-Authoritative exports from private Android Journal versions are unavailable: source-derived synthetic fixtures cover the public PsyLog converter's observed format, including nested/multi-ingredient units, but do not establish compatibility with every private version. Bundled reference-content redistribution rights remain unresolved and block public binary publication. The GitHub origin/source URL are now configured; an independent production signing key and release credentials remain provisioning requirements.
+Nix evaluation, API 36 emulation, physical-camera acquisition, reboot/process recovery, tablet/accessibility and genuine private-version export fixtures remain unverified. Production signing credentials and reference-content redistribution clearance remain outstanding. Testing pre-releases are development signed and do not claim production readiness. See the manual matrix below before claiming complete feature parity.
 
 ## Standard build and automated checks
 
@@ -65,7 +58,7 @@ apkanalyzer manifest permissions app/build/outputs/apk/direct/debug/app-direct-d
 
 Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.debug`. Release IDs omit `.debug`. Provider authority follows each variant's actual application ID. The `.github/workflows/android-checks.yml` workflow runs these variant checks and AOSP instrumentation on API 26, 29, 30, 32, 33 and 35. Dispatch its optional newer-API job separately for 36 and 37 when AOSP x86_64 images are available. A missing image is a recorded matrix gap, not a pass.
 
-## Automated Android coverage awaiting execution
+## Automated Android coverage
 
 | Test class | Acceptance covered |
 | --- | --- |
@@ -101,4 +94,4 @@ zipalign -c -p 4 PsyZine-v1.0.0.apk
 sha256sum -c SHA256SUMS
 ```
 
-Review actual screenshots captured from the accepted candidate according to [screenshots.md](screenshots.md). No GitHub release has been published and no credentials were created in this session.
+Review actual screenshots captured from the accepted candidate according to [screenshots.md](screenshots.md). Development pre-release publication is separately gated on successful build and emulator jobs; verify actual release assets rather than inferring publication from configuration. Production credentials were not created.

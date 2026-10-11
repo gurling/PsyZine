@@ -25,3 +25,7 @@ for report in Path('app/build/reports').glob('lint-results-*.xml'):
     for issue in ET.parse(report).getroot().findall('issue'):
         if issue.get('severity') in ['Error', 'Fatal']:
             error(f"{report.name}: {issue.get('id')}: {issue.get('message')}")
+
+log = Path('build-logs/gradle-build.log')
+if log.exists():
+    error('Failed Gradle build: final log output\n' + '\n'.join(log.read_text().splitlines()[-80:]))
