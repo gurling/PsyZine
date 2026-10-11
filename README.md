@@ -36,7 +36,7 @@ The Glance widget is resizable, uses the selected PsyZine palette, supports an e
 
 ## Verification and release
 
-[Feature parity checklist](docs/psylog-parity.md) records all verified PsyLog behavior and the defects corrected during the port. [Verification](docs/verification.md) separates passing host/source checks from device checks still required. All four APK variants have passed actual local Gradle builds, both JVM suites and zero-error lint. Local signed APKs installed and launched. Six CI emulator suites passed; a physical API 37 editor test remains unresolved (22/23 passed on the idle rerun). Physical-camera and full manual acceptance are still outstanding.
+[Feature parity checklist](docs/psylog-parity.md) records all verified PsyLog behavior and the defects corrected during the port. [Verification](docs/verification.md) separates passing host/source checks from device checks still required. All four APK variants have passed actual local Gradle builds, both JVM suites and zero-error lint. Local signed APKs installed and launched. Six CI emulator suites passed; all 23 physical API 37 tests passed after disabling test-window launch animations. Physical-camera and full manual acceptance are still outstanding.
 
 CI builds both distributions, checks permissions and IDs, runs unit tests/lint, and runs Android instrumentation on API 26, 29, 30, 32, 33, and 35. Dispatch the optional newer-API job for 36/37 when the selected AOSP image is available. Physical camera, process-death, reboot, TalkBack/large-text/keyboard, and tablet checks remain manual acceptance steps. Synthetic palette captures are produced by instrumentation for visual review; [screenshot instructions](docs/screenshots.md) describe release listing captures.
 

@@ -96,6 +96,10 @@ android {
         compose = true
         buildConfig = true
     }
+    testOptions {
+        // Launch transitions can reject injected taps before the window is opaque.
+        animationsDisabled = true
+    }
 }
 
 dependencies {
