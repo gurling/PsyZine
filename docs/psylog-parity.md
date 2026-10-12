@@ -35,7 +35,7 @@ All rows below have source implementation in PsyZine. This does **not** certify 
 
 | ID | Improvement | Integration |
 | --- | --- | --- |
-| D01 | Direct/Play distributions | `direct` retains `app.psyzine`; `play` adds `.play`; debug adds `.debug`. The namespaces, provider authority, typed navigation, and source schema path remain common. CI checks install IDs. |
+| D01 | Direct/Play distributions | `direct` retains `app.psyzine`; `play` adds `.play`; debug adds `.debug`. Direct Compatible Release retains `app.psyzine.debug` with non-debuggable release shrinking; Play compatibility is disabled. The namespaces, provider authority, typed navigation, and source schema path remain common. CI checks install IDs. |
 | D02 | Gradle wrapper upgrade | Exact PsyLog Gradle **8.14**, not 8.14.3; official distribution SHA-256 retained. Java 17 / AGP 8.7.3 / Kotlin 2.0.20 kept. Actual Gradle 8.14 builds pass for all four signed variants; both flavor unit suites and all four lint tasks pass. |
 | D03 | Pinned Nix build/development shells | PsyLog `flake.nix`/lock adapted to PsyZine, SDK/build-tools 35, JDK17, wrapper-based commands, optional emulator/NDK/CMake/Studio/scrcpy/adb-sync. Evaluation awaits a Nix-enabled host. |
 | D04 | Fork identity and launcher/splash artwork | PsyZine page/cursor assets, app name, application class, project name, and generated version retained. PsyLog eye artwork/namespace/IDs are not imported. |
@@ -45,7 +45,7 @@ All rows below have source implementation in PsyZine. This does **not** certify 
 | D08 | Fork support/source/share and donation treatment | Configured PsyZine source/issues/share URLs via BuildConfig; unconfigured local builds route to About. Donation page explicitly supports the original author. No PsyLog/upstream contact masquerades as PsyZine support. |
 | D09 | FOSS/offline distribution metadata | Listing includes journal, medications/substances, photos, themes, notifications/widgets and portable backups; no paid features/analytics. Instrumentation captures 13 palette previews. Thirteen synthetic palette PNGs were generated on a real device; full application screenshots still require manual acceptance; old upstream screenshots are not presented as PsyZine. |
 | D10 | Ignore local assistant files | `.claude/` and `CLAUDE.md` ignored, along with private signing files. No inherited private assistant configuration added. |
-| D11 | Independent release versions and build constants | PsyZine 1.0.0 / code1 retained; displayed version comes from BuildConfig. Signed workflow uses independent secrets, alignment, certificate verification, checksums and corresponding source. Workflow has not run. |
+| D11 | Independent release versions and build constants | PsyZine versions come from version.properties, now 1.0.1 / code2; displayed version comes from BuildConfig. Compatibility publication pins retained certificates, requires increasing codes and uses 1.0.1-compat.2. Signed workflow uses independent secrets, alignment, certificate verification, checksums and corresponding source. Workflow has not run. |
 | D12 | Reference mirror links | All dataset, administration-route, dose/reagent/responsible-use, volumetric dosing, and preview article links use `psy.st/wiki/` as pinned PsyLog. Dataset exactly matches PsyLog after this URL change; factual content/counts are otherwise unchanged. Canonical ownership/provenance remains recorded. |
 
 ## Corrected upstream and prerequisite defects

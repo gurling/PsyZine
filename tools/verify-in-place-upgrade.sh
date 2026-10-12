@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+# Non-destructive, emulator-only installed-update checks. PsyZine, GPL-3.0-or-later.
+set -euo pipefail
+project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_dir"
+[[ $# == 5 ]] || { echo "Usage: $0 EMULATOR_SERIAL BASELINE_APK TEST_APK CANDIDATE_APK NEXT_APK" >&2; exit 1; }
+serial="$1"; baseline="$2"; test_apk="$3"; candidate="$4"; next="$5"
+[[ "$serial" =~ ^emulator-[0-9]+$ ]] || { echo 'Physical devices are forbidden.' >&2; exit 1; }
+adb_cmd=("${ANDROID_HOME:?}/platform-tools/adb" -s "$serial")
+[[ "$("${adb_cmd[@]}" shell getprop ro.kernel.qemu | tr -d '\r')" == 1 ]] || { echo 'Not an emulator.' >&2; exit 1; }
+installed="$("${adb_cmd[@]}" shell pm list packages app.psyzine.debug | tr -d '\r')"
+[[ -z "$installed" ]] || { echo 'Use a fresh emulator. Existing installation left intact.' >&2; exit 1; }
+# Check packages, signatures, code progression and non-debuggable candidates BEFORE installing or seeding.
+python3 - "$baseline" "$test_apk" "$candidate" "$next" <<'PY'
+import json, sys
+from pathlib import Path
+sys.path.insert(0, 'tools')
+from apk_inspection import inspect_apk
+from release_policy import pins, read_version
+baseline, test, candidate, following = [inspect_apk(Path(p)) for p in sys.argv[1:]]
+code, base = read_version()
+for apk in (baseline, candidate, following):
+    if apk['applicationId'] != 'app.psyzine.debug' or apk['signerCertificateSha256'] != [pins()['app.psyzine.debug']]:
+        raise SystemExit('Wrong fixture package or certificate')
+if baseline['versionCode'] != 1 or not baseline['debuggable']:
+    raise SystemExit('Baseline must be reviewed version1 Direct Debug')
+if candidate['versionCode'] != code or following['versionCode'] != code + 1 or code <= 1:
+    raise SystemExit('Candidate codes do not prove two increasing updates')
+if candidate['debuggable'] or following['debuggable']:
+    raise SystemExit('Compatibility updates must be non-debuggable')
+if (candidate['versionName'], following['versionName']) != (f'{base}-compat.{code}', f'{base}-compat.{code+1}'):
+    raise SystemExit('Wrong compatibility version names')
+if test['applicationId'] != 'app.psyzine.debug.test' or test['signerCertificateSha256'] != baseline['signerCertificateSha256']:
+    raise SystemExit('Upgrade instrumentation must share the retained identity')
+Path('artifacts/upgrade').mkdir(parents=True, exist_ok=True)
+Path('artifacts/upgrade/FIXTURE_APKS.json').write_text(json.dumps([baseline, test, candidate, following], indent=2) + '\n')
+print('Verified retained certificate, package IDs and code1/code2/code3 progression before emulator writes.')
+PY
+mkdir -p artifacts/upgrade
+"${adb_cmd[@]}" install "$baseline"
+"${adb_cmd[@]}" install "$test_apk"
+run_test() {
+    local method="$1" code="$2" output_file="$3"
+    "${adb_cmd[@]}" shell am instrument -w --no-window-animation \
+        -e class "com.isaakhanimann.journal.psyzine.InPlaceUpgradeTest#$method" \
+        -e psyzineUpgradeFixture true -e expectedVersionCode "$code" \
+        app.psyzine.debug.test/androidx.test.runner.AndroidJUnitRunner | tee "$output_file"
+    # am instrument may exit zero for a failing test, so require its explicit result.
+    python3 - "$output_file" <<'PY'
+from pathlib import Path
+import re, sys
+result = Path(sys.argv[1]).read_text()
+if not re.search(r'^OK \(1 test\)', result, re.MULTILINE) or 'FAILURES!!!' in result or 'INSTRUMENTATION_FAILED' in result:
+    raise SystemExit('Upgrade instrumentation did not pass exactly one test')
+PY
+}
+run_test seedVersionOneFixture 1 artifacts/upgrade/seed.log
+run_test verifyRetainedFixtureAndKeystore 1 artifacts/upgrade/baseline-verify.log
+code="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[0])')"
+for apk in "$candidate" "$next"; do
+    "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
+    # No uninstall, data clearing, downgrade flag or signature workaround.
+    "${adb_cmd[@]}" install -r "$apk"
+    run_test verifyRetainedFixtureAndKeystore "$code" "artifacts/upgrade/code${code}-verify.log"
+    run_test upgradedJournalPhotosAndBackupWork "$code" "artifacts/upgrade/code${code}-smoke.log"
+    # Include the post-UI state in the retention check too.
+    "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
+    run_test verifyRetainedFixtureAndKeystore "$code" "artifacts/upgrade/code${code}-post-ui.log"
+    code=$((code + 1))
+done
+printf 'Both emulator upgrades preserved data, photos, preferences, UID and Keystore decryption.\n'

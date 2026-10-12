@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      publish_compatibility:
+        description: Publish a reviewed compatibility candidate (requires protected environment approval)
+        type: boolean
+        default: false
       extra_api:
         description: Optional newer emulator API (for example 36 or 37 once an image exists)
         required: false
@@ -31,27 +35,22 @@ jobs:
           cache: gradle
       - uses: android-actions/setup-android@v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
-      - name: Restore optional stable development signing key
+      - name: Check negative signing/version policy and Obtainium selection
+        run: python3 -m unittest discover -s tools/tests -v
+      - name: Build, test, lint and verify unpublished variants
         env:
-          DEVELOPMENT_KEYSTORE_BASE64: ${{ secrets.PSYZINE_DEVELOPMENT_KEYSTORE_BASE64 }}
-        run: |
-          if [[ -n "$DEVELOPMENT_KEYSTORE_BASE64" ]]; then
-            umask 077
-            printf '%s' "$DEVELOPMENT_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/psyzine-development.jks"
-          fi
-      - name: Build, test, lint and verify all signed APK variants
-        env:
-          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-development.jks
+          PSYZINE_SIGNING_MODE: unpublished
+          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-disposable.jks
         run: bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
       - name: Package corresponding source
         run: |
           git archive --format=tar.gz --prefix=PsyZine/ HEAD > "artifacts/apks/PsyZine-source-$GITHUB_SHA.tar.gz"
           cd artifacts/apks
           sha256sum "PsyZine-source-$GITHUB_SHA.tar.gz" >> SHA256SUMS
-      - name: Upload installable APKs, checksums and results
+      - name: Upload unpublished APKs, checksums and results
         uses: actions/upload-artifact@v7
         with:
-          name: PsyZine-development-APKs-${{ github.sha }}
+          name: PsyZine-unpublished-APKs-${{ github.sha }}
           path: artifacts/apks/
           if-no-files-found: error
       - name: Upload build, test and lint reports
@@ -67,9 +66,9 @@ jobs:
       - name: Report failed checks
         if: failure()
         run: python3 tools/report-check-failures.py
-      - name: Remove ephemeral development key
+      - name: Remove disposable key
         if: always()
-        run: rm -f "$RUNNER_TEMP/psyzine-development.jks"
+        run: rm -f "$RUNNER_TEMP/psyzine-disposable.jks"
 
   instrumented:
     runs-on: ubuntu-24.04
@@ -77,6 +76,8 @@ jobs:
       fail-fast: false
       matrix:
         api: [26, 29, 30, 32, 33, 35]
+    env:
+      PSYZINE_SIGNING_MODE: unpublished
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -91,6 +92,11 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare disposable unpublished signing
+        run: |
+          export PSYZINE_DEVELOPMENT_KEYSTORE="$RUNNER_TEMP/psyzine-disposable.jks"
+          echo "PSYZINE_DEVELOPMENT_KEYSTORE=$PSYZINE_DEVELOPMENT_KEYSTORE" >> "$GITHUB_ENV"
+          bash tools/prepare-development-signing.sh --unpublished-ci
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
@@ -113,6 +119,8 @@ jobs:
   newer-android:
     if: github.event_name == 'workflow_dispatch' && inputs.extra_api != ''
     runs-on: ubuntu-24.04
+    env:
+      PSYZINE_SIGNING_MODE: unpublished
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-java@v6
@@ -129,6 +137,11 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
+      - name: Prepare disposable unpublished signing
+        run: |
+          export PSYZINE_DEVELOPMENT_KEYSTORE="$RUNNER_TEMP/psyzine-disposable.jks"
+          echo "PSYZINE_DEVELOPMENT_KEYSTORE=$PSYZINE_DEVELOPMENT_KEYSTORE" >> "$GITHUB_ENV"
+          bash tools/prepare-development-signing.sh --unpublished-ci
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ inputs.extra_api }}
@@ -150,71 +163,155 @@ jobs:
         if: failure()
         run: python3 tools/report-check-failures.py
 
-  development-prerelease:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [checks, instrumented]
+  compatibility-build:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        replica: [1, 2]
+    environment: compatibility
+    env:
+      PSYZINE_SIGNING_MODE: compatibility
+      PSYZINE_COMPAT_KEYSTORE_BASE64: ${{ secrets.PSYZINE_COMPAT_KEYSTORE_BASE64 }}
+      PSYZINE_COMPAT_KEY_ALIAS: ${{ secrets.PSYZINE_COMPAT_KEY_ALIAS }}
+      PSYZINE_COMPAT_STORE_PASSWORD: ${{ secrets.PSYZINE_COMPAT_STORE_PASSWORD }}
+      PSYZINE_COMPAT_KEY_PASSWORD: ${{ secrets.PSYZINE_COMPAT_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Set runner signing path
+        run: echo "PSYZINE_COMPAT_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-compat.jks" >> "$GITHUB_ENV"
+      - name: Restore mandatory pinned compatibility identity
+        run: bash tools/restore-compat-signing.sh
+      - name: Build independent clean candidate
+        run: |
+          ./gradlew --no-daemon clean
+          bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
+          git archive --format=tar.gz --prefix=PsyZine/ HEAD > "artifacts/apks/PsyZine-source-$GITHUB_SHA.tar.gz"
+          cd artifacts/apks
+          sha256sum "PsyZine-source-$GITHUB_SHA.tar.gz" >> SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: compatibility-build-${{ matrix.replica }}
+          path: artifacts/apks/
+          if-no-files-found: error
+      - name: Remove runner signing container
+        if: always()
+        run: rm -f "$PSYZINE_COMPAT_KEYSTORE_FILE"
+
+  compatibility-upgrade:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [26, 29, 30, 32, 33, 35]
+    environment: compatibility
+    env:
+      PSYZINE_SIGNING_MODE: compatibility
+      PSYZINE_COMPAT_KEYSTORE_BASE64: ${{ secrets.PSYZINE_COMPAT_KEYSTORE_BASE64 }}
+      PSYZINE_COMPAT_KEY_ALIAS: ${{ secrets.PSYZINE_COMPAT_KEY_ALIAS }}
+      PSYZINE_COMPAT_STORE_PASSWORD: ${{ secrets.PSYZINE_COMPAT_STORE_PASSWORD }}
+      PSYZINE_COMPAT_KEY_PASSWORD: ${{ secrets.PSYZINE_COMPAT_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: gradle/actions/wrapper-validation@v6
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Set runner signing path
+        run: echo "PSYZINE_COMPAT_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-compat.jks" >> "$GITHUB_ENV"
+      - name: Restore mandatory pinned compatibility identity
+        run: bash tools/restore-compat-signing.sh
+      - name: Build reviewed baseline and consecutive candidates
+        run: bash tools/build-upgrade-fixtures.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: default
+          disable-animations: true
+          script: bash tools/verify-in-place-upgrade.sh "$(adb devices | awk '/^emulator-.*device$/ {print $1}')" artifacts/upgrade/baseline-code1.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: compatibility-upgrade-api-${{ matrix.api }}
+          path: |
+            artifacts/upgrade/*.log
+            artifacts/upgrade/FIXTURE_APKS.json
+          if-no-files-found: error
+      - name: Remove runner signing container
+        if: always()
+        run: rm -f "$PSYZINE_COMPAT_KEYSTORE_FILE"
+
+  compatibility-publish:
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
+    needs: [checks, instrumented, compatibility-build, compatibility-upgrade]
+    runs-on: ubuntu-24.04
+    environment: compatibility
+    concurrency:
+      group: psyzine-publication
+      cancel-in-progress: false
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: android-actions/setup-android@v4
+      - run: sdkmanager "build-tools;35.0.0"
       - uses: actions/download-artifact@v8
         with:
-          name: PsyZine-development-APKs-${{ github.sha }}
-          path: artifacts/apks
-      - name: Verify downloaded APK and source checksums
-        working-directory: artifacts/apks
-        run: sha256sum --check SHA256SUMS
-      - name: Publish verified testing pre-release
+          name: compatibility-build-1
+          path: artifacts/candidate
+      - uses: actions/download-artifact@v8
+        with:
+          name: compatibility-build-2
+          path: artifacts/second-build
+      - name: Check downloaded signatures, independent identities and every historical version code
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: v1.0.0-dev.${{ github.run_number }}
+        run: python3 tools/verify-publication.py --candidate artifacts/candidate --second-build artifacts/second-build --repository "$GITHUB_REPOSITORY"
+      - name: Verify Obtainium selects exactly one candidate APK
+        run: python3 tools/verify-obtainium.py --assets-dir artifacts/candidate
+      - name: Publish reviewed compatibility pre-release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          cat > "$RUNNER_TEMP/release-notes.md" <<'NOTES'
-          Development-signed testing build; this is a pre-release, not a production release.
-
-          Uses the supplied PsyZine eye artwork for legacy, round and adaptive icons.
-          Application and launcher labels are PsyZine across all four variants.
-          Add Direct Debug to Obtainium through the repository README.
-
-          Changes in this build:
-          - Onboarding uses the supplied closed-eye artwork until every acknowledgement
-            is checked, then displays the open-eye app artwork.
-          - Touch, drag or hover over the journal graph to inspect estimated percentage
-            of peak and the dose scaled to that percentage in mg. Unknown timing or
-            non-mass units display unavailable values; these are model estimates,
-            not measured drug levels or dosing guidance.
-          - Solid cards and distinct raised navigation/popover surfaces improve
-            contrast across all 13 themes, including the Frappé reference palette.
-          - Added onboarding, cursor interaction and rendered theme regression tests.
-
-          All four APK variants, both JVM test suites, Android lint, APK signatures,
-          package integrity, application IDs and checksums passed. The required
-          Android emulator instrumentation matrix also passed. See BUILD_RESULTS.json
-          and the linked Actions run for evidence and remaining manual acceptance checks.
-
-          Installation: download a Direct Debug APK for isolated testing, enable
-          installation from your chosen browser/file manager, then open the APK.
-          Future physical-device tests install only Direct Debug; verify the other
-          variants using host tools and emulators.
-          Direct Release and Play Release use development signing and retain their
-          release application IDs. Play APKs can be sideloaded without Google Play.
-          Verify downloads with `sha256sum --check SHA256SUMS`.
-
-          Upgrades require the same application ID and signing certificate. CI uses
-          an ephemeral development key unless a stable development-key secret is
-          configured; builds from separate runs may require reinstalling. Export
-          test data before changing signing identities. Production keys differ.
-
-          Corresponding GPL-3.0-or-later source and notices are included. Physical
-          camera, reboot/process recovery, tablet and accessibility acceptance are
-          separate checks documented in docs/verification.md.
-          NOTES
-          printf '\nSource commit: %s\n\nBuild evidence: https://github.com/%s/actions/runs/%s\n' \
-            "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$RUNNER_TEMP/release-notes.md"
-          gh release create "$RELEASE_TAG" artifacts/apks/* \
-            --target "$GITHUB_SHA" --prerelease \
-            --title "PsyZine 1.0.0 development test build $GITHUB_RUN_NUMBER" \
-            --notes-file "$RUNNER_TEMP/release-notes.md"
-          gh release view "$RELEASE_TAG" --json url,isPrerelease,assets
+          version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; c,n=read_version(); print(f"{n}-compat.{c}")')"
+          cp docs/compatibility-release-notes.md "$RUNNER_TEMP/compatibility-notes.md"
+          printf '\nSource commit: %s\nBuild evidence: https://github.com/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$RUNNER_TEMP/compatibility-notes.md"
+          gh release create "v$version" artifacts/candidate/* --target "$GITHUB_SHA" --prerelease --title "PsyZine Compatibility $version" --notes-file "$RUNNER_TEMP/compatibility-notes.md"
+      - name: Re-download and inspect published assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; c,n=read_version(); print(f"{n}-compat.{c}")')"
+          gh release download "v$version" --dir artifacts/published --repo "$GITHUB_REPOSITORY"
+          python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); import runpy; m=runpy.run_path("tools/verify-publication.py"); m["verify_candidate"](Path("artifacts/published"), "compatibility")'
+          python3 tools/verify-obtainium.py --assets-dir artifacts/published
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: compatibility-publication-evidence
+          path: artifacts/publication/
