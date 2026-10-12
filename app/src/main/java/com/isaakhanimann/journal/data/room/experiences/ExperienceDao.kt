@@ -82,7 +82,11 @@ interface ExperienceDao {
     suspend fun getAllSubstanceCompanions(): List<SubstanceCompanion>
 
     @Transaction
-    @Query("SELECT * FROM experience WHERE sortDate > :fromInstant AND sortDate < :toInstant ORDER BY sortDate DESC")
+    @Query("SELECT * FROM ingestion WHERE time >= :fromInstant AND time < :toInstant ORDER BY time, id")
+    fun observeCalendarIngestions(fromInstant: Instant, toInstant: Instant): Flow<List<IngestionWithCompanion>>
+
+    @Transaction
+    @Query("SELECT * FROM experience WHERE sortDate >= :fromInstant AND sortDate < :toInstant ORDER BY sortDate DESC")
     suspend fun getSortedExperiencesWithIngestionsWithSortDateBetween(fromInstant: Instant, toInstant: Instant): List<ExperienceWithIngestions>
 
     @Query("SELECT substanceName FROM ingestion ORDER BY time DESC LIMIT :limit")
@@ -152,8 +156,15 @@ interface ExperienceDao {
     suspend fun getExperienceWithIngestionsCompanionsAndRatings(id: Int): ExperienceWithIngestionsCompanionsAndRatings?
 
     @Transaction
+    @Query("SELECT * FROM experience WHERE id = :id")
+    fun observeExperienceWithIngestionsCompanionsAndRatings(id: Int): Flow<ExperienceWithIngestionsCompanionsAndRatings?>
+
+    @Transaction
     @Query("SELECT * FROM ingestion WHERE experienceId =:experienceId")
     suspend fun getIngestionsWithCompanions(experienceId: Int): List<IngestionWithCompanionAndCustomUnit>
+
+    @Query("SELECT * FROM ingestion WHERE id = :id")
+    suspend fun getIngestion(id: Int): Ingestion?
 
     @Query("SELECT * FROM shulginrating WHERE id =:id")
     suspend fun getRating(id: Int): ShulginRating?
@@ -176,14 +187,14 @@ interface ExperienceDao {
     fun getIngestionWithExperienceFlow(id: Int): Flow<IngestionWithExperienceAndCustomUnit?>
 
     @Transaction
-    @Query("SELECT * FROM ingestion WHERE time > :fromInstant AND time < :toInstant")
+    @Query("SELECT * FROM ingestion WHERE time >= :fromInstant AND time < :toInstant")
     fun getIngestionWithExperiencesFlow(
         fromInstant: Instant,
         toInstant: Instant
     ): Flow<List<IngestionWithExperienceAndCustomUnit>>
 
     @Transaction
-    @Query("SELECT * FROM ingestion WHERE time > :fromInstant AND time < :toInstant")
+    @Query("SELECT * FROM ingestion WHERE time >= :fromInstant AND time < :toInstant")
     suspend fun getIngestionsWithCompanions(
         fromInstant: Instant,
         toInstant: Instant
@@ -226,28 +237,28 @@ interface ExperienceDao {
     suspend fun insert(experience: Experience): Long
 
     @Update
-    suspend fun update(experience: Experience)
+    suspend fun update(experience: Experience): Int
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(ingestion: Ingestion)
+    suspend fun update(ingestion: Ingestion): Int
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(rating: ShulginRating)
+    suspend fun update(rating: ShulginRating): Int
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(customUnit: CustomUnit)
+    suspend fun update(customUnit: CustomUnit): Int
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(timedNote: TimedNote)
+    suspend fun update(timedNote: TimedNote): Int
 
     @Delete
-    suspend fun delete(experience: Experience)
+    suspend fun delete(experience: Experience): Int
 
     @Delete
-    suspend fun delete(rating: ShulginRating)
+    suspend fun delete(rating: ShulginRating): Int
 
     @Delete
-    suspend fun delete(timedNote: TimedNote)
+    suspend fun delete(timedNote: TimedNote): Int
 
     @Transaction
     suspend fun deleteExperienceWithIngestions(experienceWithIngestions: ExperienceWithIngestions) {
@@ -259,10 +270,10 @@ interface ExperienceDao {
     suspend fun deleteUnusedSubstanceCompanions()
 
     @Delete
-    suspend fun delete(ingestion: Ingestion)
+    suspend fun delete(ingestion: Ingestion): Int
 
     @Delete
-    suspend fun delete(customUnit: CustomUnit)
+    suspend fun delete(customUnit: CustomUnit): Int
 
     @Transaction
     suspend fun deleteEverything() {
@@ -289,7 +300,7 @@ interface ExperienceDao {
         deleteIngestions(experienceId)
         deleteRatings(experienceId)
         deleteTimedNotes(experienceId)
-        deleteExperience(experienceId)
+        check(deleteExperience(experienceId) == 1) { "This experience was deleted." }
     }
 
 
@@ -311,7 +322,7 @@ interface ExperienceDao {
 
     @Transaction
     @Query("DELETE FROM experience WHERE id = :experienceId")
-    suspend fun deleteExperience(experienceId: Int)
+    suspend fun deleteExperience(experienceId: Int): Int
 
     @Transaction
     @Query("DELETE FROM shulginrating")
@@ -363,7 +374,7 @@ interface ExperienceDao {
     suspend fun updateEditableFields(id: Int, title: String, text: String, location: String?): Int
 
     @Query("UPDATE experience SET isFavorite = :favorite WHERE id = :id")
-    suspend fun updateFavorite(id: Int, favorite: Boolean)
+    suspend fun updateFavorite(id: Int, favorite: Boolean): Int
 
     @Transaction
     suspend fun replaceEverything(journalExport: JournalExport) {
@@ -491,16 +502,16 @@ interface ExperienceDao {
     suspend fun insert(customSubstance: CustomSubstance): Long
 
     @Delete
-    suspend fun delete(customSubstance: CustomSubstance)
+    suspend fun delete(customSubstance: CustomSubstance): Int
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(customSubstance: CustomSubstance)
+    suspend fun update(customSubstance: CustomSubstance): Int
 
     @Delete
     suspend fun delete(substanceCompanion: SubstanceCompanion)
 
     @Update(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun update(substanceCompanion: SubstanceCompanion)
+    suspend fun update(substanceCompanion: SubstanceCompanion): Int
 
     @Query("SELECT * FROM substancecompanion WHERE substanceName =:substanceName")
     fun getSubstanceCompanionFlow(substanceName: String): Flow<SubstanceCompanion?>

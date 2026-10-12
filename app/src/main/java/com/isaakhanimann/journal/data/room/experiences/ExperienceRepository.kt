@@ -34,6 +34,7 @@ import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCo
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithExperienceAndCustomUnit
 import com.isaakhanimann.journal.ui.tabs.settings.JournalExport
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.flowOn
@@ -48,20 +49,77 @@ import javax.inject.Singleton
 class ExperienceRepository @Inject constructor(private val experienceDao: ExperienceDao,
     private val photoDao: com.isaakhanimann.journal.data.room.attachments.PhotoAttachmentDao,
     private val storage: com.isaakhanimann.journal.data.attachments.AttachmentStorage,
-    private val lock: com.isaakhanimann.journal.data.attachments.JournalMutationLock) {
-    suspend fun updateFavorite(id: Int, value: Boolean) = experienceDao.updateFavorite(id, value)
+    private val lock: com.isaakhanimann.journal.data.attachments.JournalMutationLock,
+    private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard) {
+    private suspend fun requireParent(id: Int) {
+        check(experienceDao.getExperience(id) != null) { "This experience was deleted. Close this screen." }
+    }
+
+    suspend fun insert(rating: ShulginRating, generation: String?) = sessionGuard.withSession(generation, rating.experienceId) {
+        check(rating.time != null || experienceDao.getRatingsFlow(rating.experienceId).first().none { it.time == null }) {
+            "This experience already has an overall rating."
+        }
+        experienceDao.insert(rating)
+    }
+
+    suspend fun insert(note: TimedNote, generation: String?) = sessionGuard.withSession(generation, note.experienceId) {
+        experienceDao.insert(note)
+    }
+
+    suspend fun update(rating: ShulginRating, generation: String?) = sessionGuard.withSession(generation, rating.experienceId) {
+        check(experienceDao.getRating(rating.id)?.experienceId == rating.experienceId) { "This rating was deleted." }
+        check(rating.time != null || experienceDao.getRatingsFlow(rating.experienceId).first().none { it.id != rating.id && it.time == null }) { "This experience already has an overall rating." }
+        check(experienceDao.update(rating) == 1) { "This rating was deleted." }
+    }
+
+    suspend fun update(note: TimedNote, generation: String?) = sessionGuard.withSession(generation, note.experienceId) {
+        check(experienceDao.getTimedNote(note.id)?.experienceId == note.experienceId) { "This note was deleted." }
+        check(experienceDao.update(note) == 1) { "This note was deleted." }
+    }
+
+    suspend fun update(ingestion: Ingestion, previousParent: Int, generation: String?) = sessionGuard.withSession(generation, previousParent) {
+        requireParent(ingestion.experienceId)
+        check(experienceDao.getIngestion(ingestion.id)?.experienceId == previousParent) { "This ingestion was deleted or moved. Reopen it." }
+        ingestion.customUnitId?.let { id ->
+            val unit = experienceDao.getCustomUnit(id)
+            check(unit != null && unit.substanceName == ingestion.substanceName && unit.administrationRoute == ingestion.administrationRoute) { "This custom unit was deleted or changed. Choose a unit again." }
+            com.isaakhanimann.journal.data.room.validateCustomUnitDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation, ingestion.isDoseAnEstimate, unit)
+        }
+        com.isaakhanimann.journal.data.room.validateDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation)
+        require(ingestion.endTime == null || ingestion.endTime!! >= ingestion.time) { "End time must not be before start time." }
+        check(experienceDao.update(ingestion) == 1) { "This ingestion was deleted." }
+    }
+
+    suspend fun delete(rating: ShulginRating, generation: String?) = sessionGuard.withSession(generation, rating.experienceId) {
+        check(experienceDao.getRating(rating.id)?.experienceId == rating.experienceId && experienceDao.delete(rating) == 1) { "This rating was deleted." }
+    }
+
+    suspend fun delete(note: TimedNote, generation: String?) = sessionGuard.withSession(generation, note.experienceId) {
+        check(experienceDao.getTimedNote(note.id)?.experienceId == note.experienceId && experienceDao.delete(note) == 1) { "This note was deleted." }
+    }
+
+    suspend fun delete(ingestion: Ingestion, generation: String?) = sessionGuard.withSession(generation, ingestion.experienceId) {
+        check(experienceDao.getIngestion(ingestion.id)?.experienceId == ingestion.experienceId && experienceDao.delete(ingestion) == 1) { "This ingestion was deleted or moved." }
+    }
+
+    suspend fun updateFavorite(id: Int, value: Boolean, generation: String?) = sessionGuard.withSession(generation, id) {
+        check(experienceDao.updateFavorite(id, value) == 1) { "This experience was deleted." }
+    }
+
+    suspend fun deleteEverythingOfExperience(id: Int, generation: String?) = sessionGuard.withSession(generation, id) {
+        val photos = photoDao.forExperience(id)
+        experienceDao.deleteEverythingOfExperience(id)
+        withContext(Dispatchers.IO) { collectLater(photos) }
+    }
+
+    fun observeCalendarIngestions(from: Instant, to: Instant) = experienceDao.observeCalendarIngestions(from, to)
+
     private fun collectLater(photos: List<com.isaakhanimann.journal.data.room.attachments.PhotoAttachment>) {
         photos.forEach { runCatching { storage.file(it.relativePath).setLastModified(System.currentTimeMillis()) } }
     }
 
-    suspend fun insert(rating: ShulginRating) = experienceDao.insert(rating)
     suspend fun insert(customUnit: CustomUnit) = experienceDao.insert(customUnit).toInt()
-    suspend fun insert(timedNote: TimedNote) = experienceDao.insert(timedNote)
-    suspend fun update(experience: Experience) = experienceDao.update(experience)
-    suspend fun update(ingestion: Ingestion) = experienceDao.update(ingestion)
-    suspend fun update(rating: ShulginRating) = experienceDao.update(rating)
-    suspend fun update(customUnit: CustomUnit) = experienceDao.update(customUnit)
-    suspend fun update(timedNote: TimedNote) = experienceDao.update(timedNote)
+    suspend fun update(customUnit: CustomUnit) { check(experienceDao.update(customUnit) == 1) { "This record was deleted. Close this screen." } }
 
     suspend fun migrateBenzydamine() = experienceDao.migrateBenzydamine()
     suspend fun migrateCannabisAndMushroomUnits() = experienceDao.migrateCannabisAndMushroomUnits()
@@ -95,23 +153,7 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         }
     }
 
-    suspend fun delete(ingestion: Ingestion) = experienceDao.delete(ingestion)
-    suspend fun delete(customUnit: CustomUnit) = experienceDao.delete(customUnit)
-
-    suspend fun deleteEverythingOfExperience(experienceId: Int) = lock.mutex.withLock {
-        val photos = photoDao.forExperience(experienceId)
-        withContext(NonCancellable) { experienceDao.deleteEverythingOfExperience(experienceId); collectLater(photos) }
-    }
-
-    suspend fun delete(experience: Experience) = deleteEverythingOfExperience(experience.id)
-
-    suspend fun delete(rating: ShulginRating) =
-        experienceDao.delete(rating)
-
-    suspend fun delete(timedNote: TimedNote) =
-        experienceDao.delete(timedNote)
-
-    suspend fun delete(experienceWithIngestions: ExperienceWithIngestions) = deleteEverythingOfExperience(experienceWithIngestions.experience.id)
+    suspend fun delete(customUnit: CustomUnit) { check(experienceDao.delete(customUnit) == 1) { "This record was deleted. Close this screen." } }
 
     suspend fun deleteUnusedSubstanceCompanions() =
         experienceDao.deleteUnusedSubstanceCompanions()
@@ -173,8 +215,13 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
     suspend fun getExperienceWithIngestionsCompanionsAndRatings(id: Int): ExperienceWithIngestionsCompanionsAndRatings? =
         experienceDao.getExperienceWithIngestionsCompanionsAndRatings(id)
 
+    fun observeExperienceWithIngestionsCompanionsAndRatings(id: Int) =
+        experienceDao.observeExperienceWithIngestionsCompanionsAndRatings(id).flowOn(Dispatchers.IO).conflate()
+
     suspend fun getIngestionsWithCompanions(experienceId: Int) =
         experienceDao.getIngestionsWithCompanions(experienceId)
+
+    suspend fun getIngestion(id: Int): Ingestion? = experienceDao.getIngestion(id)
 
     suspend fun getRating(id: Int): ShulginRating? = experienceDao.getRating(id)
     suspend fun getTimedNote(id: Int): TimedNote? = experienceDao.getTimedNote(id)
@@ -225,17 +272,20 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
     suspend fun delete(substanceCompanion: SubstanceCompanion) =
         experienceDao.delete(substanceCompanion)
 
-    suspend fun update(substanceCompanion: SubstanceCompanion) =
-        experienceDao.update(substanceCompanion)
+    suspend fun update(substanceCompanion: SubstanceCompanion) {
+        check(experienceDao.update(substanceCompanion) == 1) { "This substance color was deleted." }
+    }
 
     suspend fun insert(customSubstance: CustomSubstance): Int =
         experienceDao.insert(customSubstance).toInt()
 
-    suspend fun delete(customSubstance: CustomSubstance) =
-        experienceDao.delete(customSubstance)
+    suspend fun delete(customSubstance: CustomSubstance) {
+        check(experienceDao.delete(customSubstance) == 1) { "This substance was deleted. Close this screen." }
+    }
 
-    suspend fun update(customSubstance: CustomSubstance) =
-        experienceDao.update(customSubstance)
+    suspend fun update(customSubstance: CustomSubstance) {
+        check(experienceDao.update(customSubstance) == 1) { "This substance was deleted. Close this screen." }
+    }
 
     fun getSortedIngestionsWithSubstanceCompanionsFlow(limit: Int) =
         experienceDao.getSortedIngestionsWithSubstanceCompanionsFlow(limit)

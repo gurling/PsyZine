@@ -31,6 +31,8 @@ import com.isaakhanimann.journal.ui.main.navigation.graphs.ChooseCustomSubstance
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
+import com.isaakhanimann.journal.data.room.validateDoseText
 import javax.inject.Inject
 
 
@@ -63,13 +65,14 @@ class CustomSubstanceChooseDoseViewModel @Inject constructor(
                 purity.let { safePurity ->
                     if (safePurity == null) return null
                     val value = it.div(safePurity).times(100)
+                    if (!value.isFinite()) return "Result is too large"
                     return value.toReadableString() + " impure $units"
                 }
             }
         }
-    val dose: Double? get() = doseText.toDoubleOrNull()
-    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseDeviationText.toDoubleOrNull()
-    val isValidDose: Boolean get() = dose != null
+    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
+    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
+    val isValidDose: Boolean get() = dose != null && (!isEstimate || estimatedDoseDeviationText.isBlank() || estimatedDoseDeviationText.nonnegativeDoubleOrNull() != null)
 
     fun onDoseTextChange(newDoseText: String) {
         doseText = newDoseText

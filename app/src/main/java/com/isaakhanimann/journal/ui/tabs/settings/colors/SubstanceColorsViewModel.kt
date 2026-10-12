@@ -35,40 +35,25 @@ import javax.inject.Inject
 @HiltViewModel
 class SubstanceColorsViewModel @Inject constructor(
     private val experienceRepository: ExperienceRepository,
+    private val guard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
+    state: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
 
-    private val _substanceCompanionsFlow = MutableStateFlow<List<SubstanceCompanion>>(emptyList())
-    val substanceCompanionsFlow: StateFlow<List<SubstanceCompanion>> = _substanceCompanionsFlow
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, guard, state)
+    val substanceCompanionsFlow = experienceRepository.getAllSubstanceCompanionsFlow()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    init { session.load { experienceRepository.deleteUnusedSubstanceCompanions() } }
 
-    init {
-        viewModelScope.launch {
-            experienceRepository.getAllSubstanceCompanionsFlow().collect {
-                _substanceCompanionsFlow.value = it
-            }
-        }
-    }
-
-    fun deleteUnusedSubstanceCompanions() = viewModelScope.launch {
-        experienceRepository.deleteUnusedSubstanceCompanions()
-    }
-
-    fun updateColor(color: AdaptiveColor, substanceName: String) {
-        viewModelScope.launch {
-            val updatedList = _substanceCompanionsFlow.value.map { companion ->
-                if (companion.substanceName == substanceName) {
-                    companion.copy(color = color).also {
-                        experienceRepository.update(it)
-                    }
-                } else {
-                    companion
-                }
-            }
-            _substanceCompanionsFlow.value = updatedList
+    fun updateColor(color: AdaptiveColor, substanceName: String) = session.run {
+        guard.withSession(session.generation) {
+            val companion = experienceRepository.getAllSubstanceCompanions().firstOrNull { it.substanceName == substanceName }
+            check(companion != null) { "This substance color was deleted. Close this screen." }
+            experienceRepository.update(companion.copy(color=color))
         }
     }
 
     val alreadyUsedColorsFlow: StateFlow<List<AdaptiveColor>> =
-        _substanceCompanionsFlow.map { companions ->
+        substanceCompanionsFlow.map { companions ->
             companions.map { it.color }.distinct()
         }.stateIn(
             initialValue = emptyList(),

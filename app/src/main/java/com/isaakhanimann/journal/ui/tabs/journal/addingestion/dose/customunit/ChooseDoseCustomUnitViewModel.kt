@@ -34,6 +34,8 @@ import com.isaakhanimann.journal.ui.main.navigation.graphs.ChooseDoseCustomUnitR
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.search.suggestion.models.CustomUnitDose
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.launch
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
+import com.isaakhanimann.journal.data.room.validateDoseText
 import javax.inject.Inject
 
 @HiltViewModel
@@ -73,9 +75,10 @@ class ChooseDoseCustomUnitViewModel @Inject constructor(
         estimatedDoseDeviationText = newEstimatedDeviationText
     }
 
-    val dose: Double? get() = doseText.toDoubleOrNull()
-    val estimatedDoseDeviation: Double? get() = estimatedDoseDeviationText.toDoubleOrNull()
-    val isValidDose: Boolean get() = dose != null
+    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
+    val estimatedDoseDeviation: Double? get() = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
+    val isValidDose: Boolean get() = (customUnit?.dose == null || customUnitDose?.calculatedDose?.let { it.isFinite() && it >= 0 } == true) &&
+        (customUnitDose?.calculatedDoseStandardDeviation?.let { it.isFinite() && it >= 0 } != false) && dose != null && (!isEstimate || estimatedDoseDeviationText.isBlank() || estimatedDoseDeviationText.nonnegativeDoubleOrNull() != null)
 
     private val customUnitDose: CustomUnitDose?
         get() {

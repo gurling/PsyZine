@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -64,8 +65,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -99,6 +100,7 @@ fun EditIngestionScreen(
     navigateToAddIngestion: () -> Unit,
     navigateBack: () -> Unit
 ) {
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     EditIngestionScreen(
         note = viewModel.note,
         onNoteChange = { viewModel.note = it },
@@ -112,31 +114,31 @@ fun EditIngestionScreen(
         onEstimatedDoseStandardDeviationChange = viewModel::onChangeEstimatedDoseStandardDeviation,
         units = viewModel.units,
         onUnitsChange = { viewModel.units = it },
-        experiences = viewModel.relevantExperiences.collectAsState().value,
+        experiences = viewModel.relevantExperiences.collectAsStateWithLifecycle().value,
         selectedExperienceId = viewModel.experienceId,
         onChangeId = { viewModel.experienceId = it },
         navigateBack = navigateBack,
-        deleteIngestion = viewModel::deleteIngestion,
+        deleteIngestion = { viewModel.deleteIngestion(navigateBack) },
         onDone = {
-            viewModel.onDoneTap()
-            navigateBack()
+            viewModel.onDoneTap(navigateBack)
         },
-        ingestionTimePickerOption = viewModel.ingestionTimePickerOptionFlow.collectAsState().value,
+        ingestionTimePickerOption = viewModel.ingestionTimePickerOptionFlow.collectAsStateWithLifecycle().value,
         onChangeTimePickerOption = viewModel::onChangeTimePickerOption,
         onChangeStartDateOrTime = viewModel::onChangeStartTime,
-        localDateTimeStart = viewModel.localDateTimeStartFlow.collectAsState().value,
-        localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsState().value,
+        localDateTimeStart = viewModel.localDateTimeStartFlow.collectAsStateWithLifecycle().value,
+        localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsStateWithLifecycle().value,
         onChangeEndDateOrTime = viewModel::onChangeEndTime,
         consumerName = viewModel.consumerName,
         onChangeConsumerName = viewModel::onChangeConsumerName,
-        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsState().value,
+        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsStateWithLifecycle().value,
         customUnit = viewModel.customUnit,
         onCustomUnitChange = viewModel::onChangeCustomUnit,
-        otherCustomUnits = viewModel.otherCustomUnits.collectAsState().value,
+        otherCustomUnits = viewModel.otherCustomUnits.collectAsStateWithLifecycle().value,
         addIngestionWithClonedTime = {
-            viewModel.saveClonedIngestionTime()
-            navigateBack()
-            navigateToAddIngestion()
+            viewModel.saveClonedIngestionTime {
+                navigateBack()
+                navigateToAddIngestion()
+            }
         }
     )
 }
@@ -238,7 +240,6 @@ fun EditIngestionScreen(
                                     onClick = {
                                         isShowingDeleteDialog = false
                                         deleteIngestion()
-                                        navigateBack()
                                     }
                                 ) {
                                     Text("Delete")
@@ -325,7 +326,7 @@ fun EditIngestionScreen(
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
                             }),
-                            isError = dose.toDoubleOrNull() == null,
+                            isError = dose.nonnegativeDoubleOrNull() == null,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true
                         )
@@ -358,13 +359,13 @@ fun EditIngestionScreen(
                                     keyboardActions = KeyboardActions(onDone = {
                                         focusManager.clearFocus()
                                     }),
-                                    isError = estimatedDoseStandardDeviation.toDoubleOrNull() == null,
+                                    isError = estimatedDoseStandardDeviation.isNotBlank() && estimatedDoseStandardDeviation.nonnegativeDoubleOrNull() == null,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                val mean = dose.toDoubleOrNull()
-                                val standardDeviation = estimatedDoseStandardDeviation.toDoubleOrNull()
+                                val mean = dose.nonnegativeDoubleOrNull()
+                                val standardDeviation = estimatedDoseStandardDeviation.nonnegativeDoubleOrNull()
                                 val isExplanationShown = mean != null && standardDeviation != null
                                 AnimatedVisibility(isExplanationShown) {
                                     if (mean != null && standardDeviation != null) {

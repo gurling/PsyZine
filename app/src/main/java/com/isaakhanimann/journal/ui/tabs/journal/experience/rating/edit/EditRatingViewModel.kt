@@ -41,11 +41,15 @@ import javax.inject.Inject
 @HiltViewModel
 class EditRatingViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
+    sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     private val ratingId: Int
     var selectedRatingOption by mutableStateOf(ShulginRatingOption.TWO_PLUS)
-    var localDateTimeFlow = MutableStateFlow(LocalDateTime.now())
+    private var loadedInstant: java.time.Instant = java.time.Instant.now()
+    private var loadedLocal: LocalDateTime = loadedInstant.getLocalDateTime()
+    var localDateTimeFlow = MutableStateFlow(loadedLocal)
     var rating: ShulginRating? = null
     var isOverallRatingFlow = MutableStateFlow(false)
 
@@ -53,11 +57,14 @@ class EditRatingViewModel @Inject constructor(
         val editRatingRoute = state.toRoute<EditRatingRoute>()
         val ratingId = editRatingRoute.ratingId
         this.ratingId = ratingId
-        viewModelScope.launch {
-            val loadedRating = experienceRepo.getRating(id = ratingId) ?: return@launch
+        session.load {
+            val loadedRating = experienceRepo.getRating(id = ratingId) ?: error("This entry was deleted. Close this screen.")
+            check(experienceRepo.getExperience(loadedRating.experienceId) != null) { "This experience was deleted." }
             rating = loadedRating
             loadedRating.time?.also { time ->
-                localDateTimeFlow.emit(time.getLocalDateTime())
+                loadedInstant = time
+                loadedLocal = time.getLocalDateTime()
+                localDateTimeFlow.emit(loadedLocal)
             } ?: run {
                 isOverallRatingFlow.value = true
             }
@@ -75,22 +82,13 @@ class EditRatingViewModel @Inject constructor(
         selectedRatingOption = newRating
     }
 
-    fun delete() {
-        viewModelScope.launch {
-            rating?.let {
-                experienceRepo.delete(it)
-            }
-        }
+    fun delete(onSuccess: () -> Unit) = session.run(onSuccess) {
+        experienceRepo.delete(checkNotNull(rating), session.generation)
     }
 
-    fun onDoneTap() {
-        viewModelScope.launch {
-            val selectedInstant = localDateTimeFlow.firstOrNull()?.getInstant() ?: return@launch
-            rating?.let {
-                it.time = if (isOverallRatingFlow.value) null else selectedInstant
-                it.option = selectedRatingOption
-                experienceRepo.update(it)
-            }
-        }
+    fun onDoneTap(onSuccess: () -> Unit) = session.run(onSuccess) {
+        val current = checkNotNull(rating)
+        val updated = current.copy(time = if (isOverallRatingFlow.value) null else com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant), option = selectedRatingOption)
+        experienceRepo.update(updated, session.generation)
     }
 }

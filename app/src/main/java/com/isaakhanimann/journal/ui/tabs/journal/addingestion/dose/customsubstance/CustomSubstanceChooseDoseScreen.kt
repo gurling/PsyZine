@@ -50,6 +50,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -286,8 +287,8 @@ fun CustomSubstanceChooseDoseScreen(
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            val mean = doseText.toDoubleOrNull()
-                            val standardDeviation = estimatedDoseStandardDeviationText.toDoubleOrNull()
+                            val mean = doseText.nonnegativeDoubleOrNull()
+                            val standardDeviation = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull()
                             val isExplanationShown = mean != null && standardDeviation != null
                             AnimatedVisibility(isExplanationShown) {
                                 if (mean != null && standardDeviation != null) {

@@ -46,12 +46,16 @@ import javax.inject.Inject
 @HiltViewModel
 class EditTimedNoteViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
+    sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var note by mutableStateOf("")
     var color by mutableStateOf(AdaptiveColor.BLUE)
     var isPartOfTimeline by mutableStateOf(true)
-    var localDateTimeFlow = MutableStateFlow(LocalDateTime.now())
+    private var loadedInstant: java.time.Instant = java.time.Instant.now()
+    private var loadedLocal: LocalDateTime = loadedInstant.getLocalDateTime()
+    var localDateTimeFlow = MutableStateFlow(loadedLocal)
     private var timedNote: TimedNote? = null
     private val editTimedNoteRoute = state.toRoute<EditTimedNoteRoute>()
     val experienceId = editTimedNoteRoute.experienceId
@@ -61,11 +65,14 @@ class EditTimedNoteViewModel @Inject constructor(
     init {
         val timedNoteId = editTimedNoteRoute.timedNoteId
         this.timedNoteId = timedNoteId
-        viewModelScope.launch {
-            val loadedNote = experienceRepo.getTimedNote(id = timedNoteId) ?: return@launch
+        session.load {
+            val loadedNote = experienceRepo.getTimedNote(id = timedNoteId) ?: error("This entry was deleted. Close this screen.")
+            check(loadedNote.experienceId == experienceId && experienceRepo.getExperience(experienceId) != null) { "This note or experience was deleted." }
             timedNote = loadedNote
             loadedNote.time.let { time ->
-                localDateTimeFlow.emit(time.getLocalDateTime())
+                loadedInstant = time
+                loadedLocal = time.getLocalDateTime()
+                localDateTimeFlow.emit(loadedLocal)
             }
             note = loadedNote.note
             color = loadedNote.color
@@ -117,24 +124,13 @@ class EditTimedNoteViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000)
         )
 
-    fun delete() {
-        viewModelScope.launch {
-            timedNote?.let {
-                experienceRepo.delete(it)
-            }
-        }
+    fun delete(onSuccess: () -> Unit) = session.run(onSuccess) {
+        experienceRepo.delete(checkNotNull(timedNote), session.generation)
     }
 
-    fun onDoneTap() {
-        viewModelScope.launch {
-            val selectedInstant = localDateTimeFlow.firstOrNull()?.getInstant() ?: return@launch
-            timedNote?.let {
-                it.time = selectedInstant
-                it.note = note
-                it.color = color
-                it.isPartOfTimeline = isPartOfTimeline
-                experienceRepo.update(it)
-            }
-        }
+    fun onDoneTap(onSuccess: () -> Unit) = session.run(onSuccess) {
+        check(note.isNotBlank()) { "Enter a note before saving." }
+        val updated = checkNotNull(timedNote).copy(time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant), note = note, color = color, isPartOfTimeline = isPartOfTimeline)
+        experienceRepo.update(updated, session.generation)
     }
 }

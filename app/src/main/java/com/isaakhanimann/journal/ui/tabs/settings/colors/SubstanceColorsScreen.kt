@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.colors
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,7 +34,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,14 +48,12 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 fun SubstanceColorsScreen(
     viewModel: SubstanceColorsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(Unit) {
-        viewModel.deleteUnusedSubstanceCompanions()
-    }
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     SubstanceColorsScreenContent(
-        substanceCompanions = viewModel.substanceCompanionsFlow.collectAsState().value,
+        substanceCompanions = viewModel.substanceCompanionsFlow.collectAsStateWithLifecycle().value,
         updateColor = viewModel::updateColor,
-        alreadyUsedColors = viewModel.alreadyUsedColorsFlow.collectAsState().value,
-        otherColors = viewModel.otherColorsFlow.collectAsState().value
+        alreadyUsedColors = viewModel.alreadyUsedColorsFlow.collectAsStateWithLifecycle().value,
+        otherColors = viewModel.otherColorsFlow.collectAsStateWithLifecycle().value
     )
 }
 

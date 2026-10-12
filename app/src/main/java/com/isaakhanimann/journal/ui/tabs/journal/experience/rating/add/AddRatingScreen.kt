@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.rating.add
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -37,7 +38,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -71,16 +71,16 @@ fun AddRatingScreen(
     viewModel: AddRatingViewModel = hiltViewModel(),
     navigateBack: () -> Unit
 ) {
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     AddRatingScreen(
         onDone = {
-            viewModel.onDoneTap()
-            navigateBack()
+            viewModel.onDoneTap(navigateBack)
         },
-        selectedTime = viewModel.localDateTimeFlow.collectAsState().value,
+        selectedTime = viewModel.localDateTimeFlow.collectAsStateWithLifecycle().value,
         onTimeChange = viewModel::onChangeTime,
         selectedRating = viewModel.selectedRating,
         onRatingChange = viewModel::onChangeRating,
-        canAddOverallRating = !viewModel.isThereAlreadyAnOverallRatingFlow.collectAsState().value,
+        canAddOverallRating = !viewModel.isThereAlreadyAnOverallRatingFlow.collectAsStateWithLifecycle().value,
         isOverallRating = viewModel.isThisOverallRating,
         onChangeIsOverallRating = { viewModel.isThisOverallRating = it }
     )

@@ -27,19 +27,19 @@ import java.util.Locale
 
 
 fun Double.toReadableString(): String {
+    if (!isFinite()) return toString()
     val numberOfSignificantDigits = if (this > 1) 3 else 2
     val roundedNumber = roundToSignificantDigits(this, numberOfSignificantDigits)
     return formatToMaximumFractionDigits(roundedNumber, 6)
 }
 
 fun Double.toPreservedString(): String {
-    val numberFormat = NumberFormat.getInstance(Locale.US).apply {
-        isGroupingUsed = false
-    }
-    return numberFormat.format(this)
+    // JVM's shortest representation recovers the exact Double, including subnormal values.
+    return toString()
 }
 
 fun roundToSignificantDigits(value: Double, significantDigits: Int): Double {
+    if (!value.isFinite()) return value
     if (value == 0.0) return 0.0
     val bigDecimal = BigDecimal(value)
     val scale = significantDigits - bigDecimal.precision() + bigDecimal.scale()

@@ -46,6 +46,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -337,13 +338,13 @@ fun ChooseDoseCustomUnitScreen(
                                 keyboardActions = KeyboardActions(onDone = {
                                     focusManager.clearFocus()
                                 }),
-                                isError = estimatedDoseDeviationText.toDoubleOrNull() == null,
+                                isError = estimatedDoseDeviationText.isNotBlank() && estimatedDoseDeviationText.nonnegativeDoubleOrNull() == null,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )
-                            val mean = doseText.toDoubleOrNull()
-                            val standardDeviation = estimatedDoseDeviationText.toDoubleOrNull()
+                            val mean = doseText.nonnegativeDoubleOrNull()
+                            val standardDeviation = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
                             val isExplanationShown = mean != null && standardDeviation != null
                             AnimatedVisibility(isExplanationShown) {
                                 if (mean != null && standardDeviation != null) {

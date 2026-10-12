@@ -46,8 +46,10 @@ import javax.inject.Inject
 @HiltViewModel
 class AddRatingViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
+    sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var selectedRating by mutableStateOf(ShulginRatingOption.TWO_PLUS)
     var isThisOverallRating by mutableStateOf(false)
     val experienceId = state.toRoute<AddRatingRoute>().experienceId
@@ -62,8 +64,9 @@ class AddRatingViewModel @Inject constructor(
     )
 
     init {
-        viewModelScope.launch {
-            val experience = experienceRepo.getExperience(id = experienceId) ?: return@launch
+        session.load {
+            check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted. Close this screen." }
+            val experience = experienceRepo.getExperience(id = experienceId) ?: error("This entry was deleted. Close this screen.")
             val isOldExperience = experience.sortDate.isBefore(Instant.now().minus(12, ChronoUnit.HOURS))
             if (isOldExperience) {
                 localDateTimeFlow.emit(experience.sortDate.getLocalDateTime())
@@ -81,8 +84,8 @@ class AddRatingViewModel @Inject constructor(
         selectedRating = newRating
     }
 
-    fun onDoneTap() {
-        viewModelScope.launch {
+    fun onDoneTap(onSuccess: () -> Unit) {
+        session.run(onSuccess) {
             val selectedInstant = if (isThisOverallRating) {
                 null
             } else {
@@ -94,7 +97,7 @@ class AddRatingViewModel @Inject constructor(
                 option = selectedRating,
                 experienceId = experienceId
             )
-            experienceRepo.insert(newRating)
+            experienceRepo.insert(newRating, session.generation)
         }
     }
 }

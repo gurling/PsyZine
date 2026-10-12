@@ -36,7 +36,7 @@ class ExperienceEditorUiTest {
         val db = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java).build()
         try {
             val storage = AttachmentStorage(context); val lock = JournalMutationLock()
-            val entries = ExperienceRepository(db.experienceDao(), db.photoAttachmentDao(), storage, lock)
+            val entries = ExperienceRepository(db.experienceDao(), db.photoAttachmentDao(), storage, lock, com.isaakhanimann.journal.data.room.JournalSessionGuard(db, lock))
             val attachments = AttachmentRepository(storage, AttachmentDraftStore(storage), ImageProcessor(context, storage), db, lock, context)
             runBlocking { db.experienceDao().insert(Experience(42, "original", "notes", sortDate = Instant.EPOCH, location = null)) }
             lateinit var vm: EditExperienceViewModel
@@ -59,4 +59,31 @@ class ExperienceEditorUiTest {
             runBlocking { assertEquals("updated", db.experienceDao().getExperience(42)!!.title) }
         } finally { db.close(); directory.deleteRecursively() }
     }
+    @Test fun recreatedFormFromPreviousGenerationCannotSaveIntoRestoredParent() {
+        val app=InstrumentationRegistry.getInstrumentation().targetContext
+        val directory=File(app.cacheDir,"stale-form-${java.util.UUID.randomUUID()}").apply { mkdirs() }
+        val context=object : android.content.ContextWrapper(app) {
+            override fun getFilesDir()=File(directory,"files").apply { mkdirs() }
+            override fun getCacheDir()=File(directory,"cache").apply { mkdirs() }
+        }
+        val db=Room.inMemoryDatabaseBuilder(app,AppDatabase::class.java).build()
+        try {
+            val lock=JournalMutationLock(); val storage=AttachmentStorage(context)
+            val guard=com.isaakhanimann.journal.data.room.JournalSessionGuard(db,lock)
+            val entries=ExperienceRepository(db.experienceDao(),db.photoAttachmentDao(),storage,lock,guard)
+            val attachments=AttachmentRepository(storage,AttachmentDraftStore(storage),ImageProcessor(context,storage),db,lock,context)
+            runBlocking {
+                db.experienceDao().insert(Experience(42,"restored","",sortDate=Instant.EPOCH,location=null))
+                db.photoAttachmentDao().setGeneration(JournalState(generation="restored-generation"))
+            }
+            lateinit var vm: EditExperienceViewModel
+            compose.runOnIdle { vm=EditExperienceViewModel(entries,attachments,SavedStateHandle(mapOf("experienceId" to 42,
+                "journalGeneration" to "old-generation", "title" to "stale title", "text" to "stale notes"))) }
+            compose.setContent { PsyZineTheme(ThemeId.MOCHA) { EditExperienceScreen({},vm) } }
+            compose.waitUntil(10000) { !vm.loading }
+            compose.runOnIdle { assertFalse(vm.canSave); assertNotNull(vm.error); assertNull(vm.draft) }
+            runBlocking { assertEquals("restored",db.experienceDao().getExperience(42)!!.title) }
+        } finally { db.close(); directory.deleteRecursively() }
+    }
+
 }

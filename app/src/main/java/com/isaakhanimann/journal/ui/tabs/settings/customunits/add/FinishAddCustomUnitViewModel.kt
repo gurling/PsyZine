@@ -35,14 +35,18 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
+import com.isaakhanimann.journal.data.room.validateDoseText
 import javax.inject.Inject
 
 @HiltViewModel
 class FinishAddCustomUnitViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     substanceRepository: SubstanceRepository,
+    private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     private val finishAddCustomUnitRoute = state.toRoute<FinishAddCustomUnitRoute>()
     var substanceName by mutableStateOf("")
     val administrationRoute = finishAddCustomUnitRoute.administrationRoute
@@ -87,14 +91,14 @@ class FinishAddCustomUnitViewModel @Inject constructor(
         doseText = newDose
     }
 
-    val dose: Double? get() = doseText.toDoubleOrNull()
+    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
 
     var estimatedDoseDeviationText by mutableStateOf("")
     fun onChangeOfEstimatedDoseDeviation(newEstimatedDoseDeviation: String) {
         estimatedDoseDeviationText = newEstimatedDoseDeviation
     }
 
-    private val estimatedDoseDeviation: Double? get() = estimatedDoseDeviationText.toDoubleOrNull()
+    private val estimatedDoseDeviation: Double? get() = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
 
     var isEstimate by mutableStateOf(false)
     fun onChangeOfIsEstimate(newIsEstimate: Boolean) {
@@ -114,7 +118,7 @@ class FinishAddCustomUnitViewModel @Inject constructor(
 
     init {
         originalUnit = roaDose?.units ?: ""
-        viewModelScope.launch {
+        session.load {
             substanceName = finishAddCustomUnitRoute.substanceName
             substance = substanceRepository.getSubstance(finishAddCustomUnitRoute.substanceName)
             originalUnit = roaDose?.units ?: "mg"
@@ -131,7 +135,9 @@ class FinishAddCustomUnitViewModel @Inject constructor(
     }
 
     fun createSaveAndDismissAfter(dismiss: (customUnitId: Int) -> Unit) {
-        viewModelScope.launch {
+        session.run {
+            sessionGuard.withSession(session.generation) {
+            validateDoseText(doseText, estimatedDoseDeviationText, estimate = isEstimate)
             val customUnit = CustomUnit(
                 substanceName = substanceName,
                 name = name,
@@ -146,8 +152,7 @@ class FinishAddCustomUnitViewModel @Inject constructor(
                 note = note
             )
             val customUnitId = experienceRepo.insert(customUnit)
-            withContext(Dispatchers.Main) {
-                dismiss(customUnitId)
+            dismiss(customUnitId)
             }
         }
     }
