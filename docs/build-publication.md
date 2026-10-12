@@ -2,7 +2,7 @@
 
 Repository: https://github.com/gurling/PsyZine. The Android project is the repository root. The local checkout is `/home/izzy/codex/PsyZine/android`; upstream history and GPL attribution are retained.
 
-## Recorded execution result — 11 October 2026
+## Historical execution result — 11 October 2026
 
 The former socket restriction no longer reproduces: IPv4 sockets, the actual Gradle wrapper, ADB and authenticated SSH now work. All four Direct/Play Debug/Release APKs were built with JDK 17, Gradle 8.14, SDK 35 and explicitly pinned build-tools 35.0.0. Both flavor JVM suites passed (35 tests each). All four lint tasks passed with zero errors; dependency/unused-resource warnings remain. Minification, resource linking, manifest merging, APK signatures, ZIP integrity, application IDs and alignment were checked. All four local APKs installed and launched on an isolated Pixel test installation.
 
@@ -14,7 +14,9 @@ The required release evidence is the successful complete [Actions run](https://g
 
 ## Compatibility candidate and version policy
 
-The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The version source is `version.properties`: initially code `2`, name `1.0.1`. The compatibility APK name/version is `1.0.1-compat.2`, tag `v1.0.1-compat.2`, release title `PsyZine Compatibility 1.0.1-compat.2`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.1-compat.2.apk`. Publication requires a code greater than every previously published code for every affected package; missing historical metadata or download failures block publication for review. Two clean builds of one candidate share a code; they produce only one release. Increment the code in source before the next publication.
+See [the audit patch evidence](audit-patch-verification.md) for current local checks and outstanding protected/device acceptance.
+
+The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The current version source is `version.properties`: code `3`, base `1.0.2`. The proposed compatibility version is `1.0.2-compat.3`, tag `v1.0.2-compat.3`, title `PsyZine Compatibility 1.0.2-compat.3`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.2-compat.3.apk`. The earlier code2 / 1.0.1 candidate remains a reviewed emulator upgrade baseline. Recheck live release metadata/tag occupancy before publication. Publication requires a code greater than every previously published code for every affected package; missing historical metadata or download failures block publication for review. Two clean builds of one candidate share a code; they produce only one release. Increment the code in source before the next publication.
 
 `config/signing-policy.json` pins all four package IDs to this retained identity. Published historical CI certificates differed; matching package IDs alone cannot update those installations. No key rotation is proposed. The original local key files must remain unchanged.
 
@@ -29,11 +31,11 @@ python3 tools/verify-obtainium.py --assets-dir artifacts/apks
 
 | Variant | Gradle APK path under `app/build/outputs/apk/` | Application ID | Version |
 | --- | --- | --- | --- |
-| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.1` |
-| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.1-dev` |
-| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.1` |
-| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.1-dev` |
-| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.1-compat.2` |
+| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.2` |
+| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.2-dev` |
+| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.2` |
+| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.2-dev` |
+| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.2-compat.3` |
 
 The compatible build uses release minification/resource shrinking, `debuggable=false`, and `release` dependency fallbacks. Namespace, FileProvider authority, schema history, storage and all 13 themes remain intact. It cannot coexist with Direct Debug because they deliberately share the installed identity.
 
@@ -60,11 +62,13 @@ The owner-approved signing setup and local GitHub authentication authorized the 
 
 ## CI and explicitly approved publication
 
+All workflow actions are pinned to full commits resolving their selected major versions. Weekly Gradle and GitHub Actions dependency monitoring is configured in `.github/dependabot.yml`; enabling disabled GitHub vulnerability alerts remains an owner settings task. The owner-approved compatibility testing exception allows testing pre-releases after these gates, without establishing reference-content redistribution clearance. Production still requires `CONTENT_RIGHTS_VERIFIED=true`.
+
 `Android checks` runs unpublished build/test/lint plus ordinary instrumentation on API26/29/30/32/33/35 for pushes, PRs and dispatch. Extra APIs36/37 remain optional. Pushes to `main` no longer automatically publish.
 
-An approved dispatch with `publish_compatibility=true` on `main` additionally uses the protected environment to run two independent clean five-variant builds and six emulator-only code1 → candidate → next-code upgrade jobs. The code1 fixture comes from reviewed full commit `574831afb7ecd4c75ffab3f37b4c775f245e3596`, with only emulator test harness/dependency/signing overrides. The follow-up code3 is an unpublished fixture. Successful ordinary checks, the complete instrumentation matrix, both builds and all upgrade jobs are prerequisites for publication.
+An approved dispatch with `verify_compatibility=true` or `publish_compatibility=true` on `main` uses the protected environment for two independent clean five-variant builds and six emulator-only code1 → code3 → unpublished code4 upgrade jobs. API35 additionally starts from the reviewed minified code2 source `0f1249d0d52868c8ef42776828598675474e03ea`. Only `publish_compatibility=true` enables publication. The code1 fixture comes from reviewed full commit `574831afb7ecd4c75ffab3f37b4c775f245e3596`, with only emulator test harness/dependency/signing overrides. Checkouts fetch full history and fixture builds fail explicitly if either pinned commit is absent. Baselines require schema8; candidate/follow-up require schema9. Backup smoke checks wait for “Backup saved” before copying the export. An independent tooling-only harness packages its own Kotlin, AndroidX test and DataStore runtime so minified apps need no extra keep rules. The production checkout still has only the :app module; the standalone harness project lives under tools/upgrade-harness and is built in temporary storage. The follow-up code4 is an unpublished fixture. Successful ordinary checks, the complete instrumentation matrix, both builds and all upgrade jobs are prerequisites for publication.
 
-`verify-publication.py` checks downloaded candidate checksums and real manifests/certificates, compares both builds' identities/commit, downloads every previously published release APK/report/checksum, verifies their actual version metadata, rejects stale codes and existing candidate tags, and records historical evidence. Network/auth failures stop the job. `verify-obtainium.py` decodes the actual README deep link and checks it selects exactly one compatible APK among all five variants and supplementary assets. The publisher includes matching GPL source and re-downloads the actual release assets for checksum/signature/selection checks. Obtainium's actual consecutive phone updates remain a separate owner acceptance check.
+`verify-publication.py` checks downloaded candidate checksums and real manifests/certificates, compares both builds' identities/commit, downloads every previously published release APK/report/checksum, verifies their actual version metadata, rejects stale codes and existing candidate tags, and records historical evidence. Network/auth failures stop the job. `verify-obtainium.py` decodes the actual README deep link and checks it selects exactly one compatible APK among all five variants and supplementary assets. The publisher uploads matching GPL source and all assets to an explicit draft, re-downloads the complete server-side set for checksum/signature/selection checks, then publishes that verified draft. Verification failure retains the draft for inspection. Obtainium's actual consecutive phone updates remain a separate owner acceptance check.
 
 Production uses the existing **release** environment and `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`; credentials are unchanged. `PSYZINE_SIGNING_MODE=production` is explicit. Pre-release tags are excluded; versions/filenames are dynamic. The `CONTENT_RIGHTS_VERIFIED=true` gate is retained and package certificate pins still apply. A different production certificate cannot silently replace this existing identity; separately approve any policy/migration change. Manual dispatch builds a candidate; only a matching stable version tag publishes.
 

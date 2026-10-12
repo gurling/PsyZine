@@ -120,6 +120,18 @@ class ReleasePolicyTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Physical devices are forbidden', result.stderr)
 
+    def test_startup_benchmark_refuses_physical_devices_before_adb(self):
+        result = subprocess.run([sys.executable, str(ROOT / 'tools/benchmark-startup.py'), '24261JEGR00625',
+                                 '--fixture-confirmed', '--output', '/tmp/never-physical-startup.json'], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('physical devices are forbidden', result.stderr)
+
+    def test_background_trace_refuses_physical_devices_before_adb(self):
+        result = subprocess.run([sys.executable, str(ROOT / 'tools/benchmark-background.py'), '24261JEGR00625',
+                                 '--fixture-confirmed', '--presentation-disabled', '--output', '/tmp/never-physical-trace.pftrace'], capture_output=True, text=True)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('physical devices are forbidden', result.stderr)
+
     def test_decoded_readme_obtainium_link_selects_exactly_one_variant(self):
         subprocess.run([sys.executable, str(ROOT / 'tools/verify-obtainium.py')], check=True, capture_output=True)
 

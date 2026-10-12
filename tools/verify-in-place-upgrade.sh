@@ -22,9 +22,9 @@ code, base = read_version()
 for apk in (baseline, candidate, following):
     if apk['applicationId'] != 'app.psyzine.debug' or apk['signerCertificateSha256'] != [pins()['app.psyzine.debug']]:
         raise SystemExit('Wrong fixture package or certificate')
-if baseline['versionCode'] != 1 or not baseline['debuggable']:
-    raise SystemExit('Baseline must be reviewed version1 Direct Debug')
-if candidate['versionCode'] != code or following['versionCode'] != code + 1 or code <= 1:
+if not ((baseline['versionCode'] == 1 and baseline['debuggable']) or (baseline['versionCode'] == 2 and not baseline['debuggable'])):
+    raise SystemExit('Baseline must be reviewed code1 Direct Debug or minified code2 compatibility')
+if candidate['versionCode'] != code or following['versionCode'] != code + 1 or code <= baseline['versionCode']:
     raise SystemExit('Candidate codes do not prove two increasing updates')
 if candidate['debuggable'] or following['debuggable']:
     raise SystemExit('Compatibility updates must be non-debuggable')
@@ -34,16 +34,16 @@ if test['applicationId'] != 'app.psyzine.debug.test' or test['signerCertificateS
     raise SystemExit('Upgrade instrumentation must share the retained identity')
 Path('artifacts/upgrade').mkdir(parents=True, exist_ok=True)
 Path('artifacts/upgrade/FIXTURE_APKS.json').write_text(json.dumps([baseline, test, candidate, following], indent=2) + '\n')
-print('Verified retained certificate, package IDs and code1/code2/code3 progression before emulator writes.')
+print('Verified retained certificate, package IDs and increasing fixture codes before emulator writes.')
 PY
 mkdir -p artifacts/upgrade
 "${adb_cmd[@]}" install "$baseline"
 "${adb_cmd[@]}" install "$test_apk"
 run_test() {
-    local method="$1" code="$2" output_file="$3"
+    local method="$1" code="$2" schema="$3" output_file="$4"
     "${adb_cmd[@]}" shell am instrument -w --no-window-animation \
         -e class "com.isaakhanimann.journal.psyzine.InPlaceUpgradeTest#$method" \
-        -e psyzineUpgradeFixture true -e expectedVersionCode "$code" \
+        -e psyzineUpgradeFixture true -e expectedVersionCode "$code" -e expectedSchemaVersion "$schema" \
         app.psyzine.debug.test/androidx.test.runner.AndroidJUnitRunner | tee "$output_file"
     # am instrument may exit zero for a failing test, so require its explicit result.
     python3 - "$output_file" <<'PY'
@@ -54,18 +54,25 @@ if not re.search(r'^OK \(1 test\)', result, re.MULTILINE) or 'FAILURES!!!' in re
     raise SystemExit('Upgrade instrumentation did not pass exactly one test')
 PY
 }
-run_test seedVersionOneFixture 1 artifacts/upgrade/seed.log
-run_test verifyRetainedFixtureAndKeystore 1 artifacts/upgrade/baseline-verify.log
+baseline_code="$(python3 -c 'import json; print(json.load(open("artifacts/upgrade/FIXTURE_APKS.json"))[0]["versionCode"])')"
+run_test seedVersionOneFixture "$baseline_code" 8 artifacts/upgrade/seed.log
+run_test verifyRetainedFixtureAndKeystore "$baseline_code" 8 artifacts/upgrade/baseline-verify.log
+if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
+    python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${baseline_code}.json"
+fi
 code="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[0])')"
 for apk in "$candidate" "$next"; do
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
     # No uninstall, data clearing, downgrade flag or signature workaround.
     "${adb_cmd[@]}" install -r "$apk"
-    run_test verifyRetainedFixtureAndKeystore "$code" "artifacts/upgrade/code${code}-verify.log"
-    run_test upgradedJournalPhotosAndBackupWork "$code" "artifacts/upgrade/code${code}-smoke.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-verify.log"
+    run_test upgradedJournalPhotosAndBackupWork "$code" 9 "artifacts/upgrade/code${code}-smoke.log"
     # Include the post-UI state in the retention check too.
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
-    run_test verifyRetainedFixtureAndKeystore "$code" "artifacts/upgrade/code${code}-post-ui.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-post-ui.log"
+    if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
+        python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${code}.json"
+    fi
     code=$((code + 1))
 done
 printf 'Both emulator upgrades preserved data, photos, preferences, UID and Keystore decryption.\n'
