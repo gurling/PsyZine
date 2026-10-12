@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.search
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -39,7 +40,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -84,20 +84,20 @@ fun SearchScreen(
                         isFocused = focusState.isFocused
                     }
                     .clearAndSetSemantics { },
-                searchText = searchViewModel.searchTextFlow.collectAsState().value,
+                searchText = searchViewModel.searchTextFlow.collectAsStateWithLifecycle().value,
                 onChange = {
                     searchViewModel.filterSubstances(searchText = it)
                 },
-                categories = searchViewModel.chipCategoriesFlow.collectAsState().value,
+                categories = searchViewModel.chipCategoriesFlow.collectAsStateWithLifecycle().value,
                 onFilterTapped = searchViewModel::onFilterTapped,
                 isShowingFilter = true
             )
             val activeFilters =
-                searchViewModel.chipCategoriesFlow.collectAsState().value.filter { it.isActive }
+                searchViewModel.chipCategoriesFlow.collectAsStateWithLifecycle().value.filter { it.isActive }
             val onFilterTapped = searchViewModel::onFilterTapped
-            val filteredSubstances = searchViewModel.filteredSubstancesFlow.collectAsState().value
+            val filteredSubstances = searchViewModel.filteredSubstancesFlow.collectAsStateWithLifecycle().value
             val filteredCustomSubstances =
-                searchViewModel.filteredCustomSubstancesFlow.collectAsState().value
+                searchViewModel.filteredCustomSubstancesFlow.collectAsStateWithLifecycle().value
             if (activeFilters.isNotEmpty()) {
                 LazyRow(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),

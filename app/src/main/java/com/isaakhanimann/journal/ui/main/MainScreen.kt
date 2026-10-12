@@ -18,11 +18,11 @@
 
 package com.isaakhanimann.journal.ui.main
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
@@ -46,7 +46,7 @@ fun MainScreen(
     experienceRequest: ExperienceNavigationRequest? = null,
     consumeExperienceRequest: () -> Unit = {}
 ) {
-    val accepted = viewModel.isAcceptedFlow.collectAsState().value
+    val accepted = viewModel.isAcceptedFlow.collectAsStateWithLifecycle().value
     if (accepted == null) return
     if (accepted) {
         val navController = rememberNavController()

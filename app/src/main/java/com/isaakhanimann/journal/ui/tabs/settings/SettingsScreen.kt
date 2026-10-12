@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -64,7 +65,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -134,18 +134,18 @@ fun SettingsScreen(
         importFile = viewModel::importFile,
         importError = viewModel.importError,
         busy = viewModel.busy,
-        presentation = viewModel.presentationSettings.collectAsState().value,
+        presentation = viewModel.presentationSettings.collectAsStateWithLifecycle().value,
         saveNotificationEnabled = viewModel::saveNotificationEnabled,
         saveLockScreenDetails = viewModel::saveLockScreenDetails,
         saveWidgetDetails = viewModel::saveWidgetDetails,
         clearImportError = viewModel::clearImportError,
         exportFile = viewModel::exportFile,
         snackbarHostState = viewModel.snackbarHostState,
-        areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsState().value,
+        areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsStateWithLifecycle().value,
         saveDosageDotsAreHidden = viewModel::saveDosageDotsAreHidden,
-        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsState().value,
+        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value,
         saveIsTimelineHidden = viewModel::saveIsTimelineHidden,
-        areSubstanceHeightsIndependent = viewModel.areSubstanceHeightsIndependentFlow.collectAsState().value,
+        areSubstanceHeightsIndependent = viewModel.areSubstanceHeightsIndependentFlow.collectAsStateWithLifecycle().value,
         saveAreSubstanceHeightsIndependent = viewModel::saveAreSubstanceHeightsIndependent,
     )
 }

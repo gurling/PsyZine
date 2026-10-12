@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.screen
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.res.Configuration
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -37,7 +38,6 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
@@ -58,8 +58,8 @@ fun TimelineScreen(
 ) {
     TimelineScreen(
         title = viewModel.consumerName,
-        timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsState().value,
-        timeDisplayOption = viewModel.timeDisplayOptionFlow.collectAsState().value,
+        timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsStateWithLifecycle().value,
+        timeDisplayOption = viewModel.timeDisplayOptionFlow.collectAsStateWithLifecycle().value,
     )
 }
 

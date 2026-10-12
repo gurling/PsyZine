@@ -65,7 +65,7 @@ class TimelineScreenViewModel @Inject constructor(
         userPreferences.areSubstanceHeightsIndependentFlow.stateIn(
             initialValue = true,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
     private val timelineRoute = state.toRoute<TimelineScreenRoute>()
@@ -116,7 +116,7 @@ class TimelineScreenViewModel @Inject constructor(
         }.stateIn(
             initialValue = TimeDisplayOption.REGULAR,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
 
@@ -204,7 +204,7 @@ class TimelineScreenViewModel @Inject constructor(
         .stateIn(
         initialValue = TimelineDisplayOption.Loading,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     private fun getIngestionElements(sortedIngestionsWith: List<IngestionWithAssociatedData>): List<IngestionElement> {

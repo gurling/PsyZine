@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.search
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
@@ -52,7 +53,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -89,7 +89,7 @@ fun AddIngestionSearchScreen(
     navigateToAddCustomSubstanceScreen: (searchText: String) -> Unit,
     viewModel: AddIngestionSearchViewModel = hiltViewModel()
 ) {
-    val searchText = viewModel.searchTextFlow.collectAsState().value
+    val searchText = viewModel.searchTextFlow.collectAsStateWithLifecycle().value
     AddIngestionSearchScreen(
         navigateToCheckInteractions = navigateToCheckInteractions,
         navigateToCheckSaferUse = navigateToCheckSaferUse,
@@ -102,14 +102,14 @@ fun AddIngestionSearchScreen(
             navigateToAddCustomSubstanceScreen(searchText)
         },
         navigateToCustomUnitChooseDose = navigateToCustomUnitChooseDose,
-        suggestions = viewModel.filteredSuggestions.collectAsState().value,
+        suggestions = viewModel.filteredSuggestions.collectAsStateWithLifecycle().value,
         searchText = searchText,
         onChangeSearchText = {
             viewModel.updateSearchText(it)
         },
-        filteredSubstances = viewModel.filteredSubstancesFlow.collectAsState().value,
-        filteredCustomUnits = viewModel.filteredCustomUnitsFlow.collectAsState().value,
-        filteredCustomSubstances = viewModel.filteredCustomSubstancesFlow.collectAsState().value
+        filteredSubstances = viewModel.filteredSubstancesFlow.collectAsStateWithLifecycle().value,
+        filteredCustomUnits = viewModel.filteredCustomUnitsFlow.collectAsStateWithLifecycle().value,
+        filteredCustomSubstances = viewModel.filteredCustomSubstancesFlow.collectAsStateWithLifecycle().value
     )
 }
 

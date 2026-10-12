@@ -55,23 +55,25 @@ class InPlaceUpgradeTest {
     private fun requireEmulator() {
         check(arguments.getString("psyzineUpgradeFixture") == "true") { "Explicit emulator fixture mode required" }
         check(device.executeShellCommand("getprop ro.kernel.qemu").trim() == "1") { "Physical-device fixture seeding is forbidden" }
-        check(Build.FINGERPRINT.startsWith("generic") || Build.MODEL.contains("sdk")) { "Unrecognized emulator" }
+        check(Build.FINGERPRINT.startsWith("generic") || Build.MODEL.contains("sdk", ignoreCase = true)) { "Unrecognized emulator" }
+        check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Unrecognized emulator hardware" }
         check(context.packageName == "app.psyzine.debug") { "Wrong target sandbox" }
     }
 
     private fun database(): SQLiteDatabase {
         // Application reconciliation initializes Room. Wait for its real database, never replace it.
+        val expectedSchema = requireNotNull(arguments.getString("expectedSchemaVersion")) { "Explicit schema version required" }.toInt()
         val file = context.getDatabasePath("experiences_db")
         val deadline = System.currentTimeMillis() + 30000
         while (System.currentTimeMillis() < deadline) {
             if (file.isFile) {
                 val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE)
-                if (db.version == 8) return db
+                if (db.version == expectedSchema) return db
                 db.close()
             }
             Thread.sleep(100)
         }
-        error("Application did not initialize schema 8")
+        error("Application did not initialize schema $expectedSchema")
     }
 
     private fun hash(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
@@ -111,7 +113,7 @@ class InPlaceUpgradeTest {
         @Suppress("DEPRECATION")
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         @Suppress("DEPRECATION")
-        assertEquals(1, info.versionCode)
+        assertEquals(arguments.getString("expectedVersionCode")!!.toInt(), info.versionCode)
         check(!marker.exists()) { "Never reseed an existing fixture" }
         database().use { db ->
             tables.filter { it != "journal_state" }.forEach { table ->
@@ -217,6 +219,7 @@ class InPlaceUpgradeTest {
             ?: device.findObject(By.text(java.util.regex.Pattern.compile("(?i)save")))
             ?: error("Document save action missing")
         save.click()
+        check(device.wait(Until.hasObject(By.text("Backup saved")), 30000)) { "Backup export did not report completion" }
         // Shell copies only the synthetic export back into the target app's external test directory.
         val destination = File(context.getExternalFilesDir(null), name)
         val deadline = System.currentTimeMillis() + 15000

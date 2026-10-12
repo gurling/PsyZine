@@ -154,15 +154,10 @@ data class CustomUnitDose(
                 val expectationX = dose
                 val standardDeviationX =
                     if (isEstimate) (estimatedDoseStandardDeviation ?: 0.0) else 0.0
-                val sum1 = standardDeviationX.pow(2) + expectationX.pow(2)
-                val sum2 = standardDeviationY.pow(2) + expectationY.pow(2)
-                val expectations = expectationX.pow(2) * expectationY.pow(2)
-                val productVariance = sum1 * sum2 - expectations
-                if (productVariance > 0.0000001) {
-                    return sqrt(productVariance)
-                } else {
-                    return null
-                }
+                // Stable product uncertainty: avoid subtracting nearly equal fourth powers.
+                val value = kotlin.math.hypot(kotlin.math.hypot(standardDeviationX * expectationY, standardDeviationY * expectationX),
+                    standardDeviationX * standardDeviationY)
+                value.takeIf { it != 0.0 }
             }
         }
 
