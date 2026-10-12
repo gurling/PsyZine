@@ -9,6 +9,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.isaakhanimann.journal.data.room.AppDatabase
 import com.isaakhanimann.journal.data.room.attachments.PhotoAttachment
 import com.isaakhanimann.journal.data.room.experiences.entities.*
+import com.isaakhanimann.journal.data.room.migrations.Migration8To9
 import com.isaakhanimann.journal.data.room.migrations.Migration7To8
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import kotlinx.coroutines.runBlocking
@@ -26,18 +27,19 @@ class DatabaseParityTest {
     @get:Rule val helper = MigrationTestHelper(instrumentation, AppDatabase::class.java)
 
     @Test fun everyOriginalSchemaMigratesAndRetainsAllOriginalColumnsAndIds() {
-        for (version in 1..7) {
+        for (version in 1..8) {
             val name = "migration-$version-${UUID.randomUUID()}"
             val schema = JSONObject(instrumentation.context.assets.open("com.isaakhanimann.journal.data.room.AppDatabase/$version.json").bufferedReader().use { it.readText() })
             val entities = schema.getJSONObject("database").getJSONArray("entities")
             val records = mutableMapOf<String, Map<String, String?>>()
             helper.createDatabase(name, version).use { database ->
-                for (i in 0 until entities.length()) {
-                    val entity = entities.getJSONObject(i); val fields = entity.getJSONArray("fields")
+                val ordered = (0 until entities.length()).map { entities.getJSONObject(it) }.sortedBy { if (it.getString("tableName") == "Experience") 0 else 1 }
+                for (entity in ordered) {
+                    val fields = entity.getJSONArray("fields")
                     val values = (0 until fields.length()).associate { index ->
                         val field = fields.getJSONObject(index); val column = field.getString("columnName")
                         column to if (!field.getBoolean("notNull")) null else when (field.getString("affinity")) {
-                            "INTEGER" -> "42"
+                            "INTEGER" -> if (entity.getString("tableName") == "journal_state" && column == "id") "1" else "42"
                             "REAL" -> "1.5"
                             else -> when (column) { "administrationRoute" -> "ORAL"; "color" -> "RED"; "option" -> "PLUS"; else -> "retained:$column" }
                         }
@@ -47,12 +49,23 @@ class DatabaseParityTest {
                     records[table] = values
                 }
             }
-            helper.runMigrationsAndValidate(name, 8, true, Migration7To8).use { database ->
+            helper.runMigrationsAndValidate(name, 9, true, Migration7To8, Migration8To9).use { database ->
                 records.forEach { (table, values) ->
                     database.query("SELECT * FROM `$table`").use { cursor ->
                         assertTrue("$table has its original row", cursor.moveToFirst())
                         values.forEach { (column, value) -> assertEquals("$table.$column from v$version", value, cursor.getString(cursor.getColumnIndexOrThrow(column))) }
                         assertFalse(cursor.moveToNext())
+                    }
+                }
+                for ((sql, expected) in listOf(
+                    "SELECT * FROM Experience WHERE sortDate >= 0 AND sortDate < 10" to "index_Experience_sortDate",
+                    "SELECT * FROM Ingestion WHERE experienceId = 42 ORDER BY time,id" to "index_Ingestion_experienceId_time_id",
+                    "SELECT * FROM Ingestion WHERE time >= 0 AND time < 10" to "index_Ingestion_time",
+                    "SELECT * FROM Ingestion WHERE substanceName = 'Caffeine' ORDER BY time,id" to "index_Ingestion_substanceName_time_id",
+                    "SELECT * FROM TimedNote WHERE experienceId = 42 ORDER BY time,id" to "index_TimedNote_experienceId_time_id",
+                    "SELECT * FROM ShulginRating WHERE experienceId = 42" to "index_ShulginRating_experienceId")) {
+                    database.query("EXPLAIN QUERY PLAN $sql").use { cursor ->
+                        assertTrue(cursor.moveToFirst()); assertTrue(cursor.getString(3).contains(expected))
                     }
                 }
                 database.execSQL("DELETE FROM Experience WHERE id = 42")
@@ -155,4 +168,27 @@ class DatabaseParityTest {
             assertEquals("restored unit", dao.getCustomUnit(1)!!.name)
         }
     }
+    @Test fun failedIndexMigrationRollsBackAndLeavesSchemaEightRecordsIntact() {
+        val name = "failed-index-${UUID.randomUUID()}"
+        helper.createDatabase(name,8).use { database ->
+            database.execSQL("INSERT INTO Experience (id,title,text,creationDate,sortDate,isFavorite) VALUES (42,'retained','',0,0,1)")
+            var statements = 0
+            val failing = object : androidx.sqlite.db.SupportSQLiteDatabase by database {
+                override fun execSQL(sql: String) {
+                    if (++statements == 3) throw android.database.sqlite.SQLiteFullException("injected low space")
+                    database.execSQL(sql)
+                }
+            }
+            database.beginTransaction()
+            try { Migration8To9.migrate(failing); fail("Injected low space must fail migration") }
+            catch (_: android.database.sqlite.SQLiteFullException) { }
+            finally { database.endTransaction() }
+            assertEquals(8,database.version)
+            database.query("SELECT title FROM Experience WHERE id=42").use { cursor -> assertTrue(cursor.moveToFirst()); assertEquals("retained",cursor.getString(0)) }
+            database.query("SELECT count(*) FROM sqlite_master WHERE type='index' AND name='index_Ingestion_time'").use { cursor -> cursor.moveToFirst(); assertEquals(0,cursor.getInt(0)) }
+        }
+        helper.runMigrationsAndValidate(name,9,true,Migration8To9).close()
+        instrumentation.targetContext.deleteDatabase(name)
+    }
+
 }

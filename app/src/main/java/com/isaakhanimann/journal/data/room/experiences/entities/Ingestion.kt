@@ -19,11 +19,12 @@
 package com.isaakhanimann.journal.data.room.experiences.entities
 
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import java.time.Instant
 
-@Entity
+@Entity(indices = [Index(value = ["experienceId", "time", "id"]), Index(value = ["time"]), Index(value = ["substanceName", "time", "id"])])
 data class Ingestion(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,

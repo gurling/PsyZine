@@ -30,7 +30,5 @@ class ExperienceFetchViewModel @Inject constructor(
     val experienceRepo: ExperienceRepository,
 ) : ViewModel() {
 
-    suspend fun getExperience(experienceId: Int): ExperienceWithIngestionsCompanionsAndRatings? {
-        return experienceRepo.getExperienceWithIngestionsCompanionsAndRatings(experienceId)
-    }
+    fun observeExperience(experienceId: Int) = experienceRepo.observeExperienceWithIngestionsCompanionsAndRatings(experienceId)
 }

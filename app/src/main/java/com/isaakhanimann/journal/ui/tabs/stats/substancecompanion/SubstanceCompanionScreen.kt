@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.stats.substancecompanion
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -36,7 +37,6 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -60,7 +60,7 @@ import com.isaakhanimann.journal.ui.utils.getShortTimeText
 fun SubstanceCompanionScreen(
     viewModel: SubstanceCompanionViewModel = hiltViewModel()
 ) {
-    val companion = viewModel.thisCompanionFlow.collectAsState().value
+    val companion = viewModel.thisCompanionFlow.collectAsStateWithLifecycle().value
     if (companion == null) {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -69,7 +69,7 @@ fun SubstanceCompanionScreen(
     } else {
         SubstanceCompanionScreen(
             substanceCompanion = companion,
-            ingestionBursts = viewModel.ingestionBurstsFlow.collectAsState().value,
+            ingestionBursts = viewModel.ingestionBurstsFlow.collectAsStateWithLifecycle().value,
             tolerance = viewModel.tolerance,
             crossTolerances = viewModel.crossTolerances,
             consumerName = viewModel.consumerName
