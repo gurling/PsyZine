@@ -59,7 +59,15 @@ class InPlaceUpgradeTest {
         while (System.currentTimeMillis() < deadline) {
             val target = device.wait(Until.findObject(selector), 1000) ?: continue
             try {
-                target.click()
+                val bounds = target.visibleBounds
+                Thread.sleep(300)
+                val current = device.findObject(selector) ?: continue
+                // IME animations can move Save after accessibility reports idle.
+                if (current.visibleBounds != bounds) continue
+                val stableBounds = current.visibleBounds
+                check(!stableBounds.isEmpty) { "Clickable target has empty bounds: $selector" }
+                println("Upgrade fixture click: $selector at $stableBounds")
+                check(device.click(stableBounds.centerX(), stableBounds.centerY())) { "Touch injection failed: $selector" }
                 return
             } catch (_: StaleObjectException) {
                 // Document providers replace their nodes while opening a root; acquire a fresh node.
@@ -248,17 +256,26 @@ class InPlaceUpgradeTest {
         device.waitForIdle()
         clickWhenReady(By.text("Downloads"))
         device.waitForIdle()
-        val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}.psyzine"
+        val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}-${UUID.randomUUID()}.psyzine"
         val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000)
             ?: error("Document filename input missing after choosing Downloads")
         currentFilename.text = name
         device.waitForIdle()
-        val save = device.wait(Until.findObject(By.res("android", "button1")), 5000)
-            ?: device.findObject(By.res("com.android.documentsui", "button1"))
-            ?: device.findObject(By.text(java.util.regex.Pattern.compile("(?i)save")))
-            ?: error("Document save action missing")
-        save.click()
-        check(device.wait(Until.hasObject(By.text("Backup saved")), 30000)) { "Backup export did not report completion" }
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            device.waitForIdle()
+        }
+        val saveSelector = By.text(java.util.regex.Pattern.compile("(?i)save")).enabled(true)
+        for (attempt in 0 until 5) {
+            clickWhenReady(saveSelector)
+            if (device.wait(Until.gone(saveSelector), 2000)) break
+        }
+        check(device.wait(Until.gone(saveSelector), 10000)) { "Document picker did not accept Save" }
+        if (!device.wait(Until.hasObject(By.text("Backup saved")), 30000)) {
+            device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-export-failure.xml"))
+            device.takeScreenshot(File(context.getExternalFilesDir(null), "upgrade-export-failure.png"))
+            error("Backup export did not report completion")
+        }
         // Shell copies only the synthetic export back into the target app's external test directory.
         val destination = File(context.getExternalFilesDir(null), name)
         val deadline = System.currentTimeMillis() + 15000

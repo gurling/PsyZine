@@ -46,6 +46,10 @@ dependencies {
     implementation(libs.junit)
     implementation(libs.androidx.junit)
     implementation(libs.androidx.datastore.preferences)
+    // Instrumentation can share unminified target classes on API26. Keep these at the
+    // same catalog versions as both reviewed baselines, rather than runner transitives.
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.kotlinx.coroutines.android)
     implementation("androidx.test:runner:1.7.0") // Already resolved by the app's Espresso 3.7.0 suite.
     implementation("androidx.test.uiautomator:uiautomator:2.3.0")
