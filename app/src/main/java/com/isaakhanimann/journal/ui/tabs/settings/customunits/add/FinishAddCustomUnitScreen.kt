@@ -42,6 +42,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -83,6 +84,7 @@ fun FinishAddCustomUnitScreen(
     dismissAddCustomUnit: (customUnitId: Int) -> Unit,
     viewModel: FinishAddCustomUnitViewModel = hiltViewModel()
 ) {
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     FinishAddCustomUnitScreenContent(
         substanceName = viewModel.substanceName,
         administrationRoute = viewModel.administrationRoute,
@@ -528,7 +530,7 @@ fun EditCustomUnitSections(
                     keyboardActions = KeyboardActions(onDone = {
                         focusManager.clearFocus()
                     }),
-                    isError = doseText.toDoubleOrNull() == null,
+                    isError = doseText.nonnegativeDoubleOrNull() == null,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     singleLine = true,
                     modifier = Modifier
@@ -602,13 +604,13 @@ fun EditCustomUnitSections(
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
                             }),
-                            isError = estimatedDoseStandardDeviationText.toDoubleOrNull() == null,
+                            isError = estimatedDoseStandardDeviationText.isNotBlank() && estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull() == null,
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        val mean = doseText.toDoubleOrNull()
-                        val standardDeviation = estimatedDoseStandardDeviationText.toDoubleOrNull()
+                        val mean = doseText.nonnegativeDoubleOrNull()
+                        val standardDeviation = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull()
                         val isExplanationShown = mean != null && standardDeviation != null
                         AnimatedVisibility(isExplanationShown) {
                             if (mean != null && standardDeviation != null) {
@@ -647,8 +649,8 @@ fun EditCustomUnitSections(
                         unit = unit,
                         unitPlural = unitPlural,
                         originalUnit = originalUnit,
-                        dose = doseText.toDoubleOrNull(),
-                        estimatedDoseStandardDeviation = estimatedDoseStandardDeviationText.toDoubleOrNull(),
+                        dose = doseText.nonnegativeDoubleOrNull(),
+                        estimatedDoseStandardDeviation = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull(),
                         isEstimate = isEstimate,
                         isArchived = isArchived,
                         note = "",

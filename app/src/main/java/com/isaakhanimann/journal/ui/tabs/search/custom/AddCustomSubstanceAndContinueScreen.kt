@@ -42,6 +42,7 @@ fun AddCustomSubstanceAndContinueScreen(
     LaunchedEffect(Unit) {
         viewModel.name = initialName
     }
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Add custom substance") })

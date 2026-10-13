@@ -33,10 +33,12 @@ import com.isaakhanimann.journal.data.substances.classes.roa.DoseClass
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
 import com.isaakhanimann.journal.ui.main.navigation.graphs.EditCustomUnitRoute
-import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
+import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toPreservedString
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
+import com.isaakhanimann.journal.data.room.validateDoseText
 import javax.inject.Inject
 
 @HiltViewModel
@@ -93,13 +95,13 @@ class EditCustomUnitViewModel @Inject constructor(
     fun onChangeOfDose(newDose: String) {
         doseText = newDose
     }
-    val dose: Double? get() = doseText.toDoubleOrNull()
+    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
 
     var estimatedDoseDeviationText by mutableStateOf("")
     fun onChangeOfEstimatedDoseDeviation(newEstimatedDoseDeviation: String) {
         estimatedDoseDeviationText = newEstimatedDoseDeviation
     }
-    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseDeviationText.toDoubleOrNull()
+    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
 
 
     var isEstimate by mutableStateOf(false)
@@ -125,13 +127,15 @@ class EditCustomUnitViewModel @Inject constructor(
             try {
                 sessionGuard.withSession(generation) {
                     val it = checkNotNull(customUnit)
+                    val retainUncertainty = isEstimate || isEstimate == it.isEstimate
+                    validateDoseText(doseText, estimatedDoseDeviationText, estimate = retainUncertainty)
                     check(experienceRepo.getCustomUnit(it.id) != null) { "This custom unit was deleted. Close this screen." }
                     it.dose = dose
                     it.name = name
                     it.isEstimate = isEstimate
                     it.originalUnit = originalUnit
                     it.unitPlural = unitPlural
-                    it.estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseStandardDeviation else null
+                    it.estimatedDoseStandardDeviation = if (retainUncertainty) estimatedDoseStandardDeviation else null
                     it.isArchived = isArchived
                     it.unit = unit
                     it.note = note
@@ -180,8 +184,8 @@ class EditCustomUnitViewModel @Inject constructor(
                     val pluralizableUnit = customUnit.getPluralizableUnit()
                     unit = customUnit.unit
                     unitPlural = pluralizableUnit.plural
-                    doseText = customUnit.dose?.toReadableString() ?: ""
-                    estimatedDoseDeviationText = customUnit.estimatedDoseStandardDeviation?.toReadableString() ?: ""
+                    doseText = customUnit.dose?.toPreservedString() ?: ""
+                    estimatedDoseDeviationText = customUnit.estimatedDoseStandardDeviation?.toPreservedString() ?: ""
                     isEstimate = customUnit.isEstimate
                     isArchived = customUnit.isArchived
                     note = customUnit.note

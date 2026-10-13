@@ -55,6 +55,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.foundation.focusable
+import androidx.compose.ui.input.key.*
+import androidx.compose.ui.semantics.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.toArgb
@@ -69,6 +72,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
@@ -163,27 +167,48 @@ fun AllTimelines(
             textSize = density.run { ratingSize.toPx() }
         }
     }
-    var currentTime by remember {
-        mutableStateOf(Instant.now())
-    }
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        currentTime = Instant.now()
-    }
-    LaunchedEffect(Unit) {
-        while (true) {
-            val fiveSeconds = 5000L
-            delay(fiveSeconds)
-            currentTime = Instant.now()
-        }
-    }
+    val currentTime by com.isaakhanimann.journal.ui.utils.rememberUiTime(
+        isShowingCurrentTime || timeDisplayOption == TimeDisplayOption.RELATIVE_TO_NOW)
     var dragPoint by remember(model) { mutableStateOf<Offset?>(null) }
     var hoverPoint by remember(model) { mutableStateOf<Offset?>(null) }
     var canvasWidthPx by remember { mutableStateOf(0) }
     var visibleLeft by remember { mutableStateOf(0f) }
     var visibleRight by remember { mutableStateOf(0f) }
-    val cursorPoint = dragPoint ?: hoverPoint
+    var accessibleX by remember(model) { mutableStateOf<Float?>(null) }
+    val cursorPoint = dragPoint ?: hoverPoint ?: accessibleX?.let { Offset(it, 0f) }
+    fun moveCursor(direction: Int): Boolean {
+        if (canvasWidthPx <= 0) return false
+        val left = visibleLeft.coerceIn(0f, canvasWidthPx.toFloat())
+        val right = (visibleRight.takeIf { it > left } ?: canvasWidthPx.toFloat()).coerceIn(left, canvasWidthPx.toFloat())
+        val step = canvasWidthPx * 900f / model.widthInSeconds
+        accessibleX = ((accessibleX ?: left) + direction * step).coerceIn(left, right)
+        return true
+    }
+    val accessibleTime = cursorPoint?.let { model.startTime.plusMillis((it.x.coerceIn(0f, canvasWidthPx.toFloat()) / maxOf(1, canvasWidthPx) * model.widthInSeconds * 1000).toLong()) }
+    val cursorSummary = accessibleTime?.let { time ->
+        cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + ". " + model.cursorModel.at(time).joinToString { value ->
+            "${value.ingestion.substanceName}, ${value.ingestion.route.displayText}, " +
+                (value.peakFraction?.let { "${(it * 100).roundToInt()} percent of peak" } ?: "peak percentage unavailable") + ", " +
+                (value.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" } ?: "mg equivalent unavailable")
+        }
+    } ?: "Cursor hidden"
 
-    Box(modifier = modifier.onSizeChanged { canvasWidthPx = it.width }.onGloballyPositioned {
+    Box(modifier = modifier.semantics {
+        contentDescription = "Estimated effect timeline from ${model.startTime.getShortTimeText()}. " +
+            model.cursorModel.at(model.startTime).joinToString { "${it.ingestion.substanceName}, ${it.ingestion.route.displayText}, ${it.ingestion.startTime.getShortTimeText()}" }
+        stateDescription = cursorSummary
+        customActions = listOf(
+            CustomAccessibilityAction("Move cursor earlier by 15 minutes") { moveCursor(-1) },
+            CustomAccessibilityAction("Move cursor later by 15 minutes") { moveCursor(1) },
+            CustomAccessibilityAction("Hide timeline cursor") { accessibleX = null; true })
+    }.onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) false else when (event.key) {
+            Key.DirectionLeft -> moveCursor(-1)
+            Key.DirectionRight -> moveCursor(1)
+            Key.Escape -> { accessibleX = null; true }
+            else -> false
+        }
+    }.focusable().onSizeChanged { canvasWidthPx = it.width }.onGloballyPositioned {
         val origin = it.localToWindow(Offset.Zero)
         val visible = it.boundsInWindow()
         visibleLeft = (visible.left - origin.x).coerceAtLeast(0f)

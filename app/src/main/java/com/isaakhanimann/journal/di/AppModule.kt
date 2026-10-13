@@ -57,7 +57,8 @@ object AppModule {
             context,
             AppDatabase::class.java,
             "experiences_db"
-        ).addMigrations(com.isaakhanimann.journal.data.room.migrations.Migration7To8).build()
+        ).addMigrations(com.isaakhanimann.journal.data.room.migrations.Migration7To8,
+            com.isaakhanimann.journal.data.room.migrations.Migration8To9).build()
 
     @Singleton
     @Provides

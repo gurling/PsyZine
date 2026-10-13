@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.combinations
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -35,7 +36,6 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -48,7 +48,7 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 @Composable
 fun CombinationSettingsScreen(viewModel: CombinationSettingsViewModel = hiltViewModel()) {
     CombinationSettingsScreen(
-        substanceInteractions = viewModel.optionsFlow.collectAsState().value.map {
+        substanceInteractions = viewModel.optionsFlow.collectAsStateWithLifecycle().value.map {
             SubstanceInteraction(
                 name = it.name,
                 isOn = it.enabled,

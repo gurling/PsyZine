@@ -149,6 +149,7 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
     } }
     /** Returns a preference warning only when the journal restore itself succeeded. */
     suspend fun restore(uri: Uri): String? = lock.mutex.withLock { withContext(Dispatchers.IO) {
+        substances.initialize()
         val directory = File(storage.staging, "restore-${UUID.randomUUID()}").apply { check(mkdirs()) }
         val promoted = mutableListOf<File>(); var committed = false
         val importWarnings = mutableListOf<String>()

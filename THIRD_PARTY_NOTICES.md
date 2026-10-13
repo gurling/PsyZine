@@ -9,7 +9,7 @@ Palette sources: Catppuccin, Dracula, Gruvbox, Nord, Solarized, One Dark, Rose P
 
 Libraries: AndroidX/Compose/Room/DataStore/Glance and Coil (Apache-2.0); Kotlin and kotlinx (Apache-2.0); Dagger/Hilt (Apache-2.0); Kizitonwose Calendar (MIT). Dependency notices are recorded in THIRD_PARTY_NOTICES.md.
 
-Reference information is attributed to PsychonautWiki, TripSit, and DIZ/saferparty.ch. Its rights are separate from the application code. Attribution does not establish redistribution permission; public binaries remain subject to the content rights review.
+Reference information is attributed to PsychonautWiki, TripSit, and DIZ/saferparty.ch. Its rights are separate from the application code. Attribution does not establish redistribution permission; production binaries remain subject to the content rights review. The owner-approved compatibility testing exception permits testing pre-releases after the documented signing and verification gates; it does not establish redistribution clearance.
 
 Full palette license texts are in `app/src/main/assets/licenses/`. All upstream copyright headers and the complete GPL text are retained. New dependencies must be reviewed against this record before publication.
 

@@ -75,7 +75,7 @@ class SearchViewModel @Inject constructor(
             )
         )
         return@combine newChips
-    }.stateIn(
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)
@@ -83,7 +83,7 @@ class SearchViewModel @Inject constructor(
 
     val filteredSubstancesFlow = combine(searchTextFlow, filtersFlow, experienceRepo.getSortedLastUsedSubstanceNamesFlow(limit = 200)) { searchText, filters, recents ->
         return@combine searchRepository.getMatchingSubstances(searchText = searchText, filterCategories = filters, recentlyUsedSubstanceNamesSorted = recents).map { it.toSubstanceModel() }
-    }.stateIn(
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)
@@ -104,7 +104,7 @@ class SearchViewModel @Inject constructor(
                     other = searchText, ignoreCase = true
                 )
             }
-        }.stateIn(
+        }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
             initialValue = emptyList(),
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)

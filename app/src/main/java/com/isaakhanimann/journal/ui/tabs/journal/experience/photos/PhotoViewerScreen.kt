@@ -27,8 +27,8 @@ import androidx.compose.ui.unit.IntSize
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PhotoViewerScreen(navigateBack: () -> Unit, viewModel: PhotoViewerViewModel = hiltViewModel()) {
-    val photos by viewModel.photos.collectAsStateWithLifecycle()
-    PhotoViewerContent(photos.map { viewModel.attachments.file(it) }, viewModel.route.index, navigateBack)
+    val files by viewModel.files.collectAsStateWithLifecycle()
+    PhotoViewerContent(files, viewModel.route.index, navigateBack)
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
@@ -53,6 +53,7 @@ fun PhotoViewerContent(photoFiles: List<File>, initialIndex: Int, navigateBack: 
         }) { padding ->
         if (photoFiles.isEmpty()) Text("No photos available", Modifier.padding(padding).padding(16.dp))
         else HorizontalPager(state = pager, key = { photoFiles[it].path }, modifier = Modifier.fillMaxSize().padding(padding)) { page ->
+            var failed by remember(photoFiles[page].path) { mutableStateOf(false) }
             var scale by remember(photoFiles[page].path) { mutableFloatStateOf(1f) }
             var offset by remember(photoFiles[page].path) { mutableStateOf(Offset.Zero) }
             var viewport by remember { mutableStateOf(IntSize.Zero) }
@@ -65,9 +66,11 @@ fun PhotoViewerContent(photoFiles: List<File>, initialIndex: Int, navigateBack: 
             }
             Box(Modifier.fillMaxSize().onSizeChanged { viewport = it }.clipToBounds().transformable(transform, canPan = { scale > 1f })) {
                 AsyncImage(model = photoFiles[page], contentDescription = "Photo ${page + 1} of ${photoFiles.size}. Pinch to zoom.",
+                    onError = { failed = true }, onSuccess = { failed = false },
                     contentScale = ContentScale.Fit, modifier = Modifier.fillMaxSize().graphicsLayer {
                         scaleX = scale; scaleY = scale; translationX = offset.x; translationY = offset.y
                     })
+                if (failed) Text("Photo unavailable. Close the viewer and try again.", color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
                 if (scale > 1f) TextButton(onClick = { scale = 1f; offset = Offset.Zero }) { Text("Reset zoom") }
             }
         }

@@ -17,7 +17,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import kotlinx.coroutines.CoroutineScope
@@ -52,26 +54,52 @@ class InPlaceUpgradeTest {
         "CustomUnit", "SubstanceCompanion", "photo_attachment", "journal_state")
     private val keyAlias = "psyzine-emulator-upgrade-fixture"
 
+    private fun clickWhenReady(selector: BySelector, timeout: Long = 10000) {
+        val deadline = System.currentTimeMillis() + timeout
+        while (System.currentTimeMillis() < deadline) {
+            val target = device.wait(Until.findObject(selector), 1000) ?: continue
+            try {
+                val bounds = target.visibleBounds
+                Thread.sleep(300)
+                val current = device.findObject(selector) ?: continue
+                // IME animations can move Save after accessibility reports idle.
+                if (current.visibleBounds != bounds) continue
+                val stableBounds = current.visibleBounds
+                check(!stableBounds.isEmpty) { "Clickable target has empty bounds: $selector" }
+                println("Upgrade fixture click: $selector at $stableBounds")
+                check(device.click(stableBounds.centerX(), stableBounds.centerY())) { "Touch injection failed: $selector" }
+                return
+            } catch (_: StaleObjectException) {
+                // Document providers replace their nodes while opening a root; acquire a fresh node.
+                device.waitForIdle()
+            }
+        }
+        device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-click-failure.xml"))
+        error("Clickable target did not stabilize: $selector")
+    }
+
     private fun requireEmulator() {
         check(arguments.getString("psyzineUpgradeFixture") == "true") { "Explicit emulator fixture mode required" }
         check(device.executeShellCommand("getprop ro.kernel.qemu").trim() == "1") { "Physical-device fixture seeding is forbidden" }
-        check(Build.FINGERPRINT.startsWith("generic") || Build.MODEL.contains("sdk")) { "Unrecognized emulator" }
+        check(Build.FINGERPRINT.startsWith("generic") || Build.MODEL.contains("sdk", ignoreCase = true)) { "Unrecognized emulator" }
+        check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Unrecognized emulator hardware" }
         check(context.packageName == "app.psyzine.debug") { "Wrong target sandbox" }
     }
 
     private fun database(): SQLiteDatabase {
         // Application reconciliation initializes Room. Wait for its real database, never replace it.
+        val expectedSchema = requireNotNull(arguments.getString("expectedSchemaVersion")) { "Explicit schema version required" }.toInt()
         val file = context.getDatabasePath("experiences_db")
         val deadline = System.currentTimeMillis() + 30000
         while (System.currentTimeMillis() < deadline) {
             if (file.isFile) {
                 val db = SQLiteDatabase.openDatabase(file.path, null, SQLiteDatabase.OPEN_READWRITE)
-                if (db.version == 8) return db
+                if (db.version == expectedSchema) return db
                 db.close()
             }
             Thread.sleep(100)
         }
-        error("Application did not initialize schema 8")
+        error("Application did not initialize schema $expectedSchema")
     }
 
     private fun hash(file: File) = MessageDigest.getInstance("SHA-256").digest(file.readBytes())
@@ -111,7 +139,7 @@ class InPlaceUpgradeTest {
         @Suppress("DEPRECATION")
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         @Suppress("DEPRECATION")
-        assertEquals(1, info.versionCode)
+        assertEquals(arguments.getString("expectedVersionCode")!!.toInt(), info.versionCode)
         check(!marker.exists()) { "Never reseed an existing fixture" }
         database().use { db ->
             tables.filter { it != "journal_state" }.forEach { table ->
@@ -186,7 +214,8 @@ class InPlaceUpgradeTest {
     @Test fun upgradedJournalPhotosAndBackupWork() {
         assumeTrue(arguments.getString("psyzineUpgradeFixture") == "true")
         requireEmulator()
-        context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         check(device.wait(Until.hasObject(By.text("Journal")), 30000)) { "Journal did not open" }
         check(device.wait(Until.hasObject(By.text("Upgrade fixture")), 15000)) { "Preserved entry is missing" }
         device.findObject(By.text("Upgrade fixture")).click()
@@ -195,28 +224,58 @@ class InPlaceUpgradeTest {
         check(device.wait(Until.hasObject(By.desc("Open photo 1 of 2")), 10000)) { "Photos did not render" }
         device.findObject(By.desc("Open photo 1 of 2")).click()
         check(device.wait(Until.hasObject(By.desc("Close photo viewer")), 10000)) { "Photo viewer did not open" }
+        // Wait for each destination: consecutive system Back events can outrun navigation.
+        device.findObject(By.desc("Close photo viewer")).click()
+        check(device.wait(Until.hasObject(By.desc("Edit options")), 10000)) { "Photo viewer did not return to the entry" }
         device.pressBack()
-        device.pressBack()
-        device.findObject(By.text("Settings")).click()
-        val settingsScroll = device.wait(Until.findObject(By.scrollable(true)), 10000)
-        repeat(12) { if (!device.hasObject(By.text("Back up journal and photos"))) settingsScroll?.scroll(Direction.DOWN, 0.6f) }
-        check(device.wait(Until.hasObject(By.text("Back up journal and photos")), 10000))
+        val settings = device.wait(Until.findObject(By.text("Settings")), 10000)
+            ?: error("Journal navigation did not return after closing the entry")
+        settings.click()
+        check(device.wait(Until.hasObject(By.text("Appearance")), 10000)) { "Settings screen did not open" }
+        repeat(12) {
+            if (!device.hasObject(By.text("Back up journal and photos"))) {
+                val settingsScroll = device.wait(Until.findObject(By.pkg(context.packageName).scrollable(true)), 10000)
+                    ?: error("Settings scroll container missing")
+                // Small, slow steps keep the backup row from being skipped by a fling.
+                settingsScroll.scroll(Direction.DOWN, 0.25f, 500)
+                device.waitForIdle()
+            }
+        }
+        if (!device.wait(Until.hasObject(By.text("Back up journal and photos")), 10000)) {
+            device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-settings-failure.xml"))
+            device.takeScreenshot(File(context.getExternalFilesDir(null), "upgrade-settings-failure.png"))
+            error("Backup action missing after scrolling Settings")
+        }
         device.findObject(By.text("Back up journal and photos")).click()
         check(device.wait(Until.hasObject(By.text("Export")), 10000))
         device.findObject(By.text("Export")).click()
-        val filename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 15000)
-            ?: error("Document filename input missing")
+        check(device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 15000)) { "Document filename input missing" }
         // Select Downloads explicitly; a provider's last-used location is not reliable across APIs.
+        device.waitForIdle()
         device.findObject(By.desc("Show roots"))?.click()
-        device.wait(Until.findObject(By.text("Downloads")), 5000)?.click()
-        val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}.psyzine"
-        val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000) ?: filename
+        device.waitForIdle()
+        clickWhenReady(By.text("Downloads"))
+        device.waitForIdle()
+        val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}-${UUID.randomUUID()}.psyzine"
+        val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000)
+            ?: error("Document filename input missing after choosing Downloads")
         currentFilename.text = name
-        val save = device.wait(Until.findObject(By.res("android", "button1")), 5000)
-            ?: device.findObject(By.res("com.android.documentsui", "button1"))
-            ?: device.findObject(By.text(java.util.regex.Pattern.compile("(?i)save")))
-            ?: error("Document save action missing")
-        save.click()
+        device.waitForIdle()
+        if (device.executeShellCommand("dumpsys input_method").contains("mInputShown=true")) {
+            device.pressBack()
+            device.waitForIdle()
+        }
+        val saveSelector = By.text(java.util.regex.Pattern.compile("(?i)save")).enabled(true)
+        for (attempt in 0 until 5) {
+            clickWhenReady(saveSelector)
+            if (device.wait(Until.gone(saveSelector), 2000)) break
+        }
+        check(device.wait(Until.gone(saveSelector), 10000)) { "Document picker did not accept Save" }
+        if (!device.wait(Until.hasObject(By.text("Backup saved")), 30000)) {
+            device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-export-failure.xml"))
+            device.takeScreenshot(File(context.getExternalFilesDir(null), "upgrade-export-failure.png"))
+            error("Backup export did not report completion")
+        }
         // Shell copies only the synthetic export back into the target app's external test directory.
         val destination = File(context.getExternalFilesDir(null), name)
         val deadline = System.currentTimeMillis() + 15000

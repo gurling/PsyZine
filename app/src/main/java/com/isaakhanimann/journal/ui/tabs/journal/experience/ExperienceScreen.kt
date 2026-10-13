@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +31,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
+import com.isaakhanimann.journal.ui.tabs.journal.experience.photos.photoRows
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -66,7 +70,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -122,9 +125,11 @@ fun ExperienceScreen(
     navigateToTimelineScreen: (consumerName: String) -> Unit,
     navigateBack: () -> Unit,
 ) {
-    val ingestionsWithCompanions = viewModel.ingestionsWithCompanionsFlow.collectAsState().value
-    val experience = viewModel.experienceFlow.collectAsState().value
-    val isFavorite = viewModel.isFavoriteFlow.collectAsState().value
+    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    val ingestionsWithCompanions = viewModel.ingestionsWithCompanionsFlow.collectAsStateWithLifecycle().value
+    val experience = viewModel.experienceFlow.collectAsStateWithLifecycle().value
+    val photos = viewModel.photos.collectAsStateWithLifecycle().value
+    val isFavorite = viewModel.isFavoriteFlow.collectAsStateWithLifecycle().value
     val oneExperienceScreenModel = OneExperienceScreenModel(
         isFavorite = isFavorite,
         title = experience?.title ?: "",
@@ -132,33 +137,32 @@ fun ExperienceScreen(
             ?: experience?.sortDate ?: Instant.now(),
         notes = experience?.text ?: "",
         locationName = experience?.location?.name ?: "",
-        isCurrentExperience = viewModel.isCurrentExperienceFlow.collectAsState().value,
-        ingestionElements = viewModel.ingestionElementsFlow.collectAsState().value,
-        cumulativeDoses = viewModel.cumulativeDosesFlow.collectAsState().value,
-        interactions = viewModel.interactionsFlow.collectAsState().value,
-        interactionExplanations = viewModel.interactionExplanationsFlow.collectAsState().value,
-        ratings = viewModel.ratingsFlow.collectAsState().value,
-        timedNotesSorted = viewModel.timedNotesSortedFlow.collectAsState().value,
-        consumersWithIngestions = viewModel.consumersWithIngestionsFlow.collectAsState().value,
-        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsState().value
+        isCurrentExperience = viewModel.isCurrentExperienceFlow.collectAsStateWithLifecycle().value,
+        ingestionElements = viewModel.ingestionElementsFlow.collectAsStateWithLifecycle().value,
+        cumulativeDoses = viewModel.cumulativeDosesFlow.collectAsStateWithLifecycle().value,
+        interactions = viewModel.interactionsFlow.collectAsStateWithLifecycle().value,
+        interactionExplanations = viewModel.interactionExplanationsFlow.collectAsStateWithLifecycle().value,
+        ratings = viewModel.ratingsFlow.collectAsStateWithLifecycle().value,
+        timedNotesSorted = viewModel.timedNotesSortedFlow.collectAsStateWithLifecycle().value,
+        consumersWithIngestions = viewModel.consumersWithIngestionsFlow.collectAsStateWithLifecycle().value,
+        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsStateWithLifecycle().value
     )
     ExperienceScreen(
-        photosContent = {
-            com.isaakhanimann.journal.ui.tabs.journal.experience.components.CardWithTitle(title = "Photos") {
-                val photos = viewModel.photos.collectAsState().value
-                com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoGrid(photos, viewModel.attachments::file, viewModel.attachments.processor, navigateToPhoto)
+        lazyPhotos = {
+            item(key = "photo-title") {
+                Text("Photos", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
                 TextButton(onClick = navigateToEditExperienceScreen) { Text("Add photos") }
             }
+            photoRows(photos, viewModel.attachments::file, viewModel.attachments.processor, navigateToPhoto)
         },
         oneExperienceScreenModel = oneExperienceScreenModel,
-        timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsState().value,
-        isOralDisclaimerHidden = viewModel.isOralTimelineDisclaimerHidden.collectAsState().value,
+        timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsStateWithLifecycle().value,
+        isOralDisclaimerHidden = viewModel.isOralTimelineDisclaimerHidden.collectAsStateWithLifecycle().value,
         onChangeIsOralDisclaimerHidden = viewModel::saveOralDisclaimerIsHidden,
         addIngestion = {
-            viewModel.saveLastIngestionTimeOfExperience()
-            navigateToAddIngestionSearch()
+            viewModel.saveLastIngestionTimeOfExperience(navigateToAddIngestionSearch)
         },
-        deleteExperience = viewModel::deleteExperience,
+        deleteExperience = { viewModel.deleteExperience(navigateBack) },
         navigateToEditExperienceScreen = navigateToEditExperienceScreen,
         navigateToExplainTimeline = navigateToExplainTimeline,
         navigateToIngestionScreen = navigateToIngestionScreen,
@@ -168,12 +172,12 @@ fun ExperienceScreen(
         saveIsFavorite = viewModel::saveIsFavorite,
         navigateToEditRatingScreen = navigateToEditRatingScreen,
         navigateToEditTimedNoteScreen = navigateToEditTimedNoteScreen,
-        savedTimeDisplayOption = viewModel.savedTimeDisplayOption.collectAsState().value,
-        timeDisplayOption = viewModel.timeDisplayOptionFlow.collectAsState().value,
+        savedTimeDisplayOption = viewModel.savedTimeDisplayOption.collectAsStateWithLifecycle().value,
+        timeDisplayOption = viewModel.timeDisplayOptionFlow.collectAsStateWithLifecycle().value,
         onChangeTimeDisplayOption = viewModel::saveTimeDisplayOption,
         navigateToTimelineScreen = navigateToTimelineScreen,
-        areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsState().value,
-        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsState().value
+        areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsStateWithLifecycle().value,
+        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value
     )
 }
 
@@ -236,6 +240,7 @@ fun ExperienceScreen(
     areDosageDotsHidden: Boolean,
     isTimelineHidden: Boolean,
     photosContent: @Composable () -> Unit = {},
+    lazyPhotos: LazyListScope.() -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -256,14 +261,13 @@ fun ExperienceScreen(
             AddIngestionFAB(oneExperienceScreenModel, addIngestion)
         }
     ) { padding ->
-        Column(
+        LazyColumn(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
                 .padding(padding)
                 .padding(horizontal = horizontalPadding)
         ) {
             val verticalCardPadding = 4.dp
-            MyTimelineSection(
+            item(key = "timeline") { MyTimelineSection(
                 timelineDisplayOption = timelineDisplayOption,
                 verticalCardPadding = verticalCardPadding,
                 navigateToExplainTimeline = navigateToExplainTimeline,
@@ -273,7 +277,9 @@ fun ExperienceScreen(
                 isOralDisclaimerHidden = isOralDisclaimerHidden,
                 onChangeIsOralDisclaimerHidden = onChangeIsOralDisclaimerHidden,
             )
+            }
             if (oneExperienceScreenModel.ingestionElements.isNotEmpty()) {
+                item(key = "ingestions") {
                 MyIngestionList(
                     verticalCardPadding = verticalCardPadding,
                     oneExperienceScreenModel = oneExperienceScreenModel,
@@ -281,17 +287,21 @@ fun ExperienceScreen(
                     navigateToIngestionScreen = navigateToIngestionScreen,
                     timeDisplayOption = timeDisplayOption
                 )
+                }
             }
             val cumulativeDoses = oneExperienceScreenModel.cumulativeDoses
             if (cumulativeDoses.isNotEmpty()) {
+                item(key = "cumulative") {
                 CumulativeDosesSection(
                     verticalCardPadding = verticalCardPadding,
                     cumulativeDoses = cumulativeDoses,
                     areDosageDotsHidden = areDosageDotsHidden
                 )
+                }
             }
             val timedNotesSorted = oneExperienceScreenModel.timedNotesSorted
             if (timedNotesSorted.isNotEmpty()) {
+                item(key = "notes") {
                 TimedNotesSection(
                     verticalCardPadding = verticalCardPadding,
                     timedNotesSorted = timedNotesSorted,
@@ -299,26 +309,32 @@ fun ExperienceScreen(
                     timeDisplayOption = timeDisplayOption,
                     firstIngestionTime = oneExperienceScreenModel.firstIngestionTime
                 )
+                }
             }
             if (oneExperienceScreenModel.ratings.isNotEmpty()) {
+                item(key = "ratings") {
                 ShulginRatingsSection(
                     verticalCardPadding = verticalCardPadding,
                     oneExperienceScreenModel = oneExperienceScreenModel,
                     navigateToEditRatingScreen = navigateToEditRatingScreen,
                     timeDisplayOption = timeDisplayOption
                 )
+                }
             }
             val notes = oneExperienceScreenModel.notes
             if (notes.isNotBlank()) {
+                item(key = "text") {
                 NotesSection(
                     verticalCardPadding = verticalCardPadding,
                     navigateToEditExperienceScreen = navigateToEditExperienceScreen,
                     oneExperienceScreenModel = oneExperienceScreenModel
                 )
+                }
             }
-            photosContent()
+            item(key = "extra-photos") { photosContent() }
+            lazyPhotos()
             oneExperienceScreenModel.consumersWithIngestions.forEach { consumerWithIngestions ->
-                ConsumerSection(
+                item(key = "consumer-${consumerWithIngestions.consumerName}") { ConsumerSection(
                     verticalCardPadding = verticalCardPadding,
                     consumerWithIngestions = consumerWithIngestions,
                     navigateToTimelineScreen = navigateToTimelineScreen,
@@ -328,15 +344,17 @@ fun ExperienceScreen(
                     isTimelineHidden = isTimelineHidden
                 )
             }
+            }
             val interactions = oneExperienceScreenModel.interactions
-            AnimatedVisibility(visible = interactions.isNotEmpty()) {
+            item(key = "interactions") { AnimatedVisibility(visible = interactions.isNotEmpty()) {
                 ExperienceInteractionsSection(
                     verticalCardPadding = verticalCardPadding,
                     interactions = interactions,
                     oneExperienceScreenModel = oneExperienceScreenModel
                 )
             }
-            Spacer(modifier = Modifier.height(60.dp))
+            }
+            item(key = "end") { Spacer(modifier = Modifier.height(60.dp)) }
         }
     }
 }
@@ -819,7 +837,6 @@ private fun ExperienceTopBar(
                             onClick = {
                                 isShowingDeleteDialog = false
                                 deleteExperience()
-                                navigateBack()
                             }
                         ) {
                             Text("Delete")

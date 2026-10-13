@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.time
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -60,7 +61,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -93,30 +93,30 @@ fun FinishIngestionScreen(
     viewModel: FinishIngestionScreenViewModel = hiltViewModel()
 ) {
     JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
-    val localDateTime = viewModel.localDateTimeStartFlow.collectAsState().value
+    val localDateTime = viewModel.localDateTimeStartFlow.collectAsStateWithLifecycle().value
     FinishIngestionScreen(
         createSaveAndDismissAfter = {
             viewModel.createSaveAndDismissAfter(dismiss = dismissAddIngestionScreens)
         },
-        ingestionTimePickerOption = viewModel.ingestionTimePickerOptionFlow.collectAsState().value,
+        ingestionTimePickerOption = viewModel.ingestionTimePickerOptionFlow.collectAsStateWithLifecycle().value,
         onChangeTimePickerOption = viewModel::onChangeTimePickerOption,
         onChangeStartDateOrTime = viewModel::onChangeStartDateOrTime,
         localDateTimeStart = localDateTime,
-        localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsState().value,
+        localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsStateWithLifecycle().value,
         onChangeEndDateOrTime = viewModel::onChangeEndDateOrTime,
         isLoadingColor = viewModel.isLoadingColor || viewModel.isSaving,
         isShowingColorPicker = viewModel.isShowingColorPicker,
         selectedColor = viewModel.selectedColor,
         onChangeColor = { viewModel.selectedColor = it },
-        alreadyUsedColors = viewModel.alreadyUsedColorsFlow.collectAsState().value,
-        otherColors = viewModel.otherColorsFlow.collectAsState().value,
-        previousNotes = viewModel.previousNotesFlow.collectAsState().value,
+        alreadyUsedColors = viewModel.alreadyUsedColorsFlow.collectAsStateWithLifecycle().value,
+        otherColors = viewModel.otherColorsFlow.collectAsStateWithLifecycle().value,
+        previousNotes = viewModel.previousNotesFlow.collectAsStateWithLifecycle().value,
         note = viewModel.note,
         onNoteChange = {
             viewModel.note = it
         },
-        experiencesInRange = viewModel.experiencesInRangeFlow.collectAsState().value,
-        selectedExperience = viewModel.selectedExperienceFlow.collectAsState().value,
+        experiencesInRange = viewModel.experiencesInRangeFlow.collectAsStateWithLifecycle().value,
+        selectedExperience = viewModel.selectedExperienceFlow.collectAsStateWithLifecycle().value,
         onChangeOfSelectedExperience = viewModel::onChangeOfSelectedExperience,
         substanceName = viewModel.substanceName,
         enteredTitle = viewModel.enteredTitle,
@@ -124,7 +124,7 @@ fun FinishIngestionScreen(
         isEnteredTitleOk = viewModel.isEnteredTitleOk,
         consumerName = viewModel.consumerName,
         onChangeOfConsumerName = viewModel::changeConsumerName,
-        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsState().value
+        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsStateWithLifecycle().value
     )
 }
 

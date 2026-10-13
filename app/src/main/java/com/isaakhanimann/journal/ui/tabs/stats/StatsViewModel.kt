@@ -20,219 +20,93 @@ package com.isaakhanimann.journal.ui.tabs.stats
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.isaakhanimann.journal.data.room.LocalCalendar
+import com.isaakhanimann.journal.data.room.CalendarNow
+import com.isaakhanimann.journal.data.room.DateRange
+import com.isaakhanimann.journal.data.room.localDateRange
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
-import com.isaakhanimann.journal.data.room.experiences.entities.Ingestion
-import com.isaakhanimann.journal.data.room.experiences.entities.SubstanceCompanion
 import com.isaakhanimann.journal.data.room.experiences.relations.ExperienceWithIngestionsAndCompanions
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.LocalTime
-import java.time.Period
-import java.time.ZoneId
-import java.time.ZoneOffset
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
+import java.time.*
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
-class StatsViewModel @Inject constructor(
-    experienceRepo: ExperienceRepository
-) : ViewModel() {
+class StatsViewModel @Inject constructor(entries: ExperienceRepository, calendar: LocalCalendar) : ViewModel() {
+    private val option = MutableStateFlow(TimePickerOption.WEEKS_26)
+    private val consumer = MutableStateFlow<String?>(null)
+    fun onTapOption(value: TimePickerOption) { option.value = value }
+    fun onChangeConsumer(value: String?) { consumer.value = value }
 
-    private val _optionFlow = MutableStateFlow(TimePickerOption.WEEKS_26)
-    private val optionFlow = _optionFlow.asStateFlow()
+    val statsModelFlow = combine(entries.getSortedExperiencesWithIngestionsAndCustomUnitsFlow(), option, consumer, calendar.changes) {
+        experiences, selected, name, now -> aggregateStatistics(experiences, selected, name, now)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0),
+        StatsModel(TimePickerOption.WEEKS_26, false, "", emptyList(), emptyList(), null))
 
-    private val consumerFlow = MutableStateFlow<String?>(null)
+    val sortedConsumerNamesFlow = entries.getSortedIngestions(200).map { ingestions ->
+        ingestions.mapNotNull { it.consumerName }.distinct()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+}
 
-    fun onTapOption(timePickerOption: TimePickerOption) {
-        viewModelScope.launch {
-            _optionFlow.emit(timePickerOption)
-        }
-    }
-
-    fun onChangeConsumer(consumerName: String?) {
-        viewModelScope.launch {
-            consumerFlow.emit(consumerName)
-        }
-    }
-
-    private val startDateFlow = _optionFlow.map {
-        return@map Instant.now().getEndOfDay().minus(it.allBucketSizes)
-    }
-
-    private val startDateTextFlow = startDateFlow.map {
-        val dateTime = LocalDateTime.ofInstant(it, ZoneId.systemDefault())
-        val formatter = DateTimeFormatter.ofPattern("EEE, dd MMM yyyy")
-        return@map dateTime.format(formatter)
-    }
-
-    private val allExperiencesSortedFlow: Flow<List<ExperienceWithIngestionsAndCompanions>> =
-        experienceRepo.getSortedExperiencesWithIngestionsAndCustomUnitsFlow()
-
-    private val areThereAnyIngestionsFlow =
-        allExperiencesSortedFlow.combine(consumerFlow) { experiences, consumerName ->
-            experiences.any { experience ->
-                experience.ingestionsWithCompanionAndCustomUnit.any { it.ingestion.consumerName == consumerName }
+/** Oldest first. Calendar months/years include the current partial period. */
+fun statisticsRanges(option: TimePickerOption, today: LocalDate, zone: ZoneId): List<DateRange> {
+    val tomorrow = today.plusDays(1)
+    return (option.bucketCount - 1 downTo 0).map { ago ->
+        val start: LocalDate
+        val end: LocalDate
+        when (option) {
+            TimePickerOption.MONTHS_12 -> {
+                start = today.withDayOfMonth(1).minusMonths(ago.toLong())
+                end = if (ago == 0) tomorrow else start.plusMonths(1)
+            }
+            TimePickerOption.YEARS_10 -> {
+                start = today.withDayOfYear(1).minusYears(ago.toLong())
+                end = if (ago == 0) tomorrow else start.plusYears(1)
+            }
+            else -> {
+                val days = if (option == TimePickerOption.WEEKS_26) 7L else 1L
+                end = tomorrow.minusDays(ago * days)
+                start = end.minusDays(days)
             }
         }
-
-    private val relevantExperiencesSortedFlow: Flow<List<ExperienceWithIngestionsAndCompanions>> =
-        allExperiencesSortedFlow.combine(startDateFlow) { experiences, startDate ->
-            return@combine experiences.dropWhile { it.sortInstant > Instant.now().getEndOfDay() }
-                .takeWhile { it.sortInstant > startDate }
-        }
-
-    private val companionFlow = experienceRepo.getAllSubstanceCompanionsFlow()
-
-    private val experienceChartBucketsFlow: Flow<List<List<ColorCount>>> =
-        relevantExperiencesSortedFlow.combine(optionFlow) { sortedExperiences, option ->
-            var remainingExperiences = sortedExperiences
-            val buckets = mutableListOf<List<ExperienceWithIngestionsAndCompanions>>()
-            var startInstant = Instant.now().getEndOfDay()
-            for (i in 0 until option.bucketCount) {
-                startInstant = startInstant.minus(option.oneBucketSize)
-                val experiencesForBucket =
-                    remainingExperiences.takeWhile { it.sortInstant > startInstant }
-                buckets.add(experiencesForBucket)
-                val numExperiences = experiencesForBucket.size
-                remainingExperiences =
-                    remainingExperiences.takeLast(remainingExperiences.size - numExperiences)
-            }
-            return@combine buckets
-        }.combine(consumerFlow) { buckets, consumerName ->
-            Pair(buckets, consumerName)
-        }.combine(companionFlow) { pair, companions ->
-            return@combine pair.first.map { experiencesInBucket ->
-                return@map getColorCountsForExperiences(
-                    experiencesInBucket,
-                    companions,
-                    pair.second
-                )
-            }.reversed()
-        }
-
-    private fun getColorCountsForExperiences(
-        experiences: List<ExperienceWithIngestionsAndCompanions>,
-        companions: List<SubstanceCompanion>,
-        consumerName: String?
-    ): List<ColorCount> {
-        return experiences.map { experience ->
-            experience.ingestionsWithCompanionAndCustomUnit.filter { it.ingestion.consumerName == consumerName }
-                .map { it.ingestion.substanceName }.toSet()
-        }.flatten()
-            .groupBy { it }.values.mapNotNull { sameNames ->
-                val name =
-                    sameNames.firstOrNull() ?: return@mapNotNull null
-                val oneCompanion =
-                    companions.firstOrNull { it.substanceName == name } ?: return@mapNotNull null
-                return@mapNotNull ColorCount(
-                    color = oneCompanion.color,
-                    count = sameNames.size
-                )
-            }.sortedByDescending { it.count }
+        localDateRange(start, end, zone)
     }
+}
 
-    private val statsFlowItem: Flow<List<StatItem>> = combine(
-        relevantExperiencesSortedFlow,
-        consumerFlow,
-        companionFlow
-    ) { relevantExperiencesSorted, consumerName, companions ->
-        val allIngestions =
-            relevantExperiencesSorted.flatMap { experience -> experience.ingestionsWithCompanionAndCustomUnit.filter { it.ingestion.consumerName == consumerName } }
-        val experienceNamesMap =
-            relevantExperiencesSorted.map { experience ->
-                experience.ingestionsWithCompanionAndCustomUnit.filter { it.ingestion.consumerName == consumerName }.map { it.ingestion.substanceName }
-                    .toSet()
-            }.flatten().groupBy { it }
-        val map = allIngestions.groupBy { it.ingestion.substanceName }
-        return@combine map.values.mapNotNull { groupedIngestions ->
-            val name = groupedIngestions.firstOrNull()?.ingestion?.substanceName ?: return@mapNotNull null
-            val oneCompanion =
-                companions.firstOrNull { it.substanceName == name } ?: return@mapNotNull null
-            val experienceCounts = experienceNamesMap[name]?.size ?: 0
-            StatItem(
-                substanceName = name,
-                color = oneCompanion.color,
-                experienceCount = experienceCounts,
-                ingestionCount = groupedIngestions.size,
-                routeCounts = getRouteCounts(groupedIngestions.map { it.ingestion }),
-                totalDose = getTotalDose(groupedIngestions)
-            )
-        }.sortedByDescending { it.experienceCount }
+fun aggregateStatistics(experiences: List<ExperienceWithIngestionsAndCompanions>, option: TimePickerOption,
+    consumer: String?, now: CalendarNow): StatsModel {
+    val ranges = statisticsRanges(option, now.date, now.zone)
+    val relevant = experiences.filter { it.sortInstant >= ranges.first().start && it.sortInstant <= now.instant }
+        .sortedWith(compareBy<ExperienceWithIngestionsAndCompanions> { it.sortInstant }.thenBy { it.experience.id })
+    val filtered = relevant.associateWith { exp -> exp.ingestionsWithCompanionAndCustomUnit.filter { it.ingestion.consumerName == consumer } }
+    val all = filtered.values.flatten()
+    val colors = all.sortedBy { it.ingestion.id }.associate { it.ingestion.substanceName to (it.substanceCompanion?.color ?: AdaptiveColor.RED) }
+    val stats = all.groupBy { it.ingestion.substanceName }.map { (name, records) ->
+        StatItem(name, colors.getValue(name), filtered.values.count { list -> list.any { it.ingestion.substanceName == name } }, records.size,
+            records.groupBy { it.ingestion.administrationRoute }.entries.sortedBy { it.key.name }.map { RouteCount(it.key, it.value.size) }, totalDose(records))
+    }.sortedWith(compareByDescending<StatItem> { it.experienceCount }.thenBy { it.substanceName })
+    val buckets = ranges.map { range ->
+        relevant.filter { it.sortInstant in range }.flatMap { exp -> filtered.getValue(exp).map { it.ingestion.substanceName }.distinct() }
+            .groupingBy { it }.eachCount().entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
+            .map { ColorCount(colors.getValue(it.key), it.value, it.key) }
     }
+    val start = ranges.first().start.atZone(now.zone).format(DateTimeFormatter.ofPattern("EEE, dd MMM yyyy"))
+    return StatsModel(option, experiences.any { exp -> exp.ingestionsWithCompanionAndCustomUnit.any { it.ingestion.consumerName == consumer } },
+        start, stats, buckets, consumer)
+}
 
-    private fun getRouteCounts(groupedIngestions: List<Ingestion>): List<RouteCount> {
-        val routeMap = groupedIngestions.groupBy { it.administrationRoute }
-        return routeMap.values.mapNotNull {
-            val route = it.firstOrNull()?.administrationRoute ?: return@mapNotNull null
-            RouteCount(administrationRoute = route, count = it.size)
-        }
-    }
-
-    private fun getTotalDose(groupedIngestions: List<IngestionWithCompanionAndCustomUnit>): TotalDose? {
-        val units = groupedIngestions.firstOrNull()?.originalUnit ?: return null
-        if (groupedIngestions.any { it.originalUnit != units || it.pureDose == null }) return null
-        val sumDose = groupedIngestions.sumOf { it.pureDose ?: 0.0 }
-        val sumStandardDeviations = groupedIngestions.sumOf { it.pureDoseStandardDeviation ?: 0.0 }
-        val isEstimate = groupedIngestions.any { it.isEstimate }
-        return TotalDose(
-            dose = sumDose,
-            units = units,
-            isEstimate = isEstimate,
-            estimatedDoseStandardDeviation = sumStandardDeviations.takeIf { it > 0 })
-    }
-
-    val statsModelFlow: StateFlow<StatsModel> =
-        optionFlow.combine(startDateTextFlow) { option, startDateText ->
-            return@combine Pair(first = option, second = startDateText)
-        }.combine(statsFlowItem) { pair, substanceStats ->
-            return@combine Pair(first = pair, second = substanceStats)
-        }.combine(areThereAnyIngestionsFlow) { pair, areThere ->
-            return@combine Pair(first = pair, second = areThere)
-        }.combine(consumerFlow) { pair, consumerName ->
-            return@combine Pair(first = pair, second = consumerName)
-        }.combine(experienceChartBucketsFlow) { pair, chartBuckets ->
-            return@combine StatsModel(
-                areThereAnyIngestions = pair.first.second,
-                selectedOption = pair.first.first.first.first,
-                startDateText = pair.first.first.first.second,
-                statItems = pair.first.first.second,
-                chartBuckets = chartBuckets,
-                consumerName = pair.second
-            )
-        }.stateIn(
-            initialValue = StatsModel(
-                selectedOption = TimePickerOption.WEEKS_26,
-                areThereAnyIngestions = false,
-                startDateText = "",
-                statItems = emptyList(),
-                chartBuckets = emptyList(),
-                consumerName = null
-            ),
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
-        )
-
-    val sortedConsumerNamesFlow =
-        experienceRepo.getSortedIngestions(limit = 200).map { ingestions ->
-            return@map ingestions.mapNotNull { it.consumerName }.distinct()
-        }.stateIn(
-            initialValue = emptyList(),
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
-        )
+private fun totalDose(records: List<IngestionWithCompanionAndCustomUnit>): TotalDose? {
+    val unit = records.firstOrNull()?.originalUnit ?: return null
+    if (records.any { it.originalUnit != unit || it.pureDose == null || it.pureDose?.let { dose -> !dose.isFinite() || dose < 0 } == true }) return null
+    val dose = records.sumOf { it.pureDose ?: 0.0 }
+    val uncertainty = records.sumOf { it.pureDoseStandardDeviation ?: 0.0 }
+    if (!dose.isFinite() || !uncertainty.isFinite() || uncertainty < 0) return null
+    return TotalDose(dose, unit, records.any { it.isEstimate }, uncertainty.takeIf { it > 0 })
 }
 
 data class StatsModel(
@@ -246,7 +120,8 @@ data class StatsModel(
 
 data class ColorCount(
     val color: AdaptiveColor,
-    val count: Int
+    val count: Int,
+    val substanceName: String? = null
 )
 
 data class StatItem(
@@ -270,59 +145,10 @@ data class TotalDose(
     val estimatedDoseStandardDeviation: Double?
 )
 
-enum class TimePickerOption {
-    DAYS_7 {
-        override val displayText = "7D"
-        override val longDisplayText = "Last week"
-        override val tabIndex = 0
-        override val bucketCount = 7
-        override val oneBucketSize: Period = Period.ofDays(1)
-        override val allBucketSizes: Period = Period.ofDays(7)
-    },
-    DAYS_30 {
-        override val displayText = "30D"
-        override val longDisplayText = "Last month"
-        override val tabIndex = 1
-        override val bucketCount = 30
-        override val oneBucketSize: Period = Period.ofDays(1)
-        override val allBucketSizes: Period = Period.ofDays(30)
-    },
-    WEEKS_26 {
-        override val displayText = "26W"
-        override val longDisplayText = "Half year"
-        override val tabIndex = 2
-        override val bucketCount = 26
-        override val oneBucketSize: Period =
-            Period.ofDays(7) // the max time unit that can be used for subtraction is days
-        override val allBucketSizes: Period = Period.ofDays(7 * bucketCount)
-    },
-    MONTHS_12 {
-        override val displayText = "12M"
-        override val longDisplayText = "Last year"
-        override val tabIndex = 3
-        override val bucketCount = 12
-        override val oneBucketSize: Period = Period.ofDays(30)
-        override val allBucketSizes: Period = Period.ofDays(30 * bucketCount)
-    },
-    YEARS_10 {
-        override val displayText = "10Y"
-        override val longDisplayText = "10 years"
-        override val tabIndex = 4
-        override val bucketCount = 10
-        override val oneBucketSize: Period = Period.ofDays(365)
-        override val allBucketSizes: Period = Period.ofDays(365 * bucketCount)
-    };
-
-    abstract val displayText: String
-    abstract val longDisplayText: String
-    abstract val tabIndex: Int
-    abstract val bucketCount: Int
-    abstract val oneBucketSize: Period
-    abstract val allBucketSizes: Period
-}
-
-fun Instant.getEndOfDay(): Instant {
-    return this.atOffset(ZoneOffset.UTC)
-        .with(LocalTime.of(23,59,59, this.nano))
-        .toInstant()
+enum class TimePickerOption(val displayText: String, val longDisplayText: String, val tabIndex: Int, val bucketCount: Int) {
+    DAYS_7("7D", "Last week", 0, 7),
+    DAYS_30("30D", "Last month", 1, 30),
+    WEEKS_26("26W", "Half year", 2, 26),
+    MONTHS_12("12M", "Last year", 3, 12),
+    YEARS_10("10Y", "10 years", 4, 10)
 }

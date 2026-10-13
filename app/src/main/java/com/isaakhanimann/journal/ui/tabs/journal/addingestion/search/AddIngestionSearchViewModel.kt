@@ -37,6 +37,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -67,7 +68,7 @@ class AddIngestionSearchViewModel @Inject constructor(
             filterCategories = emptyList(),
             recentlyUsedSubstanceNamesSorted = recents
         ).map { it.toSubstanceModel() }
-    }.stateIn(
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)
@@ -92,7 +93,7 @@ class AddIngestionSearchViewModel @Inject constructor(
                 ignoreCase = true
             ) || custom.note.contains(other = searchText, ignoreCase = true)
         }
-    }.stateIn(
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)
@@ -105,7 +106,7 @@ class AddIngestionSearchViewModel @Inject constructor(
             customSubstances.filter { custom ->
                 custom.name.contains(other = searchText, ignoreCase = true)
             }
-        }.stateIn(
+        }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
             initialValue = emptyList(),
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)
@@ -123,7 +124,7 @@ class AddIngestionSearchViewModel @Inject constructor(
                 searchText = searchText,
                 substanceNames = filteredSubstances.map { it.name })
         }
-    }.stateIn(
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000)

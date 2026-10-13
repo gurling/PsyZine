@@ -32,6 +32,8 @@ import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepositor
 import com.isaakhanimann.journal.ui.main.navigation.graphs.ChooseDoseRoute
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
+import com.isaakhanimann.journal.data.room.validateDoseText
 import javax.inject.Inject
 
 @HiltViewModel
@@ -65,13 +67,14 @@ class ChooseDoseViewModel @Inject constructor(
                 purity.let { safePurity ->
                     if (safePurity == null) return null
                     val result = it.div(safePurity).times(100)
+                    if (!result.isFinite()) return "Result is too large"
                     return result.toReadableString() + " impure ${roaDose?.units ?: ""}"
                 }
             }
         }
-    val dose: Double? get() = doseText.toDoubleOrNull()
-    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseStandardDeviationText.toDoubleOrNull()
-    val isValidDose: Boolean get() = dose != null
+    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
+    val estimatedDoseStandardDeviation: Double? get() = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull()
+    val isValidDose: Boolean get() = dose != null && (!isEstimate || estimatedDoseStandardDeviationText.isBlank() || estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull() != null)
     val currentDoseClass: DoseClass? get() = roaDose?.getDoseClass(ingestionDose = dose)
 
     fun onDoseTextChange(newDoseText: String) {

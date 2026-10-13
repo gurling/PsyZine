@@ -28,6 +28,17 @@ class AttachmentRepository @Inject constructor(val storage: AttachmentStorage, v
             db.photoAttachmentDao().setGeneration(com.isaakhanimann.journal.data.room.attachments.JournalState(generation = it))
         }
     }
+    data class EditorSnapshot(val entry: com.isaakhanimann.journal.data.room.experiences.entities.Experience,
+        val photos: List<PhotoAttachment>, val generation: String)
+
+    suspend fun editorSnapshot(id: Int): EditorSnapshot = lock.mutex.withLock {
+        db.withTransaction {
+            val token = generation()
+            val entry = checkNotNull(db.experienceDao().getExperience(id)) { "Experience no longer exists" }
+            EditorSnapshot(entry, db.photoAttachmentDao().forExperience(id), token)
+        }
+    }
+
     fun observe(id: Int) = db.photoAttachmentDao().observe(id)
     suspend fun saved(id: Int) = db.photoAttachmentDao().forExperience(id)
     fun cameraUri(name: String): Uri {

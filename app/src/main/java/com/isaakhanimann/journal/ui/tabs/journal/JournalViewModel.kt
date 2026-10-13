@@ -31,6 +31,7 @@ import com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -138,7 +139,8 @@ class JournalViewModel @Inject constructor(
                             ignoreCase = true
                         ) || it.ingestionsWithCompanions.any { ingestionWithCompanion ->
                             val isSubstanceAMatch =
-                                matchingSubstances.any { name -> name == ingestionWithCompanion.substanceCompanion?.substanceName }
+                                matchingSubstances.any { name -> name == ingestionWithCompanion.ingestion.substanceName } ||
+                                    ingestionWithCompanion.ingestion.substanceName.contains(searchText, ignoreCase = true)
                             val isConsumerAMatch =
                                 ingestionWithCompanion.ingestion.consumerName?.contains(
                                     searchText,
@@ -154,6 +156,7 @@ class JournalViewModel @Inject constructor(
                 }
                 return@combine experiencesWithIngestions
             }
+            .flowOn(kotlinx.coroutines.Dispatchers.Default)
             .stateIn(
                 initialValue = emptyList(),
                 scope = viewModelScope,

@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.UUID
+import kotlinx.coroutines.sync.withPermit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +26,8 @@ data class ProcessedImage(val id: String, val mimeType: String, val width: Int, 
     val byteSize: Long, val sha256: String, val fileName: String)
 
 @Singleton
-class ImageProcessor @Inject constructor(@ApplicationContext private val context: Context, private val storage: AttachmentStorage) {
+class ImageProcessor @Inject constructor(@ApplicationContext private val context: Context, private val storage: AttachmentStorage,
+    private val thumbnailDecoder: ThumbnailDecoder = ThumbnailDecoder()) {
     suspend fun process(uri: Uri, directory: File): ProcessedImage = withContext(Dispatchers.IO) {
         val source = File(directory, "source-${UUID.randomUUID()}")
         try {
@@ -110,29 +112,43 @@ class ImageProcessor @Inject constructor(@ApplicationContext private val context
         }
         return false
     }
-    suspend fun thumbnail(id: String, source: File): File = withContext(Dispatchers.IO) {
+    private val thumbnailPermits = kotlinx.coroutines.sync.Semaphore(2)
+
+    suspend fun thumbnail(id: String, source: File, regenerate: Boolean = false): File = thumbnailPermits.withPermit {
+        try { withContext(Dispatchers.IO) { createThumbnail(id, source, regenerate) } }
+        catch (_: OutOfMemoryError) { throw java.io.IOException("Not enough memory to load this photo. Try again.") }
+    }
+
+    private suspend fun createThumbnail(id: String, source: File, regenerate: Boolean): File {
         require(id.matches(Regex("[a-f0-9-]{36}")))
         val target = File(storage.thumbnails, "$id.png")
+        currentCoroutineContext().ensureActive()
+        if (regenerate && target.exists()) check(target.delete()) { "Could not regenerate the cached preview" }
         if (!target.exists()) {
+            require(source.isFile && source.length() in 1..MAX_IMAGE_BYTES) { "Photo is missing or damaged" }
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            BitmapFactory.decodeFile(source.path, bounds)
+            thumbnailDecoder.decode(source.path, bounds)
+            require(bounds.outWidth in 1..32768 && bounds.outHeight in 1..32768 &&
+                bounds.outWidth.toLong() * bounds.outHeight <= 100_000_000) { "Photo cannot be decoded" }
             val opts = BitmapFactory.Options().apply {
                 inSampleSize = 1
                 while (maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 768) inSampleSize = maxOf(1, inSampleSize) * 2
             }
-            val decoded = BitmapFactory.decodeFile(source.path, opts) ?: error("Photo is missing")
+            val decoded = thumbnailDecoder.decode(source.path, opts) ?: error("Photo is missing")
             try {
                 val factor = minOf(1.0, 384.0 / maxOf(decoded.width, decoded.height))
                 val thumb = Bitmap.createScaledBitmap(decoded, maxOf(1, (decoded.width * factor).toInt()), maxOf(1, (decoded.height * factor).toInt()), true)
                 try {
                     val temp = File(storage.thumbnails, "$id-${UUID.randomUUID()}.tmp")
                     try {
+                        currentCoroutineContext().ensureActive()
                         FileOutputStream(temp).use { check(thumb.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+                        currentCoroutineContext().ensureActive()
                         check(temp.renameTo(target)) { "Thumbnail write failed" }
                     } finally { temp.delete() }
                 } finally { if (thumb !== decoded) thumb.recycle() }
             } finally { decoded.recycle() }
         }
-        target
+        return target
     }
 }

@@ -27,6 +27,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -51,9 +53,15 @@ fun BarChart(buckets: List<List<ColorCount>>, startDateText: String) {
                 .padding(horizontal = 10.dp)
                 .fillMaxWidth()
                 .height(150.dp)
+                .semantics {
+                    contentDescription = "Experience counts from $startDateText, oldest period first. " +
+                        buckets.mapIndexed { index, values -> "Period ${index + 1}: " +
+                            if (values.isEmpty()) "0" else values.joinToString { "${it.substanceName ?: it.color.name}: ${it.count}" }
+                        }.joinToString(". ")
+                }
         ) {
             val canvasHeightOuter = size.height
-            if (canvasHeightOuter > 0) { // for unknown reason canvasHeight can be 0 and then the app crashes
+            if (canvasHeightOuter > 0 && buckets.isNotEmpty()) { // for unknown reason canvasHeight can be 0 and then the app crashes
                 val maxCount = buckets.maxOfOrNull { bucket ->
                     bucket.sumOf { it.count }
                 }?.coerceAtLeast(1) ?: 1

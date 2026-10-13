@@ -32,6 +32,7 @@ class ActiveExperienceRepository @Inject constructor(private val db: AppDatabase
     val changes = db.experienceDao().observeActiveChanges(SimpleSQLiteQuery("SELECT 1")).map { Unit }
 
     suspend fun current(): ActiveExperience? = withContext(Dispatchers.Default) {
+        substances.initialize()
         val now = clock.instant()
         val (relation, generation) = db.withTransaction {
             val generation = db.photoAttachmentDao().generation() ?: java.util.UUID.randomUUID().toString().also {

@@ -19,34 +19,36 @@
 package com.isaakhanimann.journal.ui.tabs.journal.calendar
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.isaakhanimann.journal.data.room.*
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
-import com.isaakhanimann.journal.ui.utils.getInstant
-import com.kizitonwose.calendar.core.CalendarDay
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.*
+import java.time.*
 import javax.inject.Inject
 
-
 @HiltViewModel
-class DayViewModel @Inject constructor(
-    val experienceRepo: ExperienceRepository,
-) : ViewModel() {
+class DayViewModel @Inject constructor(private val entries: ExperienceRepository, calendar: LocalCalendar) : ViewModel() {
+    private val visibleMonths = MutableStateFlow(YearMonth.now() to YearMonth.now())
+    fun showMonths(first: YearMonth, last: YearMonth) { visibleMonths.value = first to last }
 
-    suspend fun getExperienceInfo(day: CalendarDay): ExperienceInfo {
-        val startOfDay = day.date.atStartOfDay().getInstant()
-        val endOfDay = startOfDay.plusMillis(24 * 60 * 60 * 1000)
-        val ingestions = experienceRepo.getIngestionsWithCompanions(
-            fromInstant = startOfDay,
-            toInstant = endOfDay
-        )
-        return ExperienceInfo(
-            experienceIds = ingestions.map { it.ingestion.experienceId }.toSet().toList(),
-            colors = ingestions.mapNotNull { it.substanceCompanion?.color }
-        )
-    }
+    @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
+    val model = combine(visibleMonths, calendar.changes) { months, now ->
+        val range = localDateRange(months.first.atDay(1), months.second.plusMonths(1).atDay(1), now.zone)
+        Triple(range, now.zone, now.date)
+    }.flatMapLatest { (range, zone, today) ->
+        entries.observeCalendarIngestions(range.start, range.end).map { records ->
+            val days = records.groupBy { it.ingestion.time.atZone(zone).toLocalDate() }.mapValues { (_, ingestions) ->
+                ExperienceInfo(ingestions.map { it.ingestion.experienceId }.distinct(),
+                    ingestions.map { it.substanceCompanion?.color ?: AdaptiveColor.RED }.distinct())
+            }
+            CalendarMonthInfo(today, days)
+        }
+    }.flowOn(kotlinx.coroutines.Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0),
+        CalendarMonthInfo(calendar.now().date, emptyMap()))
 }
 
-data class ExperienceInfo(
-    val experienceIds: List<Int>,
-    val colors: List<AdaptiveColor>
-)
+data class ExperienceInfo(val experienceIds: List<Int> = emptyList(), val colors: List<AdaptiveColor> = emptyList())
+
+data class CalendarMonthInfo(val today: LocalDate, val days: Map<LocalDate, ExperienceInfo>)

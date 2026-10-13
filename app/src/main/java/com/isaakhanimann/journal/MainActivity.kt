@@ -65,6 +65,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var presentation: PresentationPreferences
     @Inject lateinit var active: ActiveExperienceRepository
     @Inject lateinit var coordinator: ActiveExperienceCoordinator
+    @Inject lateinit var substances: com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
     @Inject lateinit var database: AppDatabase
     private var experienceRequest by mutableStateOf<ExperienceNavigationRequest?>(null)
     private var permissionAttempted = false
@@ -76,17 +77,40 @@ class MainActivity : ComponentActivity() {
             catch (e: Exception) { android.util.Log.w("ActiveExperience", "Permission resume unavailable: ${e.javaClass.simpleName}") }
         }
     }
+    private var startupFinished by mutableStateOf(false)
+    private var startupReady by mutableStateOf(false)
+    private var startupError by mutableStateOf(false)
+    private var startupJob: kotlinx.coroutines.Job? = null
+
+    private fun initialize() {
+        if (startupJob?.isActive == true) return
+        startupError = false
+        startupJob = lifecycleScope.launch {
+            try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { database.openHelper.writableDatabase }
+                substances.initialize()
+                loadedTheme = appearance.theme.first()
+                startupReady = true
+            } catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                loadedTheme = ThemeId.SYSTEM
+                startupError = true
+            } finally { startupFinished = true }
+        }
+    }
+
     private var loadedTheme by mutableStateOf<ThemeId?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splash = installSplashScreen()
         super.onCreate(savedInstanceState)
-        splash.setKeepOnScreenCondition { loadedTheme == null }
-        lifecycleScope.launch { loadedTheme = appearance.theme.first() }
+        splash.setKeepOnScreenCondition { !startupFinished }
+        initialize()
         enableEdgeToEdge()
         acceptExperienceIntent(intent)
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
+                snapshotFlow { startupReady }.first { it }
                 combine(presentation.settings, active.changes, appearance.theme) { settings, _, _ -> settings }.collect { settings ->
                     if (settings.accepted && settings.enabled && !settings.permissionRequested && !permissionAttempted && Build.VERSION.SDK_INT >= 33 &&
                         ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
@@ -113,7 +137,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val initial = loadedTheme
             if (initial != null) {
-            val theme by appearance.theme.collectAsStateWithLifecycle(initialValue = initial)
+            val theme = if (startupReady) appearance.theme.collectAsStateWithLifecycle(initialValue = initial).value else initial
             PsyZineTheme(theme) {
                 val dark = LocalPsyZinePalette.current.dark
                 SideEffect {
@@ -126,7 +150,12 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    MainScreen(experienceRequest = experienceRequest, consumeExperienceRequest = { experienceRequest = null; intent.removeExtra(EXTRA_EXPERIENCE_ID); intent.removeExtra(EXTRA_JOURNAL_GENERATION) })
+                    if (startupReady) MainScreen(experienceRequest = experienceRequest, consumeExperienceRequest = { experienceRequest = null; intent.removeExtra(EXTRA_EXPERIENCE_ID); intent.removeExtra(EXTRA_JOURNAL_GENERATION) })
+                }
+                if (startupError) {
+                    androidx.compose.material3.AlertDialog(onDismissRequest = {}, title = { androidx.compose.material3.Text("Could not open PsyZine") },
+                        text = { androidx.compose.material3.Text("Your journal is still stored on this device. Try opening it again.") },
+                        confirmButton = { androidx.compose.material3.TextButton(onClick = ::initialize) { androidx.compose.material3.Text("Retry") } })
                 }
                 notificationError?.let { message ->
                     androidx.compose.material3.AlertDialog(onDismissRequest = { notificationError = null },

@@ -60,6 +60,13 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
             SavedTimeDisplayOption.valueOf(name)
         }
 
+    suspend fun saveIngestionTimes(last: Instant?, cloned: Instant?) {
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.KEY_LAST_INGESTION_OF_EXPERIENCE] = last?.epochSecond ?: 0L
+            preferences[PreferencesKeys.KEY_CLONED_INGESTION_TIME] = cloned?.epochSecond ?: 0L
+        }
+    }
+
     suspend fun saveLastIngestionTimeOfExperience(value: Instant?) {
         dataStore.edit { preferences ->
             preferences[PreferencesKeys.KEY_LAST_INGESTION_OF_EXPERIENCE] = value?.epochSecond ?: 0L

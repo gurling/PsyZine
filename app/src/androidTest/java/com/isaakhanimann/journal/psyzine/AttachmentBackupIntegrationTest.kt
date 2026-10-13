@@ -51,7 +51,7 @@ class AttachmentBackupIntegrationTest {
         database = Room.inMemoryDatabaseBuilder(app, AppDatabase::class.java).build()
         storage = AttachmentStorage(context); processor = ImageProcessor(context, storage)
         val lock = JournalMutationLock()
-        val entries = ExperienceRepository(database.experienceDao(), database.photoAttachmentDao(), storage, lock)
+        val entries = ExperienceRepository(database.experienceDao(), database.photoAttachmentDao(), storage, lock, com.isaakhanimann.journal.data.room.JournalSessionGuard(database, lock))
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val store = PreferenceDataStoreFactory.create(scope = scope) { File(directory, "preferences.preferences_pb") }
         appearance = AppearanceRepository(store); presentation = PresentationPreferences(store)

@@ -40,6 +40,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.MutableState
@@ -98,6 +100,13 @@ fun CalendarJournalScreen(
         firstVisibleMonth = currentMonth.minusMonths(1),
         firstDayOfWeek = firstDayOfWeek
     )
+    val viewModel: DayViewModel = hiltViewModel()
+    val monthInfo by viewModel.model.collectAsStateWithLifecycle()
+    LaunchedEffect(state) {
+        snapshotFlow { state.firstVisibleMonth.yearMonth to state.lastVisibleMonth.yearMonth }.collect { (first, last) ->
+            viewModel.showMonths(first, last)
+        }
+    }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -147,6 +156,8 @@ fun CalendarJournalScreen(
                 Day(
                     calendarDay,
                     navigateToExperiencePopNothing,
+                    today = monthInfo.today,
+                    experienceInfos = monthInfo.days[calendarDay.date] ?: ExperienceInfo(),
                     chooseBetweenExperiences = { experienceIds ->
                         experienceIdsToShowInSheet = experienceIds
                         showBottomSheet = true
@@ -189,15 +200,9 @@ fun ExperienceRowWithFetch(
     dismissSheet: () -> Unit
 ) {
     val viewModel: ExperienceFetchViewModel = hiltViewModel()
-    val experienceState: MutableState<ExperienceWithIngestionsCompanionsAndRatings?> = remember {
-        mutableStateOf(
-            null
-        )
-    }
-    LaunchedEffect(key1 = experienceId) {
-        experienceState.value = viewModel.getExperience(experienceId)
-    }
-    experienceState.value?.let { experience ->
+    val experienceFlow = remember(experienceId, viewModel) { viewModel.observeExperience(experienceId) }
+    val experience by experienceFlow.collectAsStateWithLifecycle(initialValue = null)
+    experience?.let { experience ->
         ExperienceRow(
             experience,
             navigateToExperienceScreen = {
@@ -213,22 +218,11 @@ fun ExperienceRowWithFetch(
 fun Day(
     day: CalendarDay,
     navigateToExperiencePopNothing: (experienceId: Int) -> Unit,
-    chooseBetweenExperiences: (experienceIds: List<Int>) -> Unit
+    chooseBetweenExperiences: (experienceIds: List<Int>) -> Unit,
+    experienceInfos: ExperienceInfo = ExperienceInfo(),
+    today: LocalDate = LocalDate.now()
 ) {
     if (day.position == DayPosition.MonthDate) {
-        val viewModel: DayViewModel = hiltViewModel()
-        val experienceInfoState: MutableState<ExperienceInfo> = remember {
-            mutableStateOf(
-                ExperienceInfo(
-                    experienceIds = emptyList(),
-                    colors = emptyList()
-                )
-            )
-        }
-        LaunchedEffect(Unit) {
-            experienceInfoState.value = viewModel.getExperienceInfo(day)
-        }
-        val experienceInfos = experienceInfoState.value
         val aspectRatioModifier = Modifier.aspectRatio(1f) // This is important for square sizing!
         val modifier = if (experienceInfos.experienceIds.count() == 1) {
             aspectRatioModifier.clickable {
@@ -241,7 +235,7 @@ fun Day(
         } else {
             aspectRatioModifier
         }
-        val isToday = day.date == LocalDate.now()
+        val isToday = day.date == today
         val dayText = day.date.dayOfMonth.toString()
         Box(
             modifier = modifier
@@ -288,7 +282,7 @@ fun HorizontalColorRectangle(
 ) {
     val isDarkTheme = LocalPsyZinePalette.current
     if (colors.size >= 2) {
-        val brush = remember(colors) {
+        val brush = remember(colors, isDarkTheme) {
             val composeColors = colors.map { it.getComposeColor(isDarkTheme) }
             Brush.horizontalGradient(colors = composeColors)
         }

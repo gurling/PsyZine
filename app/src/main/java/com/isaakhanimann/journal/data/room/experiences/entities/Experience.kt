@@ -20,10 +20,11 @@ package com.isaakhanimann.journal.data.room.experiences.entities
 
 import androidx.room.Embedded
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import java.time.Instant
 
-@Entity
+@Entity(indices = [Index(value = ["sortDate"])])
 data class Experience(
     @PrimaryKey(autoGenerate = true)
     val id: Int,

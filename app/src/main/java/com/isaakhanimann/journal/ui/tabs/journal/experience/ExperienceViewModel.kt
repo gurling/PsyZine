@@ -71,20 +71,22 @@ class ExperienceViewModel @Inject constructor(
     private val interactionChecker: InteractionChecker,
     private val userPreferences: UserPreferences,
     combinationSettingsStorage: CombinationSettingsStorage,
+    private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
 
     private val areSubstanceHeightsIndependentFlow =
         userPreferences.areSubstanceHeightsIndependentFlow.stateIn(
             initialValue = true,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
     val isTimelineHiddenFlow = userPreferences.isTimelineHiddenFlow.stateIn(
         initialValue = true,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     fun saveTimeDisplayOption(savedTimeDisplayOption: SavedTimeDisplayOption) {
@@ -96,13 +98,13 @@ class ExperienceViewModel @Inject constructor(
     val isOralTimelineDisclaimerHidden = userPreferences.isOralDisclaimerHiddenFlow.stateIn(
         initialValue = true,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     val areDosageDotsHiddenFlow = userPreferences.areDosageDotsHiddenFlow.stateIn(
         initialValue = false,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     fun saveOralDisclaimerIsHidden(isOralDisclaimerHidden: Boolean) {
@@ -118,35 +120,35 @@ class ExperienceViewModel @Inject constructor(
     val isFavoriteFlow = localIsFavoriteFlow.stateIn(
         initialValue = false,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     init {
         val experienceRoute = state.toRoute<ExperienceRoute>()
         val expId = experienceRoute.experienceId
         experienceId = expId
-        viewModelScope.launch {
-            val experience = experienceRepo.getExperience(expId)
+        session.load {
+            val experience = experienceRepo.getExperience(expId) ?: error("This experience was deleted. Close this screen.")
             val isFavorite = experience?.isFavorite ?: false
             localIsFavoriteFlow.emit(isFavorite)
         }
     }
 
     fun saveIsFavorite(isFavorite: Boolean) {
-        viewModelScope.launch {
-            experienceRepo.updateFavorite(experienceId, isFavorite)
+        session.run {
+            experienceRepo.updateFavorite(experienceId, isFavorite, session.generation)
             localIsFavoriteFlow.emit(isFavorite)
         }
     }
 
-    val photos = attachments.observe(experienceId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    val photos = attachments.observe(experienceId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
 
     val ingestionsWithCompanionsFlow =
         experienceRepo.getIngestionsWithCompanionsFlow(experienceId)
             .stateIn(
                 initialValue = emptyList(),
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000)
+                started = SharingStarted.WhileSubscribed(0)
             )
 
     val ratingsFlow =
@@ -154,7 +156,7 @@ class ExperienceViewModel @Inject constructor(
             .stateIn(
                 initialValue = emptyList(),
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000)
+                started = SharingStarted.WhileSubscribed(0)
             )
 
     val timedNotesSortedFlow =
@@ -162,13 +164,13 @@ class ExperienceViewModel @Inject constructor(
             .stateIn(
                 initialValue = emptyList(),
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000)
+                started = SharingStarted.WhileSubscribed(0)
             )
 
     val experienceFlow = experienceRepo.getExperienceFlow(experienceId).stateIn(
         initialValue = null,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     private val currentTimeFlow: Flow<Instant> = flow {
@@ -188,13 +190,13 @@ class ExperienceViewModel @Inject constructor(
         }.stateIn(
             initialValue = false,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
     val savedTimeDisplayOption = userPreferences.savedTimeDisplayOptionFlow.stateIn(
         initialValue = SavedTimeDisplayOption.REGULAR,
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     val timeDisplayOptionFlow =
@@ -209,7 +211,7 @@ class ExperienceViewModel @Inject constructor(
         }.stateIn(
             initialValue = TimeDisplayOption.REGULAR,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
     private val sortedIngestionsWithCompanionsFlow =
@@ -283,7 +285,7 @@ class ExperienceViewModel @Inject constructor(
         .stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     val ingestionElementsFlow = myIngestionsWithAssociatedDataFlow.map {
@@ -291,7 +293,7 @@ class ExperienceViewModel @Inject constructor(
     }.stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     val dataForEffectTimelinesFlow = ingestionElementsFlow.map { ingestionElements ->
@@ -301,7 +303,7 @@ class ExperienceViewModel @Inject constructor(
     }.stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     val cumulativeDosesFlow = myIngestionsWithAssociatedDataFlow.map {
@@ -309,7 +311,7 @@ class ExperienceViewModel @Inject constructor(
     }.stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
     private fun getIngestionElements(sortedIngestionsWith: List<IngestionWithAssociatedData>): List<IngestionElement> {
@@ -351,7 +353,7 @@ class ExperienceViewModel @Inject constructor(
             .stateIn(
                 initialValue = emptyList(),
                 scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5000)
+                started = SharingStarted.WhileSubscribed(0)
             )
 
     val interactionExplanationsFlow = interactionsFlow.map { interactions ->
@@ -367,21 +369,18 @@ class ExperienceViewModel @Inject constructor(
     }.stateIn(
         initialValue = emptyList(),
         scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
+        started = SharingStarted.WhileSubscribed(0)
     )
 
-    fun deleteExperience() {
-        viewModelScope.launch {
-            experienceRepo.deleteEverythingOfExperience(experienceId = experienceId)
-        }
+    fun deleteExperience(onSuccess: () -> Unit) = session.run(onSuccess) {
+        experienceRepo.deleteEverythingOfExperience(experienceId, session.generation)
     }
 
-    fun saveLastIngestionTimeOfExperience() = viewModelScope.launch {
-        val lastIngestionTime =
-            ingestionElementsFlow.value.maxOfOrNull { it.ingestionWithCompanionAndCustomUnit.ingestion.time }
-        if (lastIngestionTime != null) {
-            userPreferences.saveLastIngestionTimeOfExperience(lastIngestionTime)
-            userPreferences.saveClonedIngestionTime(null)
+    fun saveLastIngestionTimeOfExperience(onSuccess: () -> Unit) = session.run(onSuccess) {
+        sessionGuard.withSession(session.generation) {
+        check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted." }
+        val lastIngestionTime = experienceRepo.getIngestionsWithCompanions(experienceId).maxOfOrNull { it.ingestion.time }
+        userPreferences.saveIngestionTimes(lastIngestionTime, null)
         }
     }
 
@@ -432,7 +431,7 @@ class ExperienceViewModel @Inject constructor(
         .stateIn(
             initialValue = TimelineDisplayOption.Loading,
             scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5000)
+            started = SharingStarted.WhileSubscribed(0)
         )
 
     companion object {

@@ -42,8 +42,10 @@ import javax.inject.Inject
 @HiltViewModel
 class AddTimedNoteViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
+    sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var note by mutableStateOf("")
     var color by mutableStateOf(AdaptiveColor.BLUE)
     var isPartOfTimeline by mutableStateOf(true)
@@ -53,7 +55,8 @@ class AddTimedNoteViewModel @Inject constructor(
     var otherColors by mutableStateOf(emptyList<AdaptiveColor>())
 
     init {
-        viewModelScope.launch {
+        session.load {
+            check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted. Close this screen." }
             val ingestionsWithCompanions = experienceRepo.getIngestionsWithCompanions(experienceId)
             val substanceColors = ingestionsWithCompanions.mapNotNull { it.substanceCompanion?.color }.distinct()
             val notes = experienceRepo.getTimedNotes(experienceId)
@@ -90,9 +93,9 @@ class AddTimedNoteViewModel @Inject constructor(
         color = newColor
     }
 
-    fun onDoneTap() {
+    fun onDoneTap(onSuccess: () -> Unit) {
         if (note.isNotBlank()) {
-            viewModelScope.launch {
+            session.run(onSuccess) {
                 val newTimedNote = TimedNote(
                     time = localDateTimeFlow.firstOrNull()?.getInstant() ?: Instant.now(),
                     creationDate = Instant.now(),
@@ -101,7 +104,7 @@ class AddTimedNoteViewModel @Inject constructor(
                     experienceId = experienceId,
                     isPartOfTimeline = isPartOfTimeline
                 )
-                experienceRepo.insert(newTimedNote)
+                experienceRepo.insert(newTimedNote, session.generation)
             }
         }
     }

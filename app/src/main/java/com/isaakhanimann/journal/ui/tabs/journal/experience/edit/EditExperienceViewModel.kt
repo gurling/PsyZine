@@ -37,15 +37,25 @@ class EditExperienceViewModel @Inject constructor(private val entries: Experienc
     var enteredLocation by mutableStateOf(state.get<String>("location") ?: ""); private set
     val dirty get() = enteredTitle != originalTitle || enteredText != originalText || enteredLocation != originalLocation ||
         draft?.let { it.photos.isNotEmpty() || it.removedIds.isNotEmpty() || it.pendingCamera != null || it.pendingSources.isNotEmpty() || it.failed.isNotEmpty() } == true
-    val canSave get() = !loading && !saving && !discarding && !importing && draft?.pendingCamera == null && enteredTitle.isNotBlank()
+    val canSave get() = draft != null && !loading && !saving && !discarding && !importing && draft?.pendingCamera == null && enteredTitle.isNotBlank()
 
     init {
         viewModelScope.launch {
             try {
-                val entry = entries.getExperience(experienceId) ?: error("Experience no longer exists")
+                val loaded = attachments.editorSnapshot(experienceId)
+                val entry = loaded.entry
+                val recoveredGeneration = state.get<String>("journalGeneration")
+                check(recoveredGeneration == null || recoveredGeneration == loaded.generation) {
+                    "The journal was restored or deleted. Close this editor and reopen it."
+                }
+                // Unbound form state from older versions cannot be attributed to this journal.
+                if (recoveredGeneration == null) {
+                    state.remove<String>("title"); state.remove<String>("text"); state.remove<String>("location")
+                }
+                state["journalGeneration"] = loaded.generation
                 originalTitle = entry.title; originalText = entry.text; originalLocation = entry.location?.name ?: ""
-                savedPhotos = attachments.saved(experienceId)
-                val generation = attachments.generation()
+                savedPhotos = loaded.photos
+                val generation = loaded.generation
                 val restored = withContext(Dispatchers.IO) { attachments.drafts.load(experienceId) }
                 if (restored != null && restored.generation != generation) attachments.discard(restored)
                 draft = restored?.takeIf { it.generation == generation } ?: AttachmentDraft(experienceId = experienceId, generation = generation, title = entry.title, text = entry.text, location = originalLocation)

@@ -16,8 +16,7 @@ object BackupValidation {
         val units = journal.customUnits.map { it.id }.toSet()
         journal.customUnits.forEach { unit ->
             require(unit.id > 0 && unit.name.isNotBlank() && unit.substanceName.isNotBlank() && unit.unit.isNotBlank()) { "Invalid custom unit" }
-            require(unit.dose == null || unit.dose!!.isFinite() && unit.dose!! >= 0) { "Invalid custom unit dose" }
-            require(unit.estimatedDoseStandardDeviation == null || unit.estimatedDoseStandardDeviation!!.isFinite() && unit.estimatedDoseStandardDeviation!! >= 0) { "Invalid custom unit uncertainty" }
+            com.isaakhanimann.journal.data.room.validateDose(unit.dose, unit.estimatedDoseStandardDeviation)
         }
         var total = 0L
         journal.experiences.forEach { entry ->
@@ -27,8 +26,7 @@ object BackupValidation {
             entry.ingestions.forEach { ingestion ->
                 require(ingestion.customUnitId == null || ingestion.customUnitId in units) { "Missing custom unit reference" }
                 require(ingestion.substanceName.isNotBlank()) { "Missing ingestion substance" }
-                require(ingestion.dose == null || ingestion.dose!!.isFinite() && ingestion.dose!! >= 0) { "Invalid dose" }
-                require(ingestion.estimatedDoseStandardDeviation == null || ingestion.estimatedDoseStandardDeviation!!.isFinite() && ingestion.estimatedDoseStandardDeviation!! >= 0) { "Invalid dose uncertainty" }
+                com.isaakhanimann.journal.data.room.validateDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation)
                 require(ingestion.endTime == null || ingestion.endTime!! >= ingestion.time) { "Invalid ingestion end time" }
             }
         }

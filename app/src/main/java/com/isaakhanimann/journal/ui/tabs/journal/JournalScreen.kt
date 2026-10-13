@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,7 +56,6 @@ import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -82,7 +82,7 @@ fun JournalScreen(
     navigateToCalendar: () -> Unit,
     viewModel: JournalViewModel = hiltViewModel()
 ) {
-    val experiences = viewModel.experiences.collectAsState().value
+    val experiences = viewModel.experiences.collectAsStateWithLifecycle().value
     LaunchedEffect(Unit) {
         viewModel.maybeMigrate()
     }
@@ -93,11 +93,11 @@ fun JournalScreen(
             navigateToAddIngestion()
         },
         navigateToCalendar = navigateToCalendar,
-        isFavoriteEnabled = viewModel.isFavoriteEnabledFlow.collectAsState().value,
+        isFavoriteEnabled = viewModel.isFavoriteEnabledFlow.collectAsStateWithLifecycle().value,
         onChangeIsFavorite = viewModel::onChangeFavorite,
         isTimeRelativeToNow = viewModel.isTimeRelativeToNow.value,
         onChangeIsRelative = viewModel::onChangeRelative,
-        searchText = viewModel.searchTextFlow.collectAsState().value,
+        searchText = viewModel.searchTextFlow.collectAsStateWithLifecycle().value,
         onChangeSearchText = viewModel::search,
         isSearchEnabled = viewModel.isSearchEnabled.value,
         onChangeIsSearchEnabled = viewModel::onChangeOfIsSearchEnabled,

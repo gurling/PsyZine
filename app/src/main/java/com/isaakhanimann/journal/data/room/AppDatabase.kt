@@ -34,7 +34,7 @@ import com.isaakhanimann.journal.data.room.experiences.entities.TimedNote
 
 @TypeConverters(InstantConverter::class)
 @Database(
-    version = 8,
+    version = 9,
     entities = [com.isaakhanimann.journal.data.room.attachments.JournalState::class, com.isaakhanimann.journal.data.room.attachments.PhotoAttachment::class, Experience::class, Ingestion::class, SubstanceCompanion::class, CustomSubstance::class, ShulginRating::class, TimedNote::class, CustomUnit::class],
     autoMigrations = [
         AutoMigration (from = 1, to = 2),

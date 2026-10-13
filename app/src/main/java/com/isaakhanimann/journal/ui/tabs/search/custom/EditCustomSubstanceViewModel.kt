@@ -89,7 +89,7 @@ class EditCustomSubstanceViewModel @Inject constructor(
         isSaving = true
         viewModelScope.launch {
             try {
-                sessionGuard.withSession(generation, action)
+                sessionGuard.withSession(generation, action = action)
                 dismiss()
             } catch (e: CancellationException) {
                 throw e

@@ -32,7 +32,11 @@ import javax.inject.Inject
 @HiltViewModel
 class AddCustomSubstanceViewModel @Inject constructor(
     val experienceRepo: ExperienceRepository,
+    private val guard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
+    state: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, guard, state)
+    init { session.load {} }
 
     var name by mutableStateOf("")
     var units by mutableStateOf("")
@@ -41,7 +45,9 @@ class AddCustomSubstanceViewModel @Inject constructor(
     val isValid get() = name.isNotBlank() && units.isNotBlank()
 
     fun addCustomSubstance(onDone: (customSubstanceName: String) -> Unit) {
-        viewModelScope.launch {
+        if (!isValid) return
+        session.run {
+            guard.withSession(session.generation) {
             val customSubstance = CustomSubstance(
                 name = name,
                 units = units,
@@ -49,6 +55,7 @@ class AddCustomSubstanceViewModel @Inject constructor(
             )
             experienceRepo.insert(customSubstance)
             onDone(name)
+            }
         }
     }
 }

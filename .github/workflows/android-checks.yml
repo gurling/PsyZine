@@ -6,6 +6,10 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      verify_compatibility:
+        description: Verify a reviewed signed candidate without publishing (requires protected environment approval)
+        type: boolean
+        default: false
       publish_compatibility:
         description: Publish a reviewed compatibility candidate (requires protected environment approval)
         type: boolean
@@ -26,14 +30,14 @@ jobs:
   checks:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v7
-      - uses: gradle/actions/wrapper-validation@v6
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Check negative signing/version policy and Obtainium selection
         run: python3 -m unittest discover -s tools/tests -v
@@ -48,13 +52,13 @@ jobs:
           cd artifacts/apks
           sha256sum "PsyZine-source-$GITHUB_SHA.tar.gz" >> SHA256SUMS
       - name: Upload unpublished APKs, checksums and results
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: PsyZine-unpublished-APKs-${{ github.sha }}
           path: artifacts/apks/
           if-no-files-found: error
       - name: Upload build, test and lint reports
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: build-reports
@@ -79,13 +83,13 @@ jobs:
     env:
       PSYZINE_SIGNING_MODE: unpublished
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Enable KVM
         run: |
@@ -97,14 +101,14 @@ jobs:
           export PSYZINE_DEVELOPMENT_KEYSTORE="$RUNNER_TEMP/psyzine-disposable.jks"
           echo "PSYZINE_DEVELOPMENT_KEYSTORE=$PSYZINE_DEVELOPMENT_KEYSTORE" >> "$GITHUB_ENV"
           bash tools/prepare-development-signing.sh --unpublished-ci
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: default
           disable-animations: true
           script: bash tools/run-device-checks.sh --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: instrumented-api-${{ matrix.api }}
@@ -122,12 +126,12 @@ jobs:
     env:
       PSYZINE_SIGNING_MODE: unpublished
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Validate newer API and enable KVM
         env:
@@ -142,7 +146,7 @@ jobs:
           export PSYZINE_DEVELOPMENT_KEYSTORE="$RUNNER_TEMP/psyzine-disposable.jks"
           echo "PSYZINE_DEVELOPMENT_KEYSTORE=$PSYZINE_DEVELOPMENT_KEYSTORE" >> "$GITHUB_ENV"
           bash tools/prepare-development-signing.sh --unpublished-ci
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ inputs.extra_api }}
           arch: x86_64
@@ -150,7 +154,7 @@ jobs:
           disable-animations: true
           script: bash tools/run-device-checks.sh --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: instrumented-api-${{ inputs.extra_api }}
@@ -164,7 +168,7 @@ jobs:
         run: python3 tools/report-check-failures.py
 
   compatibility-build:
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && (inputs.verify_compatibility || inputs.publish_compatibility) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -178,14 +182,14 @@ jobs:
       PSYZINE_COMPAT_STORE_PASSWORD: ${{ secrets.PSYZINE_COMPAT_STORE_PASSWORD }}
       PSYZINE_COMPAT_KEY_PASSWORD: ${{ secrets.PSYZINE_COMPAT_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: gradle/actions/wrapper-validation@v6
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Set runner signing path
         run: echo "PSYZINE_COMPAT_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-compat.jks" >> "$GITHUB_ENV"
@@ -198,7 +202,7 @@ jobs:
           git archive --format=tar.gz --prefix=PsyZine/ HEAD > "artifacts/apks/PsyZine-source-$GITHUB_SHA.tar.gz"
           cd artifacts/apks
           sha256sum "PsyZine-source-$GITHUB_SHA.tar.gz" >> SHA256SUMS
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: compatibility-build-${{ matrix.replica }}
           path: artifacts/apks/
@@ -208,12 +212,16 @@ jobs:
         run: rm -f "$PSYZINE_COMPAT_KEYSTORE_FILE"
 
   compatibility-upgrade:
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' && (inputs.verify_compatibility || inputs.publish_compatibility) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         api: [26, 29, 30, 32, 33, 35]
+        baseline: [code1]
+        include:
+          - api: 35
+            baseline: code2
     environment: compatibility
     env:
       PSYZINE_SIGNING_MODE: compatibility
@@ -222,14 +230,16 @@ jobs:
       PSYZINE_COMPAT_STORE_PASSWORD: ${{ secrets.PSYZINE_COMPAT_STORE_PASSWORD }}
       PSYZINE_COMPAT_KEY_PASSWORD: ${{ secrets.PSYZINE_COMPAT_KEY_PASSWORD }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: gradle/actions/wrapper-validation@v6
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: gradle/actions/wrapper-validation@3f5f9adaf7d9fecd50b5935e54106014257a94e6 # v6
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
           cache: gradle
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - name: Set runner signing path
         run: echo "PSYZINE_COMPAT_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-compat.jks" >> "$GITHUB_ENV"
@@ -242,17 +252,17 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@v2
+      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: default
           disable-animations: true
-          script: bash tools/verify-in-place-upgrade.sh "$(adb devices | awk '/^emulator-.*device$/ {print $1}')" artifacts/upgrade/baseline-code1.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
-      - uses: actions/upload-artifact@v7
+          script: bash tools/verify-in-place-upgrade.sh "$(adb devices | awk '/^emulator-.*device$/ {print $1}')" artifacts/upgrade/baseline-${{ matrix.baseline }}.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
-          name: compatibility-upgrade-api-${{ matrix.api }}
+          name: compatibility-upgrade-api-${{ matrix.api }}-${{ matrix.baseline }}
           path: |
             artifacts/upgrade/*.log
             artifacts/upgrade/FIXTURE_APKS.json
@@ -272,18 +282,18 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v7
-      - uses: actions/setup-java@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v4
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
       - run: sdkmanager "build-tools;35.0.0"
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: compatibility-build-1
           path: artifacts/candidate
-      - uses: actions/download-artifact@v8
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: compatibility-build-2
           path: artifacts/second-build
@@ -293,7 +303,7 @@ jobs:
         run: python3 tools/verify-publication.py --candidate artifacts/candidate --second-build artifacts/second-build --repository "$GITHUB_REPOSITORY"
       - name: Verify Obtainium selects exactly one candidate APK
         run: python3 tools/verify-obtainium.py --assets-dir artifacts/candidate
-      - name: Publish reviewed compatibility pre-release
+      - name: Stage reviewed compatibility pre-release as a draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -301,8 +311,8 @@ jobs:
           version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; c,n=read_version(); print(f"{n}-compat.{c}")')"
           cp docs/compatibility-release-notes.md "$RUNNER_TEMP/compatibility-notes.md"
           printf '\nSource commit: %s\nBuild evidence: https://github.com/%s/actions/runs/%s\n' "$GITHUB_SHA" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID" >> "$RUNNER_TEMP/compatibility-notes.md"
-          gh release create "v$version" artifacts/candidate/* --target "$GITHUB_SHA" --prerelease --title "PsyZine Compatibility $version" --notes-file "$RUNNER_TEMP/compatibility-notes.md"
-      - name: Re-download and inspect published assets
+          gh release create "v$version" artifacts/candidate/* --target "$GITHUB_SHA" --draft --prerelease --title "PsyZine Compatibility $version" --notes-file "$RUNNER_TEMP/compatibility-notes.md"
+      - name: Re-download and inspect draft assets
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -310,7 +320,13 @@ jobs:
           gh release download "v$version" --dir artifacts/published --repo "$GITHUB_REPOSITORY"
           python3 -c 'import sys; from pathlib import Path; sys.path.insert(0,"tools"); import runpy; m=runpy.run_path("tools/verify-publication.py"); m["verify_candidate"](Path("artifacts/published"), "compatibility")'
           python3 tools/verify-obtainium.py --assets-dir artifacts/published
-      - uses: actions/upload-artifact@v7
+      - name: Publish only the verified draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; c,n=read_version(); print(f"{n}-compat.{c}")')"
+          gh release edit "v$version" --draft=false --repo "$GITHUB_REPOSITORY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: compatibility-publication-evidence

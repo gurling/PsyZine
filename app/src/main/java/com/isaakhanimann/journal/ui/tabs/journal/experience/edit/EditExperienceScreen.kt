@@ -6,6 +6,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,7 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoTile
+import com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoTileFromSource
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -33,46 +34,62 @@ fun EditExperienceScreen(navigateBack: () -> Unit, viewModel: EditExperienceView
             IconButton(onClick = { back() }, enabled = !viewModel.saving) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close editor") }
         }, actions = { TextButton(onClick = { viewModel.save(navigateBack) }, enabled = viewModel.canSave) { Text(if (viewModel.saving) "Saving…" else "Save") } })
     }) { padding ->
-        Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (viewModel.loading) CircularProgressIndicator()
-            viewModel.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
-            OutlinedTextField(viewModel.enteredTitle, viewModel::editTitle, label = { Text("Title") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            OutlinedTextField(viewModel.enteredText, viewModel::editText, label = { Text("Notes") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), minLines = 4)
-            OutlinedTextField(viewModel.enteredLocation, viewModel::editLocation, label = { Text("Location name") }, enabled = !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth())
-            Text("Photos", style = MaterialTheme.typography.titleLarge)
-            Text("Private copies · location metadata removed", style = MaterialTheme.typography.bodySmall)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { viewModel.prepareCamera(camera::launch) }, enabled = viewModel.canSave) { Text("Take photo") }
-                OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = viewModel.canSave) { Text("Choose photos") }
-                OutlinedButton(onClick = { files.launch(arrayOf("image/*")) }, enabled = viewModel.canSave) { Text("Choose files") }
+        val draft = viewModel.draft
+        LazyColumn(Modifier.fillMaxSize().padding(padding).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp),
+            contentPadding = PaddingValues(vertical = 16.dp)) {
+            item(key = "status") {
+                if (viewModel.loading) CircularProgressIndicator()
+                viewModel.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             }
-            if (viewModel.importing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(viewModel.progress) }
-            val draft = viewModel.draft
+            item(key = "title") { OutlinedTextField(viewModel.enteredTitle, viewModel::editTitle, label = { Text("Title") }, enabled = viewModel.draft != null && !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), singleLine = true) }
+            item(key = "text") { OutlinedTextField(viewModel.enteredText, viewModel::editText, label = { Text("Notes") }, enabled = viewModel.draft != null && !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth(), minLines = 4) }
+            item(key = "location") { OutlinedTextField(viewModel.enteredLocation, viewModel::editLocation, label = { Text("Location name") }, enabled = viewModel.draft != null && !viewModel.loading && !viewModel.saving, modifier = Modifier.fillMaxWidth()) }
+            item(key = "photo-actions") {
+                Text("Photos", style = MaterialTheme.typography.titleLarge)
+                Text("Private copies · location metadata removed", style = MaterialTheme.typography.bodySmall)
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(onClick = { viewModel.prepareCamera(camera::launch) }, enabled = viewModel.canSave) { Text("Take photo") }
+                    OutlinedButton(onClick = { picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }, enabled = viewModel.canSave) { Text("Choose photos") }
+                    OutlinedButton(onClick = { files.launch(arrayOf("image/*")) }, enabled = viewModel.canSave) { Text("Choose files") }
+                }
+                if (viewModel.importing) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(viewModel.progress) }
+            }
             if (draft != null) {
-                if (draft.pendingCamera != null) {
+                if (draft.pendingCamera != null) item(key = "camera") {
                     Text("A camera capture is pending.")
                     Row { TextButton(onClick = viewModel::recoverCamera) { Text("Recover photo") }; TextButton(onClick = viewModel::cancelCamera) { Text("Cancel capture") } }
                 }
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    viewModel.savedPhotos.forEachIndexed { index, photo -> key(photo.id) {
-                        Column {
-                            PhotoTile(photo.id, viewModel.attachments.file(photo), "Saved photo ${index + 1}", viewModel.attachments.processor) {}
-                            val removed = photo.id in draft.removedIds
-                            TextButton(onClick = { if (removed) viewModel.undoRemove(photo.id) else viewModel.removeSaved(photo.id) }, enabled = !viewModel.saving) { Text(if (removed) "Undo removal" else "Remove photo ${index + 1}") }
+                val saved = viewModel.savedPhotos.associateBy { it.id }
+                val staged = draft.photos.associateBy { it.id }
+                val ids = saved.keys.toList() + staged.keys.toList()
+                ids.chunked(3).forEach { row ->
+                    item(key = "photos-${row.first()}", contentType = "photos") {
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            row.forEach { id -> key(id) {
+                                Column(Modifier.weight(1f)) {
+                                    val photo = saved[id]
+                                    val newPhoto = staged[id]
+                                    val label = if (photo != null) "Saved photo ${viewModel.savedPhotos.indexOf(photo) + 1}" else "New photo ${draft.photos.indexOf(newPhoto) + 1}"
+                                    PhotoTileFromSource(id, { if (photo != null) viewModel.attachments.file(photo) else viewModel.attachments.file(draft, requireNotNull(newPhoto)) },
+                                        label, viewModel.attachments.processor, modifier = Modifier.fillMaxWidth().aspectRatio(1f))
+                                    val removed = id in draft.removedIds
+                                    TextButton(onClick = {
+                                        if (photo != null) { if (removed) viewModel.undoRemove(id) else viewModel.removeSaved(id) }
+                                        else viewModel.removeStaged(id)
+                                    }, enabled = !viewModel.saving) { Text(if (removed) "Undo removal" else "Remove $label") }
+                                }
+                            } }
+                            repeat(3 - row.size) { Spacer(Modifier.weight(1f)) }
                         }
-                    } }
-                    draft.photos.forEachIndexed { index, photo -> key(photo.id) {
-                        Column {
-                            PhotoTile(photo.id, viewModel.attachments.file(draft, photo), "New photo ${index + 1}", viewModel.attachments.processor) {}
-                            TextButton(onClick = { viewModel.removeStaged(photo.id) }, enabled = !viewModel.saving) { Text("Remove new photo ${index + 1}") }
-                        }
-                    } }
+                    }
                 }
                 draft.failed.forEachIndexed { index, failure ->
-                    Text("Photo ${index + 1}: ${failure.message}", color = MaterialTheme.colorScheme.error)
-                    Row {
-                        TextButton(onClick = { viewModel.retry(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Retry") }
-                        TextButton(onClick = { viewModel.removeFailure(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Remove failed photo") }
+                    item(key = "failure-${failure.source}") {
+                        Text("Photo ${index + 1}: ${failure.message}", color = MaterialTheme.colorScheme.error)
+                        Row {
+                            TextButton(onClick = { viewModel.retry(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Retry") }
+                            TextButton(onClick = { viewModel.removeFailure(failure) }, enabled = !viewModel.importing && !viewModel.saving) { Text("Remove failed photo") }
+                        }
                     }
                 }
             }

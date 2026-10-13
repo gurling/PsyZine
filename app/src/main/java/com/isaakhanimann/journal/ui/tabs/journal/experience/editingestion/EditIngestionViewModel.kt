@@ -54,10 +54,15 @@ import javax.inject.Inject
 class EditIngestionViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     private val userPreferences: UserPreferences,
+    private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     private var ingestionFlow: MutableStateFlow<Ingestion?> = MutableStateFlow(null)
     var ingestion: Ingestion? = null
+    private var loadedStart: LocalDateTime? = null
+    private var loadedEnd: LocalDateTime? = null
+    private var initialEndInstant: java.time.Instant? = null
     var note by mutableStateOf("")
     var isEstimate by mutableStateOf(false)
     var isKnown by mutableStateOf(true)
@@ -69,6 +74,7 @@ class EditIngestionViewModel @Inject constructor(
     var localDateTimeStartFlow = MutableStateFlow(LocalDateTime.now())
     var localDateTimeEndFlow = MutableStateFlow(LocalDateTime.now())
     var consumerName by mutableStateOf("")
+    private var selectedCustomUnitId: Int? = null
     var customUnit: CustomUnit? by mutableStateOf(null)
     val otherCustomUnits = experienceRepo.getAllCustomUnitsFlow().combine(ingestionFlow) { customUnits, ing ->
         customUnits.filter {customUnit ->
@@ -90,10 +96,11 @@ class EditIngestionViewModel @Inject constructor(
 
     init {
         val editIngestionRoute = state.toRoute<EditIngestionRoute>()
-        viewModelScope.launch {
+        session.load {
             val ingestionAndCustomUnit =
-                experienceRepo.getIngestionFlow(id = editIngestionRoute.ingestionId).first() ?: return@launch
+                experienceRepo.getIngestionFlow(id = editIngestionRoute.ingestionId).first() ?: error("This entry was deleted. Close this screen.")
             val ing = ingestionAndCustomUnit.ingestion
+            check(experienceRepo.getExperience(ing.experienceId) != null) { "This experience was deleted." }
             ingestionFlow.emit(ing)
             ingestion = ing
             note = ing.notes ?: ""
@@ -104,7 +111,8 @@ class EditIngestionViewModel @Inject constructor(
             isKnown = ing.dose != null
             units = ing.units ?: ""
             consumerName = ing.consumerName ?: ""
-            localDateTimeStartFlow.emit(ing.time.getLocalDateTime())
+            loadedStart = ing.time.getLocalDateTime()
+            localDateTimeStartFlow.emit(checkNotNull(loadedStart))
             val endTime = ing.endTime
             if (endTime != null) {
                 ingestionTimePickerOptionFlow.emit(IngestionTimePickerOption.TIME_RANGE)
@@ -112,7 +120,10 @@ class EditIngestionViewModel @Inject constructor(
             } else {
                 localDateTimeEndFlow.emit(ing.time.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
             }
+            selectedCustomUnitId = ing.customUnitId
             customUnit = ingestionAndCustomUnit.customUnit
+            loadedEnd = localDateTimeEndFlow.value
+            initialEndInstant = ing.endTime ?: ing.time.plus(30, ChronoUnit.MINUTES)
         }
     }
 
@@ -126,6 +137,7 @@ class EditIngestionViewModel @Inject constructor(
         )
 
     fun onChangeCustomUnit(newCustomUnit: CustomUnit?) {
+        selectedCustomUnitId = newCustomUnit?.id
         customUnit = newCustomUnit
         newCustomUnit?.unit?.let {
             units = it
@@ -170,8 +182,14 @@ class EditIngestionViewModel @Inject constructor(
         isEstimate = newIsEstimate
     }
 
-    fun saveClonedIngestionTime() = viewModelScope.launch {
-        userPreferences.saveClonedIngestionTime(ingestion?.time)
+    fun saveClonedIngestionTime(onSuccess: () -> Unit) = session.run(onSuccess) {
+        sessionGuard.withSession(session.generation) {
+            val current = checkNotNull(ingestion)
+            check(experienceRepo.getExperience(current.experienceId) != null) { "This experience was deleted." }
+            val stored = experienceRepo.getIngestion(current.id)
+            check(stored != null && stored.experienceId == current.experienceId) { "This ingestion was deleted or moved. Reopen it." }
+            userPreferences.saveClonedIngestionTime(stored.time)
+        }
     }
 
     val relevantExperiences: StateFlow<List<ExperienceOption>> = localDateTimeStartFlow.map {
@@ -190,34 +208,25 @@ class EditIngestionViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5000)
     )
 
-    fun onDoneTap() {
-        viewModelScope.launch {
-            val selectedStartInstant = localDateTimeStartFlow.firstOrNull()?.getInstant() ?: return@launch
-            val selectedEndInstant = localDateTimeEndFlow.firstOrNull()?.getInstant()
-            val timePickerOption = ingestionTimePickerOptionFlow.first()
-            val endTime = if (timePickerOption == IngestionTimePickerOption.TIME_RANGE) selectedEndInstant else null
-            ingestion?.let {
-                it.notes = note
-                it.isDoseAnEstimate = isEstimate
-                it.experienceId = experienceId
-                it.dose = if (isKnown) dose.toDoubleOrNull() else null
-                it.estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseStandardDeviation.toDoubleOrNull() else null
-                it.units = units
-                it.customUnitId = customUnit?.id
-                it.time = selectedStartInstant
-                it.endTime = endTime
-                it.consumerName = consumerName.ifBlank { null }
-                experienceRepo.update(it)
-            }
-        }
+    fun onDoneTap(onSuccess: () -> Unit) = session.run(onSuccess) {
+        val current = checkNotNull(ingestion)
+        // Imported records may retain uncertainty even when the estimate flag is false.
+        // A note-only edit must preserve it; changing the flag to false is an explicit edit.
+        val retainUncertainty = isEstimate || isEstimate == current.isDoseAnEstimate
+        com.isaakhanimann.journal.data.room.validateDoseText(dose, estimatedDoseStandardDeviation, known = isKnown, estimate = retainUncertainty)
+        val updated = current.copy(notes = if (note == current.notes.orEmpty()) current.notes else note, isDoseAnEstimate = isEstimate, experienceId = experienceId,
+            dose = if (isKnown) dose.toDoubleOrNull() else null,
+            estimatedDoseStandardDeviation = if (retainUncertainty) estimatedDoseStandardDeviation.toDoubleOrNull() else null,
+            units = if (units == current.units.orEmpty()) current.units else units, customUnitId = selectedCustomUnitId,
+            time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeStartFlow.value, loadedStart, current.time),
+            endTime = if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
+                com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeEndFlow.value, loadedEnd, initialEndInstant) else null,
+            consumerName = if (consumerName == current.consumerName.orEmpty()) current.consumerName else consumerName.ifBlank { null })
+        experienceRepo.update(updated, current.experienceId, session.generation)
     }
 
-    fun deleteIngestion() {
-        viewModelScope.launch {
-            ingestion?.let {
-                experienceRepo.delete(ingestion = it)
-            }
-        }
+    fun deleteIngestion(onSuccess: () -> Unit) = session.run(onSuccess) {
+        experienceRepo.delete(checkNotNull(ingestion), session.generation)
     }
 }
 

@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.stats
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
@@ -54,7 +55,6 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -80,9 +80,9 @@ fun StatsScreen(
     StatsScreen(
         navigateToSubstanceCompanion = navigateToSubstanceCompanion,
         onTapOption = viewModel::onTapOption,
-        statsModel = viewModel.statsModelFlow.collectAsState().value,
+        statsModel = viewModel.statsModelFlow.collectAsStateWithLifecycle().value,
         onChangeConsumerName = viewModel::onChangeConsumer,
-        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsState().value,
+        consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsStateWithLifecycle().value,
     )
 }
 

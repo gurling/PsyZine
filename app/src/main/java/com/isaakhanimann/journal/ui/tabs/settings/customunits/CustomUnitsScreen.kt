@@ -18,6 +18,7 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits
 
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -44,7 +45,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalFocusManager
@@ -65,11 +65,11 @@ fun CustomUnitsScreen(
     navigateToCustomUnitArchive: () -> Unit,
     ) {
     CustomUnitsScreenContent(
-        filteredUnits = viewModel.filteredCustomUnitsFlow.collectAsState().value,
+        filteredUnits = viewModel.filteredCustomUnitsFlow.collectAsStateWithLifecycle().value,
         navigateToEditCustomUnit = navigateToEditCustomUnit,
         navigateToAddCustomUnit = navigateToAddCustomUnit,
         navigateToCustomUnitArchive = navigateToCustomUnitArchive,
-        searchText = viewModel.searchTextFlow.collectAsState().value,
+        searchText = viewModel.searchTextFlow.collectAsStateWithLifecycle().value,
         onSearch = viewModel::onSearch
     )
 }
