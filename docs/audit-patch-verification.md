@@ -1,4 +1,4 @@
-# PsyZine audit patch verification — 12 October 2026
+# PsyZine audit patch verification — 13 October 2026
 
 Candidate: base 1.0.2, versionCode 3, compatibility version/tag 1.0.2-compat.3 / v1.0.2-compat.3. Implementation branch: fix/audit-compatible-patch, based on fetched remote main 0f1249d0d52868c8ef42776828598675474e03ea. No push, merge, GitHub settings change, release publication or physical-device operation is authorized by this evidence record.
 
@@ -24,6 +24,8 @@ Release tooling fetches/checks both reviewed history objects, supports protected
 - Synthetic detail captures generated for all13 palettes; Frappé and Latte reviewed for preserved layout/contrast. Full TalkBack/keyboard/large-font/RTL/tablet acceptance remains separate.
 
 Ignored evidence: artifacts/audit-device/, artifacts/audit-upgrade35/, build logs and actual Gradle XML/reports. Release/build and upgrade results will be added after the signed candidate checks complete; historical audit/CI results do not establish this candidate’s success.
+
+13 October follow-up: two independent clean retained-key builds of source 699b31749e504710bd361ba7d199331c4b73b790 pass all five APK checks, all five lint tasks and 56 JVM tests in each of three suites (168 per build). Their package/version/certificate identities match; the release APK ZIP entry contents match, while full signed APK hashes differ. The read-only publication preflight passes against downloaded historical assets, and Obtainium selects exactly one proposed compatibility APK. API35 code2 → code3 retention and photo-viewer/completed-export checks pass. Running the real minified fixture exposed additional harness races: consecutive Back events, Settings scroll flings skipping the backup row, and stale document-provider nodes. The harness now starts a fresh activity task without clearing app data, waits for destinations, uses bounded slow scrolls and retries fresh provider nodes. Final source/build/upgrade evidence after this harness correction is recorded in ignored artifacts/audit-verification.json; the protected CI and owner gates below still apply.
 
 ## Outstanding release and owner gates
 

@@ -17,7 +17,9 @@ import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
 import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.StaleObjectException
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import kotlinx.coroutines.CoroutineScope
@@ -51,6 +53,22 @@ class InPlaceUpgradeTest {
     private val tables = listOf("Experience", "Ingestion", "TimedNote", "ShulginRating", "CustomSubstance",
         "CustomUnit", "SubstanceCompanion", "photo_attachment", "journal_state")
     private val keyAlias = "psyzine-emulator-upgrade-fixture"
+
+    private fun clickWhenReady(selector: BySelector, timeout: Long = 10000) {
+        val deadline = System.currentTimeMillis() + timeout
+        while (System.currentTimeMillis() < deadline) {
+            val target = device.wait(Until.findObject(selector), 1000) ?: continue
+            try {
+                target.click()
+                return
+            } catch (_: StaleObjectException) {
+                // Document providers replace their nodes while opening a root; acquire a fresh node.
+                device.waitForIdle()
+            }
+        }
+        device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-click-failure.xml"))
+        error("Clickable target did not stabilize: $selector")
+    }
 
     private fun requireEmulator() {
         check(arguments.getString("psyzineUpgradeFixture") == "true") { "Explicit emulator fixture mode required" }
@@ -188,7 +206,8 @@ class InPlaceUpgradeTest {
     @Test fun upgradedJournalPhotosAndBackupWork() {
         assumeTrue(arguments.getString("psyzineUpgradeFixture") == "true")
         requireEmulator()
-        context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(context.packageManager.getLaunchIntentForPackage(context.packageName)!!
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         check(device.wait(Until.hasObject(By.text("Journal")), 30000)) { "Journal did not open" }
         check(device.wait(Until.hasObject(By.text("Upgrade fixture")), 15000)) { "Preserved entry is missing" }
         device.findObject(By.text("Upgrade fixture")).click()
@@ -197,23 +216,43 @@ class InPlaceUpgradeTest {
         check(device.wait(Until.hasObject(By.desc("Open photo 1 of 2")), 10000)) { "Photos did not render" }
         device.findObject(By.desc("Open photo 1 of 2")).click()
         check(device.wait(Until.hasObject(By.desc("Close photo viewer")), 10000)) { "Photo viewer did not open" }
+        // Wait for each destination: consecutive system Back events can outrun navigation.
+        device.findObject(By.desc("Close photo viewer")).click()
+        check(device.wait(Until.hasObject(By.desc("Edit options")), 10000)) { "Photo viewer did not return to the entry" }
         device.pressBack()
-        device.pressBack()
-        device.findObject(By.text("Settings")).click()
-        val settingsScroll = device.wait(Until.findObject(By.scrollable(true)), 10000)
-        repeat(12) { if (!device.hasObject(By.text("Back up journal and photos"))) settingsScroll?.scroll(Direction.DOWN, 0.6f) }
-        check(device.wait(Until.hasObject(By.text("Back up journal and photos")), 10000))
+        val settings = device.wait(Until.findObject(By.text("Settings")), 10000)
+            ?: error("Journal navigation did not return after closing the entry")
+        settings.click()
+        check(device.wait(Until.hasObject(By.text("Appearance")), 10000)) { "Settings screen did not open" }
+        repeat(12) {
+            if (!device.hasObject(By.text("Back up journal and photos"))) {
+                val settingsScroll = device.wait(Until.findObject(By.pkg(context.packageName).scrollable(true)), 10000)
+                    ?: error("Settings scroll container missing")
+                // Small, slow steps keep the backup row from being skipped by a fling.
+                settingsScroll.scroll(Direction.DOWN, 0.25f, 500)
+                device.waitForIdle()
+            }
+        }
+        if (!device.wait(Until.hasObject(By.text("Back up journal and photos")), 10000)) {
+            device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-settings-failure.xml"))
+            device.takeScreenshot(File(context.getExternalFilesDir(null), "upgrade-settings-failure.png"))
+            error("Backup action missing after scrolling Settings")
+        }
         device.findObject(By.text("Back up journal and photos")).click()
         check(device.wait(Until.hasObject(By.text("Export")), 10000))
         device.findObject(By.text("Export")).click()
-        val filename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 15000)
-            ?: error("Document filename input missing")
+        check(device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 15000)) { "Document filename input missing" }
         // Select Downloads explicitly; a provider's last-used location is not reliable across APIs.
+        device.waitForIdle()
         device.findObject(By.desc("Show roots"))?.click()
-        device.wait(Until.findObject(By.text("Downloads")), 5000)?.click()
+        device.waitForIdle()
+        clickWhenReady(By.text("Downloads"))
+        device.waitForIdle()
         val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}.psyzine"
-        val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000) ?: filename
+        val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000)
+            ?: error("Document filename input missing after choosing Downloads")
         currentFilename.text = name
+        device.waitForIdle()
         val save = device.wait(Until.findObject(By.res("android", "button1")), 5000)
             ?: device.findObject(By.res("com.android.documentsui", "button1"))
             ?: device.findObject(By.text(java.util.regex.Pattern.compile("(?i)save")))
