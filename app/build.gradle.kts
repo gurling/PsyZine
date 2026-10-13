@@ -152,7 +152,7 @@ dependencies {
     androidTestImplementation(libs.androidx.glance.appwidget.testing)
     androidTestImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
 
-    implementation("io.coil-kt.coil3:coil-compose:3.0.4")
+    implementation("io.coil-kt.coil3:coil-compose:3.6.3")
     implementation("androidx.exifinterface:exifinterface:1.4.2")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     androidTestImplementation("androidx.room:room-testing:2.6.1")
