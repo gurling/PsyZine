@@ -266,6 +266,7 @@ jobs:
           path: |
             artifacts/upgrade/*.log
             artifacts/upgrade/FIXTURE_APKS.json
+            artifacts/upgrade/diagnostics/
           if-no-files-found: error
       - name: Remove runner signing container
         if: always()

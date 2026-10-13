@@ -252,9 +252,13 @@ class InPlaceUpgradeTest {
         check(device.wait(Until.hasObject(By.clazz("android.widget.EditText")), 15000)) { "Document filename input missing" }
         // Select Downloads explicitly; a provider's last-used location is not reliable across APIs.
         device.waitForIdle()
-        device.findObject(By.desc("Show roots"))?.click()
-        device.waitForIdle()
-        clickWhenReady(By.text("Downloads"))
+        val rootsSelector = By.res(java.util.regex.Pattern.compile(".*:id/roots_list"))
+        if (!device.hasObject(rootsSelector)) clickWhenReady(By.desc("Show roots"))
+        check(device.wait(Until.hasObject(rootsSelector), 10000)) { "Document roots drawer did not open" }
+        // The toolbar also says Downloads and remains in the hierarchy behind the drawer.
+        // Root rows use android:id/title; select that row instead of the covered toolbar.
+        clickWhenReady(By.res("android:id/title").text("Downloads"))
+        check(device.wait(Until.gone(rootsSelector), 10000)) { "Document roots drawer did not close" }
         device.waitForIdle()
         val name = "psyzine-upgrade-${arguments.getString("expectedVersionCode")}-${UUID.randomUUID()}.psyzine"
         val currentFilename = device.wait(Until.findObject(By.clazz("android.widget.EditText")), 10000)
@@ -276,15 +280,24 @@ class InPlaceUpgradeTest {
             device.takeScreenshot(File(context.getExternalFilesDir(null), "upgrade-export-failure.png"))
             error("Backup export did not report completion")
         }
-        // Shell copies only the synthetic export back into the target app's external test directory.
-        val destination = File(context.getExternalFilesDir(null), name)
+        // API30 scoped storage forbids shell writes into Android/data. Read only this
+        // completed synthetic export through shell, then create the copy as the app UID.
+        val destination = File(context.cacheDir, name)
         val deadline = System.currentTimeMillis() + 15000
-        while (!destination.isFile && System.currentTimeMillis() < deadline) {
-            device.executeShellCommand("cp /sdcard/Download/$name ${destination.path}")
-            if (!destination.isFile) device.executeShellCommand("cp /sdcard/Download/$name.zip ${destination.path}")
-            Thread.sleep(250)
+        var encoded = ""
+        while (encoded.isBlank() && System.currentTimeMillis() < deadline) {
+            // UiAutomation executes a program directly, not a compound shell script.
+            encoded = device.executeShellCommand("base64 /sdcard/Download/$name").trim()
+            if (encoded.isBlank()) {
+                encoded = device.executeShellCommand("base64 /sdcard/Download/$name.zip").trim()
+            }
+            if (encoded.isBlank()) Thread.sleep(250)
         }
-        check(destination.isFile) { "Backup export did not complete in Downloads" }
+        check(encoded.isNotBlank()) {
+            "Completed synthetic backup is missing from Downloads: " +
+                device.executeShellCommand("ls -l /sdcard/Download")
+        }
+        destination.writeBytes(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
         ZipFile(destination).use { archive ->
             val manifest = JSONObject(archive.getInputStream(archive.getEntry("manifest.json")).bufferedReader().use { it.readText() })
             assertEquals("nord", manifest.getString("theme"))
