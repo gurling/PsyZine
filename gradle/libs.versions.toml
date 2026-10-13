@@ -1,6 +1,6 @@
 [versions]
 glance = "1.1.1"
-agp = "8.7.3"
+agp = "9.4.1"
 compose = "2.5.0"
 coreSplashscreen = "1.0.1"
 datastorePreferences = "1.1.2"
