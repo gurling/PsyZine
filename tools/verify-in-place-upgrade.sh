@@ -37,6 +37,20 @@ Path('artifacts/upgrade/FIXTURE_APKS.json').write_text(json.dumps([baseline, tes
 print('Verified retained certificate, package IDs and increasing fixture codes before emulator writes.')
 PY
 mkdir -p artifacts/upgrade
+capture_failure() {
+    local upgrade_result="$1"
+    if [[ "$upgrade_result" != 0 ]]; then
+        # This script has already verified a fresh synthetic emulator. Keep failure
+        # evidence before emulator-runner shuts it down; never read a physical journal.
+        mkdir -p artifacts/upgrade/diagnostics
+        timeout 20 "${adb_cmd[@]}" shell uiautomator dump /sdcard/psyzine-upgrade-failure.xml >/dev/null 2>&1 || true
+        timeout 10 "${adb_cmd[@]}" pull /sdcard/psyzine-upgrade-failure.xml artifacts/upgrade/diagnostics/window.xml >/dev/null 2>&1 || true
+        timeout 10 "${adb_cmd[@]}" exec-out screencap -p > artifacts/upgrade/diagnostics/screen.png || true
+        timeout 10 "${adb_cmd[@]}" logcat -d -t 2000 > artifacts/upgrade/diagnostics/logcat.log || true
+    fi
+    exit "$upgrade_result"
+}
+trap 'capture_failure "$?"' EXIT
 "${adb_cmd[@]}" install "$baseline"
 "${adb_cmd[@]}" install "$test_apk"
 run_test() {
