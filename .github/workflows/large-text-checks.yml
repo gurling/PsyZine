@@ -19,6 +19,8 @@ jobs:
     env:
       PSYZINE_SIGNING_MODE: unpublished
       PSYZINE_DEVELOPMENT_KEYSTORE: ${{ github.workspace }}/.local/signing/large-text-disposable.jks
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.local/ci-large-text-avds
+      ANDROID_USER_HOME: ${{ github.workspace }}/.local/ci-android-user
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
@@ -35,7 +37,7 @@ jobs:
           sudo apt-get install --no-install-recommends -y libpulse0 libx11-6 libxcb1 libgl1
       - name: Enable KVM
         run: |
-          mkdir -p build-logs
+          mkdir -p build-logs "$ANDROID_AVD_HOME" "$ANDROID_USER_HOME"
           exec > >(tee build-logs/emulator-kvm-37.log) 2>&1
           sudo modprobe kvm
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -54,10 +56,12 @@ jobs:
         run: |
           mkdir -p build-logs
           exec > >(tee build-logs/emulator-setup-37.log) 2>&1
-          echo no | avdmanager create avd --name PsyZineLargeText37 --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          echo no | avdmanager create avd --name PsyZineLargeText37 --path "$ANDROID_AVD_HOME/PsyZineLargeText37.avd" --package "system-images;android-37.0;google_apis_ps16k;x86_64"
           emulator_bin="$ANDROID_HOME/emulator/emulator"
           test -x "$emulator_bin"
           "$emulator_bin" -version
+          "$emulator_bin" -list-avds | tee build-logs/emulator-avds-37.log
+          test -f "$ANDROID_AVD_HOME/PsyZineLargeText37.ini"
           "$emulator_bin" -avd PsyZineLargeText37 -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -accel on -gpu software -memory 4096 -cores 2 > build-logs/emulator-large-text-37.log 2>&1 &
           emulator_pid=$!
           ready=false
