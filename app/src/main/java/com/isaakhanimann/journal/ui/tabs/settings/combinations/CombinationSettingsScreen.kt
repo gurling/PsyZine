@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.combinations
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -87,7 +89,7 @@ fun CombinationSettingsScreen(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Combinations") })
+            TopAppBar(title = { Text("Combinations", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(

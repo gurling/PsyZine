@@ -18,6 +18,24 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose.customsubstance
 
+import com.isaakhanimann.journal.data.room.numericInputError
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+
+import androidx.compose.foundation.layout.FlowRow
+
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.layout.consumeWindowInsets
+
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -143,7 +161,7 @@ fun CustomChooseDosePreview() {
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun CustomSubstanceChooseDoseScreen(
     navigateToSaferSniffingScreen: () -> Unit,
@@ -165,9 +183,11 @@ fun CustomSubstanceChooseDoseScreen(
     convertedDoseAndUnitText: String?,
     units: String,
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(administrationRoute.displayText + " " + substanceName + " Dosage") },
+            TopAppBar(title = { Text(administrationRoute.displayText + " " + substanceName + " Dosage", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     var isShowingUnknownDoseDialog by remember { mutableStateOf(false) }
                     IconButton(onClick = { isShowingUnknownDoseDialog = true }) {
@@ -187,7 +207,7 @@ fun CustomSubstanceChooseDoseScreen(
         floatingActionButton = {
             if (isValidDose) {
                 ExtendedFloatingActionButton(
-                    modifier = Modifier.imePadding(),
+                    modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } },
                     onClick = navigateToNext,
                     icon = {
                         Icon(
@@ -203,6 +223,9 @@ fun CustomSubstanceChooseDoseScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
+                .padding(bottom = fabHeight + 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             LinearProgressIndicator(
@@ -235,19 +258,18 @@ fun CustomSubstanceChooseDoseScreen(
                             )
                         },
                         textStyle = textStyle,
-                        label = { Text("Pure dose", style = textStyle) },
+                        label = { Text("Pure dose") },
                         isError = !isValidDose,
-                        trailingIcon = {
-                            Text(
-                                text = units,
-                                style = textStyle,
-                                modifier = Modifier.padding(horizontal = horizontalPadding)
-                            )
+                        supportingText = {
+                            Column {
+                                Text("Amount in ${units.ifBlank { "the chosen unit" }}.")
+                                numericInputError(doseText, "Dose")?.let { Text(it) }
+                            }
                         },
                         keyboardActions = KeyboardActions(onDone = {
                             focusManager.clearFocus()
                         }),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
@@ -271,19 +293,18 @@ fun CustomSubstanceChooseDoseScreen(
                                     )
                                 },
                                 textStyle = textStyle,
-                                label = { Text("Estimated standard deviation", style = textStyle) },
+                                label = { Text("Uncertainty") },
                                 isError = !isValidDose,
-                                trailingIcon = {
-                                    Text(
-                                        text = units,
-                                        style = textStyle,
-                                        modifier = Modifier.padding(horizontal = horizontalPadding)
-                                    )
+                                supportingText = {
+                                    Column {
+                                        Text("Standard deviation in ${units.ifBlank { "the chosen unit" }}.")
+                                        numericInputError(estimatedDoseStandardDeviationText, "Uncertainty")?.let { Text(it) }
+                                    }
                                 },
                                 keyboardActions = KeyboardActions(onDone = {
                                     focusManager.clearFocus()
                                 }),
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )

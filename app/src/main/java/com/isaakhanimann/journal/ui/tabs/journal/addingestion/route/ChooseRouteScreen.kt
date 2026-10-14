@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.route
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -129,7 +131,7 @@ fun ChooseRouteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("$substanceName route") },
+                title = { Text("$substanceName route", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     if (showOtherRoutes && pwRoutes.isNotEmpty()) {
                         IconButton(onClick = { onChangeOfShowOtherRoutes(false) }) {

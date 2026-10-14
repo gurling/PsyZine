@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.safer
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -57,7 +59,7 @@ fun RouteExplanationScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Routes of administration") },
+                title = { Text("Routes of administration", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     TextButton(
                         onClick = { uriHandler.openUri(AdministrationRoute.PSYCHONAUT_WIKI_ARTICLE_URL) },

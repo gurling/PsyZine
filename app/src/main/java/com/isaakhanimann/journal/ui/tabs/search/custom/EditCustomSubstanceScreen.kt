@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.custom
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
@@ -50,7 +52,7 @@ fun EditCustomSubstanceScreen(
     JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Edit custom substance") }, actions = {
+            TopAppBar(title = { Text("Edit custom substance", maxLines = 1, overflow = TextOverflow.Ellipsis) }, actions = {
                 var isShowingDeleteDialog by remember { mutableStateOf(false) }
                 IconButton(
                     enabled = viewModel.id > 0 && !viewModel.isSaving,

@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.rating.add
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -101,7 +103,7 @@ fun AddRatingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add Shulgin rating") },
+                title = { Text("Add Shulgin rating", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         },
         floatingActionButton = {

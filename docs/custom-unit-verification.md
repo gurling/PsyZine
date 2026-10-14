@@ -1,0 +1,30 @@
+# Custom-unit fixes and verification
+
+Implementation branch: `fix/custom-unit-validation`. Database schema remains 9; application IDs, signing and versions are unchanged. This is an implementation branch, not a publication candidate.
+
+## Behavior
+
+- Creating/editing requires a nonblank name and singular label. Plural is optional with a suggestion; manually chosen plurals survive singular edits. Existing blank plurals display a fallback without rewriting stored records.
+- Dose and uncertainty accept zero, decimal commas and scientific notation. Blank per-unit doses remain unknown; malformed, negative and non-finite input produces field-specific explanations. A known dose needs a measurement label.
+- Save and Next remain visible. Invalid submission focuses the first error; keyboard navigation visits separate singular and plural fields. Legacy invalid uncertainty remains available for manual correction even with Estimate off. Correction fields remain visible while clearing or typing valid values; corrected values stop showing an error.
+- List/archive screens distinguish loading, failure, empty data and no search matches. Retry resubscribes; search survives recreation and rows use stable IDs.
+- Writes check generation, existence and original unit state in a single guarded transaction. Immutable candidates keep the saved baseline intact after failures. Draft recovery is bound to the same generation and unit. The generation is persisted only after a successful read commits, so a failed first load can retry without receiving a false restore/deletion error. Navigation occurs after commit; duplicate taps and cancellation are handled.
+- A calculation-changing unit edit checks current dependent ingestions for overflow. Stale unit selections carry generation and definition tokens through final ingestion save. Existing unknown doses and exact numeric values remain compatible.
+- Used units cannot be deleted. The archive action changes only the saved archive flag, preserving historical definitions and leaving other form edits unsaved as the dialog explains. Unused units remain deletable after confirmation.
+- Storage/load failures use plain-language messages, including a low-storage explanation. Temporary load failures offer retry; deleted records and stale sessions instruct reopening or reselection. Internal exception details are not shown.
+
+## Evidence
+
+- All five APK variants built; all five lint reports contain zero errors. SDK, package/version/debuggable flags, permissions, signatures/certificate pins, ZIP integrity and alignment passed `tools/verify-apks.py`.
+- Direct Debug, Play Debug and Direct Compatible Release JVM suites: **65 tests each, 195 total**, zero failures/errors/skips. Nine new numeric/validation/token/error-flow tests supplement existing suites.
+- APIs 26 and 35: **42 focused instrumentation tests each, 84 total**, zero failures, including all **22 new custom-unit regressions** on each API, plus mutation sessions, schema/data parity, accessibility, lifecycle and existing editor checks.
+- Thirty synthetic captures (15 per API) cover all 13 palettes and both system-theme appearances with 200% fonts and RTL. The full API-26 palette contact sheet and full-resolution light/dark screens were visually inspected.
+- API 35 required emulator-only `ro.hw_timeout_multiplier=5` after restarting its framework; application and coroutine test timeouts stayed unchanged. Two default-timeout starts timed out before tests began; the saved ANR trace places the main thread in `AndroidJUnitRunner.registerTestStorage` → ServiceLoader → ZIP central-directory loading. These attempts do not count as passing tests. The successful scaled run is functional evidence, not a normal-speed startup/performance measurement. The [Android framework timeout multiplier](https://android.googlesource.com/platform/frameworks/base/+/android15-release/core/java/android/os/Build.java) was used only on the owned synthetic emulator.
+
+Logs and synthetic captures are ignored under `build-logs/` and `artifacts/custom-unit-testing/`. The staged APK hashes match the final built APKs. This build retains versionCode 3 and has uncommitted source changes. The verifier marks it **publicationAllowed=false**; these binaries are for local verification only.
+
+## Remaining manual acceptance
+
+Actual TalkBack spoken feedback, physical-device keyboard/navigation, process kill by Android, and a physical installation were not verified. Automated tests cover SavedState recovery, Compose focus/click semantics, large fonts, RTL, and theme error states. No phone data, settings, installation or release was changed.
+
+The original palette/error checks above tested error visibility and action semantics; they did not verify every label or the keyboard layout. Subsequent [large-text verification](large-text-verification.md) adds platform font/display-size runs, measured text bounds and actual IME visibility checks. Number fields now use short “Dose per unit”/“Dose” and “Uncertainty” labels with the full unit context in wrapping supporting text, and the scrolling viewport reserves room for Done/Next.

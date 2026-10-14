@@ -26,9 +26,7 @@ class JournalSessionGuard @Inject constructor(
         mutationLock.mutex.withLock {
             database.withTransaction {
                 val generation = currentGeneration()
-                check(recoveredGeneration == null || recoveredGeneration == generation) {
-                    "The journal was restored or deleted. Close this screen and reopen it."
-                }
+                if (recoveredGeneration != null && recoveredGeneration != generation) throw StaleJournalSession()
                 action(generation)
             }
         }
@@ -36,9 +34,7 @@ class JournalSessionGuard @Inject constructor(
     suspend fun <T> withSession(generation: String?, parentId: Int? = null, action: suspend () -> T): T =
         mutationLock.mutex.withLock {
             database.withTransaction {
-                check(generation != null && database.photoAttachmentDao().generation() == generation) {
-                    "The journal was restored or deleted. Close this screen and reopen it before saving."
-                }
+                if (generation == null || database.photoAttachmentDao().generation() != generation) throw StaleJournalSession()
                 if (parentId != null) {
                     check(database.experienceDao().getExperience(parentId) != null) { "This experience was deleted. Close this screen." }
                 }

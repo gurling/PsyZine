@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
@@ -149,7 +151,7 @@ fun JournalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Journal") },
+                title = { Text("Journal", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconToggleButton(
                         checked = isTimeRelativeToNow,

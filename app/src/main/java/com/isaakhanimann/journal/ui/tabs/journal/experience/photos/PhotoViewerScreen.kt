@@ -1,6 +1,8 @@
 // PsyZine, 2026-10-11. GPL-3.0-or-later.
 package com.isaakhanimann.journal.ui.tabs.journal.experience.photos
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
@@ -43,7 +45,7 @@ fun PhotoViewerContent(photoFiles: List<File>, initialIndex: Int, navigateBack: 
         }
     }
     val scope = rememberCoroutineScope()
-    Scaffold(topBar = { TopAppBar(title = { Text(if (photoFiles.isEmpty()) "Photos" else "${pager.currentPage + 1} / ${photoFiles.size}") },
+    Scaffold(topBar = { TopAppBar(title = { Text(if (photoFiles.isEmpty()) "Photos" else "${pager.currentPage + 1} / ${photoFiles.size}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
         navigationIcon = { IconButton(onClick = navigateBack) { Icon(Icons.Default.Close, "Close photo viewer") } }) },
         bottomBar = {
             Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.SpaceBetween) {

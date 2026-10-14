@@ -18,6 +18,12 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits.edit
 
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.layout.consumeWindowInsets
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
@@ -36,6 +42,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -45,16 +55,21 @@ import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.ui.tabs.journal.experience.rating.FloatingDoneButton
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.dose.RoaDosePreviewProvider
 import com.isaakhanimann.journal.ui.tabs.settings.customunits.add.EditCustomUnitSections
-import com.isaakhanimann.journal.ui.utils.JournalActionErrorDialog
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.CustomUnitEditorStatus
+import com.isaakhanimann.journal.data.room.CustomUnitField
 
 @Composable
 fun EditCustomUnitScreen(
     navigateBack: () -> Unit,
     viewModel: EditCustomUnitViewModel = hiltViewModel()
 ) {
-    JournalActionErrorDialog(viewModel.saveError, viewModel::dismissSaveError)
+    CustomUnitEditorStatus(viewModel, navigateBack) { viewModel.archiveSavedUnit(navigateBack) }
+    if (!viewModel.ready) return
     EditCustomUnitScreenContent(
         canSave = viewModel.canSave,
+        errors = viewModel.errors,
+        validationAttempt = viewModel.validationAttempt,
+        showRetainedUncertainty = viewModel.showRetainedUncertainty,
         substanceName = viewModel.substanceName,
         administrationRoute = viewModel.administrationRoute,
         numberOfIngestionsWithThisCustomUnit = viewModel.numberOfIngestionsWithThisCustomUnit,
@@ -71,7 +86,7 @@ fun EditCustomUnitScreen(
         isEstimate = viewModel.isEstimate,
         onChangeIsEstimate = viewModel::onChangeOfIsEstimate,
         currentDoseClass = viewModel.currentDoseClass,
-        isShowingUnitsField = viewModel.roaDose?.units?.isBlank() ?: true,
+        isShowingUnitsField = viewModel.isUnitsFieldShown,
         unit = viewModel.unit,
         onChangeOfUnits = viewModel::onChangeOfUnit,
         unitPlural = viewModel.unitPlural,
@@ -155,11 +170,16 @@ private fun EditCustomUnitScreenContent(
     onChangeOfIsArchived: (Boolean) -> Unit,
     onDelete: () -> Unit,
     canSave: Boolean = true,
+    errors: Map<CustomUnitField, String> = emptyMap(),
+    validationAttempt: Int = 0,
+    showRetainedUncertainty: Boolean = false,
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("$substanceName unit") },
+                title = { Text("$substanceName unit", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     var isShowingDeleteDialog by remember { mutableStateOf(false) }
                     IconButton(enabled = canSave, onClick = { isShowingDeleteDialog = true }) {
@@ -175,7 +195,7 @@ private fun EditCustomUnitScreenContent(
                                 Text(text = "Delete custom unit?")
                             },
                             text = {
-                                Text("This will affect all ingestions that are using it. Consider archiving it instead.")
+                                Text("Deletion is permanent. Units used by ingestions must be archived instead to preserve past entries.")
                             },
                             confirmButton = {
                                 TextButton(
@@ -200,19 +220,23 @@ private fun EditCustomUnitScreenContent(
             )
         },
         floatingActionButton = {
-            if (canSave) {
             FloatingDoneButton(
                 onDone = dismiss,
-                modifier = Modifier.imePadding(),
+                enabled = canSave,
+                modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } },
             )
-            }
         }
     ) { padding ->
         EditCustomUnitSections(
+            errors = errors,
+            validationAttempt = validationAttempt,
+            showRetainedUncertainty = showRetainedUncertainty,
+            enabled = canSave,
             substanceName = substanceName,
             administrationRoute = administrationRoute,
             numberOfIngestionsWithThisCustomUnit = numberOfIngestionsWithThisCustomUnit,
             padding = padding,
+            bottomContentPadding = fabHeight + 32.dp,
             roaDose = roaDose,
             name = name,
             onChangeOfName = onChangeOfName,

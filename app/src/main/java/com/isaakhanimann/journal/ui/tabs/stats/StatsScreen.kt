@@ -52,6 +52,13 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -61,6 +68,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.isaakhanimann.journal.ui.utils.ContentWithSideStripe
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
@@ -104,7 +112,7 @@ fun StatsPreview(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun StatsScreen(
     navigateToSubstanceCompanion: (substanceName: String, consumerName: String?) -> Unit,
@@ -116,7 +124,7 @@ fun StatsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (statsModel.consumerName == null) "Statistics" else "Statistics for ${statsModel.consumerName}") },
+                title = { Text(if (statsModel.consumerName == null) "Statistics" else "Statistics for ${statsModel.consumerName}", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     if (consumerNamesSorted.isNotEmpty()) {
                         var isConsumerSelectionExpanded by remember { mutableStateOf(false) }
@@ -174,16 +182,28 @@ fun StatsScreen(
             )
         } else {
             Column(modifier = Modifier.padding(padding)) {
-                TabRow(
-                    selectedTabIndex = statsModel.selectedOption.tabIndex,
-                    contentColor = MaterialTheme.colorScheme.onSurface,
-                ) {
-                    TimePickerOption.entries.forEachIndexed { index, option ->
-                        Tab(
-                            text = { Text(option.displayText) },
-                            selected = statsModel.selectedOption.tabIndex == index,
-                            onClick = { onTapOption(option) }
-                        )
+                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                    val style = MaterialTheme.typography.titleSmall
+                    val measurer = rememberTextMeasurer()
+                    val density = LocalDensity.current
+                    val labelWidth = TimePickerOption.entries.maxOf {
+                        measurer.measure(it.displayText, style = style, softWrap = false).size.width
+                    }
+                    val tabWidth = with(density) { labelWidth.toDp() } + 36.dp
+                    val tabs: @Composable () -> Unit = {
+                        TimePickerOption.entries.forEachIndexed { index, option ->
+                            Tab(
+                                text = { Text(option.displayText, style = style, maxLines = 1) },
+                                selected = statsModel.selectedOption.tabIndex == index,
+                                onClick = { onTapOption(option) }
+                            )
+                        }
+                    }
+                    if (maxWidth >= tabWidth * TimePickerOption.entries.size) {
+                        TabRow(statsModel.selectedOption.tabIndex, contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
+                    } else {
+                        ScrollableTabRow(statsModel.selectedOption.tabIndex, edgePadding = 0.dp,
+                            contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
                     }
                 }
                 if (statsModel.statItems.isNotEmpty()) {
@@ -210,12 +230,10 @@ fun StatsScreen(
                         LazyColumn {
                             items(statsModel.statItems) { subStat ->
                                 Column {
-                                    Row(
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    ContentWithSideStripe(
+                                        stripeWidth = 11.dp,
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .height(intrinsicSize = IntrinsicSize.Min)
                                             .clickable {
                                                 navigateToSubstanceCompanion(
                                                     subStat.substanceName,
@@ -225,9 +243,9 @@ fun StatsScreen(
                                             .padding(
                                                 horizontal = horizontalPadding,
                                                 vertical = 5.dp
-                                            )
-                                    ) {
-                                        Surface(
+                                            ),
+                                        stripe = {
+                                            Surface(
                                             shape = RoundedCornerShape(3.dp),
                                             color = subStat.color.getComposeColor(
                                                 isDarkTheme
@@ -235,39 +253,46 @@ fun StatsScreen(
                                             modifier = Modifier
                                                 .width(11.dp)
                                                 .fillMaxHeight()
-                                        ) {}
-                                        Column {
-                                            Text(
-                                                text = subStat.substanceName,
-                                                style = MaterialTheme.typography.titleMedium
-                                            )
-                                            val addOn =
-                                                if (subStat.experienceCount == 1) " experience" else " experiences"
-                                            Text(
-                                                text = subStat.experienceCount.toString() + addOn,
-                                            )
+                                            ) {}
                                         }
-                                        Spacer(modifier = Modifier.weight(1f))
-                                        Column(horizontalAlignment = Alignment.End) {
-                                            val cumulativeDose = subStat.totalDose
-                                            if (cumulativeDose != null) {
-                                                if (cumulativeDose.isEstimate) {
-                                                    if (cumulativeDose.estimatedDoseStandardDeviation != null) {
-                                                        Text(text = "total ${cumulativeDose.dose.toReadableString()}±${cumulativeDose.estimatedDoseStandardDeviation.toReadableString()} ${cumulativeDose.units}")
+                                    ) {
+                                        FlowRow(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalArrangement = Arrangement.spacedBy(4.dp)
+                                        ) {
+                                            Column {
+                                                Text(
+                                                    text = subStat.substanceName,
+                                                    style = MaterialTheme.typography.titleMedium
+                                                )
+                                                val addOn =
+                                                    if (subStat.experienceCount == 1) " experience" else " experiences"
+                                                Text(
+                                                    text = subStat.experienceCount.toString() + addOn,
+                                                )
+                                            }
+                                            Column(horizontalAlignment = Alignment.End) {
+                                                val cumulativeDose = subStat.totalDose
+                                                if (cumulativeDose != null) {
+                                                    if (cumulativeDose.isEstimate) {
+                                                        if (cumulativeDose.estimatedDoseStandardDeviation != null) {
+                                                            Text(text = "total ${cumulativeDose.dose.toReadableString()}±${cumulativeDose.estimatedDoseStandardDeviation.toReadableString()} ${cumulativeDose.units}")
+                                                        } else {
+                                                            Text(text = "total ~${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
+                                                        }
                                                     } else {
-                                                        Text(text = "total ~${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
+                                                        Text(text = "total ${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
+
                                                     }
                                                 } else {
-                                                    Text(text = "total ${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
-
+                                                    Text(text = "total dose unknown")
                                                 }
-                                            } else {
-                                                Text(text = "total dose unknown")
-                                            }
-                                            subStat.routeCounts.forEach {
-                                                Text(
-                                                    text = "${it.administrationRoute.displayText.lowercase()} ${it.count}x ",
-                                                )
+                                                subStat.routeCounts.forEach {
+                                                    Text(
+                                                        text = "${it.administrationRoute.displayText.lowercase()} ${it.count}x ",
+                                                    )
+                                                }
                                             }
                                         }
 

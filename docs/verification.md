@@ -91,6 +91,10 @@ Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.
 | `WidgetParityTest` | Glance row displays the expected formatted substance/dose/route/phase. |
 | `ExperienceEditorUiTest` | Failed save retains draft and does not navigate; discard confirmation/keep-editing; successful save dismisses only after commit. |
 
+Custom-unit validation, guarded mutations and recovery checks are documented in [custom-unit verification](custom-unit-verification.md).
+
+Large-font/display-size layout changes, platform scaling checks and remaining physical-device gaps are documented in [large-text verification](large-text-verification.md).
+
 ## Manual acceptance matrix
 
 Use synthetic journals/photos only. Retain a pristine export and record APK SHA, SDK/device/launcher, theme and result for every run. Repeat core checks on API 26/29/30/32/33/35/36/37, an AOSP device without Play services, a physical camera and a tablet. Check the minified release separately on an emulator; physical-device installation remains Direct Debug only.

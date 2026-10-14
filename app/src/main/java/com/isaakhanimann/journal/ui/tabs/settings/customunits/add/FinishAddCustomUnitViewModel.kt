@@ -1,3 +1,57 @@
+// PsyZine, 2026. GPL-3.0-or-later.
+package com.isaakhanimann.journal.ui.tabs.settings.customunits.add
+
+import androidx.lifecycle.SavedStateHandle
+import androidx.navigation.toRoute
+import com.isaakhanimann.journal.data.room.*
+import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
+import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
+import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
+import com.isaakhanimann.journal.ui.main.navigation.graphs.FinishAddCustomUnitRoute
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.CustomUnitEditorViewModel
+import dagger.hilt.android.lifecycle.HiltViewModel
+import javax.inject.Inject
+
+@HiltViewModel
+class FinishAddCustomUnitViewModel @Inject constructor(
+    private val experienceRepo: ExperienceRepository,
+    private val substanceRepository: SubstanceRepository,
+    sessionGuard: JournalSessionGuard,
+    state: SavedStateHandle
+) : CustomUnitEditorViewModel(sessionGuard, state) {
+    val journalGeneration get() = generation
+    private val route = state.toRoute<FinishAddCustomUnitRoute>()
+    init {
+        administrationRoute = route.administrationRoute
+        substanceName = route.substanceName
+        load {
+            val substance = substanceRepository.getSubstance(substanceName)
+            val customSubstance = experienceRepo.getCustomSubstance(substanceName)
+            if (substance == null && customSubstance == null) throw CustomUnitProblem("This substance no longer exists. Go back and choose a substance again.")
+            roaDose = substance?.getRoa(administrationRoute)?.roaDose
+            if (savedState.get<Boolean>("unitDraft.initialized") != true) {
+                originalUnit = roaDose?.units ?: customSubstance?.units ?: "mg"
+                savedState["unitDraft.initialized"] = true
+            }
+            isUnitsFieldShown = roaDose?.units.isNullOrBlank() && customSubstance?.units.isNullOrBlank() || originalUnit.isBlank()
+        }
+    }
+    fun createSaveAndDismissAfter(dismiss: (Int) -> Unit) {
+        if (!canSave || !validate()) return
+        val candidate = CustomUnit(substanceName = substanceName, administrationRoute = administrationRoute,
+            name = name.trim(), unit = unit.trim(), unitPlural = unitPlural.trim().ifBlank { null },
+            originalUnit = originalUnit.trim(), dose = dose, isEstimate = isEstimate,
+            estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseStandardDeviation else null,
+            isArchived = isArchived, note = note)
+        var id = 0
+        operation("save this unit", { dismiss(id) }) {
+            if (substanceRepository.getSubstance(substanceName) == null && experienceRepo.getCustomSubstance(substanceName) == null)
+                throw CustomUnitProblem("This substance was deleted. Go back and choose a substance again.")
+            id = experienceRepo.insert(candidate)
+        }
+    }
+}
+
 /*
  * Copyright (c) 2024. Isaak Hanimann.
  * This file is part of PsychonautWiki Journal.
@@ -15,145 +69,3 @@
  * You should have received a copy of the GNU General Public License
  * along with PsychonautWiki Journal.  If not, see https://www.gnu.org/licenses/gpl-3.0.en.html.
  */
-
-package com.isaakhanimann.journal.ui.tabs.settings.customunits.add
-
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.SavedStateHandle
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
-import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
-import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
-import com.isaakhanimann.journal.data.substances.classes.Substance
-import com.isaakhanimann.journal.data.substances.classes.roa.DoseClass
-import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
-import com.isaakhanimann.journal.ui.main.navigation.graphs.FinishAddCustomUnitRoute
-import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
-import com.isaakhanimann.journal.data.room.validateDoseText
-import javax.inject.Inject
-
-@HiltViewModel
-class FinishAddCustomUnitViewModel @Inject constructor(
-    private val experienceRepo: ExperienceRepository,
-    substanceRepository: SubstanceRepository,
-    private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
-) : ViewModel() {
-    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
-    private val finishAddCustomUnitRoute = state.toRoute<FinishAddCustomUnitRoute>()
-    var substanceName by mutableStateOf("")
-    val administrationRoute = finishAddCustomUnitRoute.administrationRoute
-
-    var substance by mutableStateOf<Substance?>(null)
-    val roaDose get() = substance?.getRoa(administrationRoute)?.roaDose
-
-    var name by mutableStateOf("")
-    var isUnitsFieldShown by mutableStateOf(false)
-
-    val currentDoseClass: DoseClass? get() = roaDose?.getDoseClass(ingestionDose = dose)
-
-    fun onChangeOfName(newName: String) {
-        name = newName
-    }
-
-    var unit by mutableStateOf("")
-
-    fun onChangeOfUnit(newUnit: String) {
-        unit = newUnit
-        unitPlural = if (newUnit != "mg" && newUnit != "g" && newUnit.lowercase() != "ml" && newUnit.lastOrNull() != 's') {
-            newUnit + "s"
-        } else {
-            newUnit
-        }
-    }
-
-    var unitPlural by mutableStateOf("")
-
-    fun onChangeOfUnitPlural(newUnit: String) {
-        unitPlural = newUnit
-    }
-
-    var originalUnit by mutableStateOf("mg")
-
-    fun onChangeOfOriginalUnit(newUnit: String) {
-        originalUnit = newUnit
-    }
-
-    var doseText by mutableStateOf("")
-    fun onChangeOfDose(newDose: String) {
-        doseText = newDose
-    }
-
-    val dose: Double? get() = doseText.nonnegativeDoubleOrNull()
-
-    var estimatedDoseDeviationText by mutableStateOf("")
-    fun onChangeOfEstimatedDoseDeviation(newEstimatedDoseDeviation: String) {
-        estimatedDoseDeviationText = newEstimatedDoseDeviation
-    }
-
-    private val estimatedDoseDeviation: Double? get() = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
-
-    var isEstimate by mutableStateOf(false)
-    fun onChangeOfIsEstimate(newIsEstimate: Boolean) {
-        isEstimate = newIsEstimate
-    }
-
-    var isArchived by mutableStateOf(false)
-    fun onChangeOfIsArchived(newIsArchived: Boolean) {
-        isArchived = newIsArchived
-    }
-
-    var note by mutableStateOf("")
-
-    fun onChangeOfNote(newNote: String) {
-        note = newNote
-    }
-
-    init {
-        originalUnit = roaDose?.units ?: ""
-        session.load {
-            substanceName = finishAddCustomUnitRoute.substanceName
-            substance = substanceRepository.getSubstance(finishAddCustomUnitRoute.substanceName)
-            originalUnit = roaDose?.units ?: "mg"
-            isUnitsFieldShown = roaDose?.units?.isBlank() ?: true
-            if (substance == null || roaDose?.units == null) {
-                val customSubstance =
-                    experienceRepo.getCustomSubstance(finishAddCustomUnitRoute.substanceName)
-                if (customSubstance != null) {
-                    originalUnit = customSubstance.units
-                    isUnitsFieldShown = false
-                }
-            }
-        }
-    }
-
-    fun createSaveAndDismissAfter(dismiss: (customUnitId: Int) -> Unit) {
-        session.run {
-            sessionGuard.withSession(session.generation) {
-            validateDoseText(doseText, estimatedDoseDeviationText, estimate = isEstimate)
-            val customUnit = CustomUnit(
-                substanceName = substanceName,
-                name = name,
-                administrationRoute = administrationRoute,
-                dose = dose,
-                isEstimate = isEstimate,
-                estimatedDoseStandardDeviation = if (isEstimate) estimatedDoseDeviation else null,
-                isArchived = isArchived,
-                unit = unit,
-                unitPlural = unitPlural,
-                originalUnit = originalUnit,
-                note = note
-            )
-            val customUnitId = experienceRepo.insert(customUnit)
-            dismiss(customUnitId)
-            }
-        }
-    }
-}

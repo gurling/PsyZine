@@ -25,12 +25,15 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.disabled
 
 @Composable
-fun FloatingDoneButton(onDone: ()->Unit, modifier: Modifier = Modifier) {
+fun FloatingDoneButton(onDone: ()->Unit, modifier: Modifier = Modifier, enabled: Boolean = true) {
     ExtendedFloatingActionButton(
-        modifier = modifier,
-        onClick = onDone,
+        modifier = if (enabled) modifier else modifier.semantics { disabled() },
+        onClick = { if (enabled) onDone() },
+        containerColor = if (enabled) androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer else androidx.compose.material3.MaterialTheme.colorScheme.surfaceVariant,
         icon = {
             Icon(
                 Icons.Filled.Done,

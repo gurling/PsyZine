@@ -18,11 +18,18 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits.add
 
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -46,8 +53,24 @@ import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.focus.onFocusChanged
+import com.isaakhanimann.journal.data.room.CustomUnitField
+import com.isaakhanimann.journal.data.room.customUnitInputErrors
+import com.isaakhanimann.journal.data.room.numericInputError
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.CustomUnitEditorStatus
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalFocusManager
@@ -59,6 +82,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 import com.isaakhanimann.journal.data.room.experiences.entities.Ingestion
@@ -81,16 +105,22 @@ import java.time.Instant
 
 @Composable
 fun FinishAddCustomUnitScreen(
-    dismissAddCustomUnit: (customUnitId: Int) -> Unit,
-    viewModel: FinishAddCustomUnitViewModel = hiltViewModel()
+    dismissAddCustomUnit: (customUnitId: Int, journalGeneration: String?) -> Unit,
+    viewModel: FinishAddCustomUnitViewModel = hiltViewModel(),
+    onClose: () -> Unit = {}
 ) {
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    CustomUnitEditorStatus(viewModel, onClose)
+    if (!viewModel.ready) return
     FinishAddCustomUnitScreenContent(
+        errors = viewModel.errors,
+        validationAttempt = viewModel.validationAttempt,
+        enabled = viewModel.canSave,
+        showRetainedUncertainty = viewModel.showRetainedUncertainty,
         substanceName = viewModel.substanceName,
         administrationRoute = viewModel.administrationRoute,
         roaDose = viewModel.roaDose,
         dismiss = {
-            viewModel.createSaveAndDismissAfter(dismiss = dismissAddCustomUnit)
+            viewModel.createSaveAndDismissAfter { id -> dismissAddCustomUnit(id, viewModel.journalGeneration) }
         },
         name = viewModel.name,
         onChangeOfName = viewModel::onChangeOfName,
@@ -175,18 +205,30 @@ private fun FinishAddCustomUnitScreenContent(
     onChangeOfNote: (String) -> Unit,
     isArchived: Boolean,
     onChangeOfIsArchived: (Boolean) -> Unit,
+    errors: Map<CustomUnitField, String> = emptyMap(),
+    validationAttempt: Int = 0,
+    enabled: Boolean = true,
+    showRetainedUncertainty: Boolean = false,
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     Scaffold(
-        topBar = { TopAppBar(title = { Text("$substanceName unit") }) },
+        topBar = { TopAppBar(title = { Text("$substanceName unit", maxLines = 1, overflow = TextOverflow.Ellipsis) }) },
         floatingActionButton = {
             FloatingDoneButton(
-                onDone = dismiss,
-                modifier = Modifier.imePadding()
+                onDone = { if (enabled) dismiss() },
+                enabled = enabled,
+                modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } }
             )
         }
     ) { padding ->
         EditCustomUnitSections(
+            errors = errors,
+            validationAttempt = validationAttempt,
+            enabled = enabled,
+            showRetainedUncertainty = showRetainedUncertainty,
             padding = padding,
+            bottomContentPadding = fabHeight + 32.dp,
             substanceName = substanceName,
             administrationRoute = administrationRoute,
             numberOfIngestionsWithThisCustomUnit = null,
@@ -215,9 +257,11 @@ private fun FinishAddCustomUnitScreenContent(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditCustomUnitSections(
     padding: PaddingValues,
+    bottomContentPadding: Dp = 88.dp,
     substanceName: String,
     administrationRoute: AdministrationRoute,
     numberOfIngestionsWithThisCustomUnit: Int?,
@@ -242,21 +286,39 @@ fun EditCustomUnitSections(
     onChangeOfNote: (String) -> Unit,
     isArchived: Boolean,
     onChangeOfIsArchived: (Boolean) -> Unit,
+    errors: Map<CustomUnitField, String> = emptyMap(),
+    validationAttempt: Int = 0,
+    enabled: Boolean = true,
+    showRetainedUncertainty: Boolean = false,
 ) {
     Column(
         modifier = Modifier
             .padding(padding)
+            .consumeWindowInsets(padding)
+            .imePadding()
+            .padding(bottom = bottomContentPadding)
             .verticalScroll(rememberScrollState())
     ) {
         Spacer(modifier = Modifier.height(4.dp))
         val textStyle = MaterialTheme.typography.titleMedium
         val focusRequesterName = remember { FocusRequester() }
         val focusRequesterUnit = remember { FocusRequester() }
+        val focusRequesterPlural = remember { FocusRequester() }
+        val focusRequesterOriginal = remember { FocusRequester() }
+        val focusRequesterUncertainty = remember { FocusRequester() }
         val focusRequesterNote = remember { FocusRequester() }
         val focusRequesterDose = remember { FocusRequester() }
         val focusManager = LocalFocusManager.current
-        LaunchedEffect(Unit) {
-            focusRequesterName.requestFocus()
+        var blurred by remember { mutableStateOf(setOf<CustomUnitField>()) }
+        val candidates = customUnitInputErrors(name, unit, originalUnit, doseText,
+            estimatedDoseStandardDeviationText, isEstimate || showRetainedUncertainty)
+        fun message(field: CustomUnitField): String? = errors[field] ?: candidates[field]?.takeIf { field in blurred }
+        val uncertaintyError = message(CustomUnitField.UNCERTAINTY) ?: numericInputError(estimatedDoseStandardDeviationText, "Uncertainty")?.takeIf { showRetainedUncertainty }
+        val requesters = mapOf(CustomUnitField.NAME to focusRequesterName, CustomUnitField.UNIT to focusRequesterUnit,
+            CustomUnitField.ORIGINAL_UNIT to focusRequesterOriginal, CustomUnitField.DOSE to focusRequesterDose,
+            CustomUnitField.UNCERTAINTY to focusRequesterUncertainty)
+        LaunchedEffect(validationAttempt) {
+            if (validationAttempt > 0) { withFrameNanos { }; errors.keys.firstOrNull()?.let { requesters[it]?.requestFocus() } }
         }
         AnimatedVisibility(visible = numberOfIngestionsWithThisCustomUnit != null) {
             if (numberOfIngestionsWithThisCustomUnit != null) {
@@ -424,6 +486,9 @@ fun EditCustomUnitSections(
                 )
             ) {
                 OutlinedTextField(
+                    enabled = enabled,
+                    isError = message(CustomUnitField.NAME) != null,
+                    supportingText = { message(CustomUnitField.NAME)?.let { Text(it) } },
                     value = name,
                     onValueChange = onChangeOfName,
                     textStyle = textStyle,
@@ -439,10 +504,13 @@ fun EditCustomUnitSections(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequesterName)
+                        .unitFieldFocus(focusRequesterName) { blurred = blurred + CustomUnitField.NAME }
 
                 )
                 OutlinedTextField(
+                    enabled = enabled,
+                    isError = message(CustomUnitField.UNIT) != null,
+                    supportingText = { message(CustomUnitField.UNIT)?.let { Text(it) } },
                     value = unit,
                     onValueChange = onChangeOfUnits,
                     textStyle = textStyle,
@@ -451,21 +519,23 @@ fun EditCustomUnitSections(
                     placeholder = {
                         Text(prompt.unit)
                     },
-                    keyboardActions = KeyboardActions(onNext = { focusRequesterNote.requestFocus() }),
+                    keyboardActions = KeyboardActions(onNext = { focusRequesterPlural.requestFocus() }),
                     keyboardOptions = KeyboardOptions.Default.copy(
                         imeAction = ImeAction.Next,
                         capitalization = KeyboardCapitalization.None
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequesterUnit)
+                        .unitFieldFocus(focusRequesterUnit) { blurred = blurred + CustomUnitField.UNIT }
                 )
                 OutlinedTextField(
+                    enabled = enabled,
+                    supportingText = { Text("Optional. Leave blank for an automatic plural.") },
                     value = unitPlural,
                     onValueChange = onChangeOfUnitPlural,
                     textStyle = textStyle,
                     singleLine = true,
-                    label = { Text(text = "Unit plural") },
+                    label = { Text(text = "Unit plural (optional)") },
                     placeholder = {
                         Text(prompt.unitPlural)
                     },
@@ -476,9 +546,10 @@ fun EditCustomUnitSections(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequesterUnit)
+                        .unitFieldFocus(focusRequesterPlural)
                 )
                 OutlinedTextField(
+                    enabled = enabled,
                     value = note,
                     onValueChange = onChangeOfNote,
                     label = { Text(text = "Note") },
@@ -489,7 +560,7 @@ fun EditCustomUnitSections(
                     ),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequesterNote)
+                        .unitFieldFocus(focusRequesterNote)
                 )
             }
         }
@@ -509,6 +580,7 @@ fun EditCustomUnitSections(
                     }
                 }
                 OutlinedTextField(
+                    enabled = enabled,
                     value = doseText,
                     onValueChange = {
                         onChangeDoseText(
@@ -519,48 +591,51 @@ fun EditCustomUnitSections(
                         )
                     },
                     textStyle = textStyle,
-                    label = { Text("Dose per $unit", style = textStyle) },
-                    trailingIcon = {
-                        Text(
-                            text = originalUnit,
-                            style = textStyle,
-                            modifier = Modifier.padding(horizontal = horizontalPadding)
-                        )
-                    },
+                    label = { Text("Dose per unit") },
                     keyboardActions = KeyboardActions(onDone = {
                         focusManager.clearFocus()
                     }),
-                    isError = doseText.nonnegativeDoubleOrNull() == null,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    isError = message(CustomUnitField.DOSE) != null,
+                    supportingText = {
+                        Column {
+                            Text("Amount in ${originalUnit.ifBlank { "the measurement unit below" }} for one ${unit.ifBlank { "unit" }}.")
+                            Text(message(CustomUnitField.DOSE) ?: "Leave blank if the dose is unknown.")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusRequester(focusRequesterDose)
+                        .unitFieldFocus(focusRequesterDose) { blurred = blurred + CustomUnitField.DOSE }
                 )
-                if (isShowingUnitsField) {
+                if (isShowingUnitsField || originalUnit.isBlank() && doseText.isNotBlank()) {
                     OutlinedTextField(
+                        enabled = enabled,
+                        isError = message(CustomUnitField.ORIGINAL_UNIT) != null,
+                        supportingText = { message(CustomUnitField.ORIGINAL_UNIT)?.let { Text(it) } },
                         value = originalUnit,
                         onValueChange = onChangeOfOriginalUnit,
                         label = { Text("Units") },
                         keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
                         singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth().unitFieldFocus(focusRequesterOriginal) { blurred = blurred + CustomUnitField.ORIGINAL_UNIT }
                     )
-                    Row(
-                        horizontalArrangement = Arrangement.SpaceBetween,
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        OutlinedButton(onClick = { onChangeOfOriginalUnit("µg") }) {
+                        OutlinedButton(enabled = enabled, onClick = { onChangeOfOriginalUnit("µg") }) {
                             Text(text = "µg")
                         }
-                        OutlinedButton(onClick = { onChangeOfOriginalUnit("mg") }) {
+                        OutlinedButton(enabled = enabled, onClick = { onChangeOfOriginalUnit("mg") }) {
                             Text(text = "mg")
                         }
-                        OutlinedButton(onClick = { onChangeOfOriginalUnit("g") }) {
+                        OutlinedButton(enabled = enabled, onClick = { onChangeOfOriginalUnit("g") }) {
                             Text(text = "g")
                         }
-                        OutlinedButton(onClick = { onChangeOfOriginalUnit("mL") }) {
+                        OutlinedButton(enabled = enabled, onClick = { onChangeOfOriginalUnit("mL") }) {
                             Text(text = "mL")
                         }
                     }
@@ -570,14 +645,16 @@ fun EditCustomUnitSections(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Switch(
+                        enabled = enabled,
                         checked = isEstimate,
                         onCheckedChange = onChangeIsEstimate,
                         modifier = Modifier.semantics { contentDescription = "Is an estimate" })
                     Text("Estimate", style = MaterialTheme.typography.titleMedium)
                 }
-                AnimatedVisibility(visible = isEstimate) {
+                AnimatedVisibility(visible = isEstimate || showRetainedUncertainty) {
                     Column {
                         OutlinedTextField(
+                            enabled = enabled,
                             value = estimatedDoseStandardDeviationText,
                             onValueChange = {
                                 onChangeEstimatedDoseStandardDeviationText(
@@ -588,26 +665,20 @@ fun EditCustomUnitSections(
                                 )
                             },
                             textStyle = textStyle,
-                            label = {
-                                Text(
-                                    "Estimated standard deviation per $unit",
-                                    style = textStyle
-                                )
-                            },
-                            trailingIcon = {
-                                Text(
-                                    text = originalUnit,
-                                    style = textStyle,
-                                    modifier = Modifier.padding(horizontal = horizontalPadding)
-                                )
-                            },
+                            label = { Text("Uncertainty") },
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
                             }),
-                            isError = estimatedDoseStandardDeviationText.isNotBlank() && estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull() == null,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            isError = uncertaintyError != null,
+                            supportingText = {
+                                Column {
+                                    Text("Standard deviation in ${originalUnit.ifBlank { "the measurement unit below" }} for one ${unit.ifBlank { "unit" }}.")
+                                    Text(uncertaintyError ?: "Optional. Leave blank if the uncertainty is unknown.")
+                                }
+                            },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
+                            modifier = Modifier.fillMaxWidth().unitFieldFocus(focusRequesterUncertainty) { blurred = blurred + CustomUnitField.UNCERTAINTY }
                         )
                         val mean = doseText.nonnegativeDoubleOrNull()
                         val standardDeviation = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull()
@@ -647,7 +718,7 @@ fun EditCustomUnitSections(
                         name = name,
                         administrationRoute = administrationRoute,
                         unit = unit,
-                        unitPlural = unitPlural,
+                        unitPlural = unitPlural.ifBlank { null },
                         originalUnit = originalUnit,
                         dose = doseText.nonnegativeDoubleOrNull(),
                         estimatedDoseStandardDeviation = estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull(),
@@ -708,6 +779,7 @@ fun EditCustomUnitSections(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
                     Switch(
+                        enabled = enabled,
                         checked = isArchived,
                         onCheckedChange = onChangeOfIsArchived,
                         modifier = Modifier.semantics { contentDescription = "Archive this unit" })
@@ -724,3 +796,17 @@ data class Prompt(
     val unit: String,
     val unitPlural: String
 )
+
+/** Bring a focused error into view without changing the surrounding scroll/keyboard behavior. */
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.unitFieldFocus(requester: FocusRequester, onBlur: () -> Unit = {}): Modifier {
+    val bring = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
+    var focused by remember { mutableStateOf(false) }
+    return this.bringIntoViewRequester(bring).onFocusChanged {
+        if (it.isFocused) scope.launch { withFrameNanos { }; bring.bringIntoView() }
+        if (focused && !it.isFocused) onBlur()
+        focused = it.isFocused
+    }.focusRequester(requester)
+}

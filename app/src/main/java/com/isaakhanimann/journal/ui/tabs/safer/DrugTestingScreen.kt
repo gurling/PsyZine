@@ -61,7 +61,7 @@ import com.isaakhanimann.journal.ui.theme.minimumTouchTargetHeight
 fun DrugTestingScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Drug testing services") })
+            TopAppBar(title = { Text("Drug testing services", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(

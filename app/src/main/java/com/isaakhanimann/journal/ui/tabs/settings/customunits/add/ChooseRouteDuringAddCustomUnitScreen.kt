@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits.add
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -44,7 +46,7 @@ fun ChooseRouteDuringAddCustomUnitScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("${viewModel.substanceName} route") },
+                title = { Text("${viewModel.substanceName} route", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 navigationIcon = {
                     if (viewModel.showOtherRoutes && viewModel.pwRoutes.isNotEmpty()) {
                         IconButton(onClick = { viewModel.showOtherRoutes = false }) {

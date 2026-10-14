@@ -72,7 +72,8 @@ fun NavGraphBuilder.addCustomUnitGraph(navController: NavController) {
         }
         composableWithTransitions<FinishAddCustomUnitRoute> {
             FinishAddCustomUnitScreen(
-                dismissAddCustomUnit = {
+                onClose = { navController.popBackStack() },
+                dismissAddCustomUnit = { _, _ ->
                     navController.popBackStack(
                         route = AddCustomUnitsChooseSubstanceScreenRoute,
                         inclusive = true

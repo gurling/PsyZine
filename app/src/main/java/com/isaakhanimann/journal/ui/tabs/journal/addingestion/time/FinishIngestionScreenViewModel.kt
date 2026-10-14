@@ -55,6 +55,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
+import com.isaakhanimann.journal.data.room.*
 
 const val hourLimitToSeparateIngestions: Long = 12
 
@@ -70,6 +71,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
     state: SavedStateHandle
 ) : ViewModel() {
     private var generation: String? = null
+    private var expectedUnitFingerprint: String? = null
     var isSaving by mutableStateOf(false)
         private set
     var saveError by mutableStateOf<String?>(null)
@@ -169,6 +171,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         dose = finishIngestionRoute.dose
         estimatedDoseStandardDeviation = finishIngestionRoute.estimatedDoseStandardDeviation
         customUnitId = finishIngestionRoute.customUnitId
+        expectedUnitFingerprint = finishIngestionRoute.customUnitFingerprint
         units = finishIngestionRoute.units?.let {
             if (it == "null") {
                 null
@@ -179,7 +182,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         isEstimate = finishIngestionRoute.isEstimate
         viewModelScope.launch {
             try {
-                generation = state.get<String>("journalGeneration") ?: sessionGuard.currentGeneration().also { state["journalGeneration"] = it }
+                generation = sessionGuard.readSession(state.get<String>("journalGeneration") ?: finishIngestionRoute.journalGeneration) { token -> token }.also { state["journalGeneration"] = it }
                 val lastIngestionTimeOfExperience =
                     userPreferences.lastIngestionTimeOfExperienceFlow.first()
                 val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first()
@@ -219,7 +222,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                saveError = if (e is IllegalStateException) e.message else "Could not load the journal. Close this screen and try again."
+                saveError = if (customUnitId != null) customUnitFailure(e, "load the journal") else if (e is IllegalStateException) e.message else "Could not load the journal. Close this screen and try again."
             }
         }
     }
@@ -293,7 +296,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                saveError = if (e is IllegalStateException) e.message else "Could not save this ingestion. Try again."
+                saveError = if (customUnitId != null) customUnitFailure(e, "save this ingestion") else if (e is IllegalStateException) e.message else "Could not save this ingestion. Try again."
             } finally { isSaving = false }
         }
     }
@@ -301,9 +304,11 @@ class FinishIngestionScreenViewModel @Inject constructor(
     private suspend fun createAndSaveIngestion() {
         com.isaakhanimann.journal.data.room.validateDose(dose, estimatedDoseStandardDeviation)
         customUnitId?.let { id ->
-            val unit = checkNotNull(experienceRepo.getCustomUnit(id)) { "This custom unit was deleted. Choose a dose again." }
-            check(unit.substanceName == substanceName && unit.administrationRoute == administrationRoute) { "This custom unit changed. Choose a dose again." }
-            com.isaakhanimann.journal.data.room.validateCustomUnitDose(dose, estimatedDoseStandardDeviation, isEstimate, unit)
+            val unit = experienceRepo.getCustomUnit(id) ?: throw CustomUnitProblem("This custom unit was deleted. Go back and choose a dose again.")
+            if (expectedUnitFingerprint != null && expectedUnitFingerprint != unit.definitionFingerprint()) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
+            if (unit.substanceName != substanceName || unit.administrationRoute != administrationRoute) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
+            try { validateCustomUnitDose(dose, estimatedDoseStandardDeviation, isEstimate, unit) }
+            catch (_: IllegalArgumentException) { throw CustomUnitProblem("This dose cannot be calculated with the custom unit. Go back and correct the amount or the unit in Settings.") }
         }
         val substanceCompanion = SubstanceCompanion(
             substanceName,

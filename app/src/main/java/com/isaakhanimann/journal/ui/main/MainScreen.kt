@@ -19,9 +19,7 @@
 package com.isaakhanimann.journal.ui.main
 
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffold
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -63,48 +61,41 @@ fun MainScreen(
             }
         }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
-        NavigationSuiteScaffold(
-            layoutType = if (navBackStackEntry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
-            navigationSuiteItems = {
-                val currentDestination = navBackStackEntry?.destination
-                topLevelRoutes.forEach { topLevelRoute ->
-                    val selected =
-                        currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
-                    item(
-                        icon = {
-                            Icon(
-                                if (selected) topLevelRoute.filledIcon else topLevelRoute.outlinedIcon,
-                                contentDescription = topLevelRoute.name
-                            )
-                        },
-                        label = { Text(topLevelRoute.name) },
-                        selected = selected,
-                        onClick = {
-                            if (selected) {
-                                val isAlreadyOnTopOfTab =
-                                    topLevelRoutes.any { it.route == currentDestination?.route }
-                                if (!isAlreadyOnTopOfTab) {
-                                    navController.popBackStack()
-                                }
-                            } else {
-                                navController.navigate(topLevelRoute.route) {
-                                    // Pop up to the start destination of the graph to
-                                    // avoid building up a large stack of destinations
-                                    // on the back stack as users select items
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
-                                    }
-                                    // Avoid multiple copies of the same destination when
-                                    // reselecting the same item
-                                    launchSingleTop = true
-                                    // Restore state when reselecting a previously selected item
-                                    restoreState = true
-                                }
-                            }
+        val currentDestination = navBackStackEntry?.destination
+        val items = topLevelRoutes.map { topLevelRoute ->
+            val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
+            PsyZineNavigationItem(
+                name = topLevelRoute.name,
+                icon = if (selected) topLevelRoute.filledIcon else topLevelRoute.outlinedIcon,
+                selected = selected,
+                onClick = {
+                    if (selected) {
+                        val isAlreadyOnTopOfTab =
+                            topLevelRoutes.any { it.route == currentDestination?.route }
+                        if (!isAlreadyOnTopOfTab) {
+                            navController.popBackStack()
                         }
-                    )
+                    } else {
+                        navController.navigate(topLevelRoute.route) {
+                            // Pop up to the start destination of the graph to
+                            // avoid building up a large stack of destinations
+                            // on the back stack as users select items
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                saveState = true
+                            }
+                            // Avoid multiple copies of the same destination when
+                            // reselecting the same item
+                            launchSingleTop = true
+                            // Restore state when reselecting a previously selected item
+                            restoreState = true
+                        }
+                    }
                 }
-            }
+            )
+        }
+        PsyZineNavigationScaffold(
+            layoutType = if (navBackStackEntry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
+            items = items
         ) {
             NavHost(
                 navController,

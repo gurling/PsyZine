@@ -20,6 +20,7 @@ package com.isaakhanimann.journal.ui.tabs.search.substance.roa.dose
 
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -30,6 +31,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.dp
 import com.isaakhanimann.journal.data.substances.classes.roa.DoseClass
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 
@@ -54,8 +58,47 @@ fun DoseClassificationRow(
     unit: String,
     modifier: Modifier = Modifier
 ) {
+    val numberStyle = MaterialTheme.typography.labelLarge
+    val labelStyle = MaterialTheme.typography.labelSmall
+    val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current
+    fun number(value: Double?) = value?.toReadableString() ?: ".."
+    fun width(text: String, label: Boolean = false) = measurer.measure(
+        text, style = if (label) labelStyle else numberStyle, softWrap = false
+    ).size.width
+    // Measure with the current font resolver and density, including platform font scaling.
+    val requiredWidth = maxOf(width(number(lightMin)), width("thresh  ", true)) +
+        maxOf(width("-"), width("light", true)) + width(number(commonMin)) +
+        maxOf(width("-"), width("common", true)) + width(number(strongMin)) +
+        maxOf(width("-"), width("strong", true)) + width(number(heavyMin)) +
+        maxOf(width("-"), width("heavy", true)) + width(unit) + with(density) { 48.dp.toPx() }
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+        if (constraints.maxWidth >= requiredWidth) {
+            CompactDoseClassificationRow(lightMin, commonMin, strongMin, heavyMin, unit)
+        } else {
+            val palette = LocalPsyZinePalette.current
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                listOf(
+                    DoseClass.THRESHOLD to "Threshold: <${number(lightMin)}",
+                    DoseClass.LIGHT to "Light: ${number(lightMin)}–${number(commonMin)}",
+                    DoseClass.COMMON to "Common: ${number(commonMin)}–${number(strongMin)}",
+                    DoseClass.STRONG to "Strong: ${number(strongMin)}–${number(heavyMin)}",
+                    DoseClass.HEAVY to "Heavy: ≥${number(heavyMin)}"
+                ).forEach { (classification, text) ->
+                    Text(text, style = numberStyle, color = classification.getComposeColor(palette))
+                }
+                Text(unit, style = numberStyle)
+            }
+        }
+    }
+}
+
+@Composable
+private fun CompactDoseClassificationRow(
+    lightMin: Double?, commonMin: Double?, strongMin: Double?, heavyMin: Double?, unit: String
+) {
     Row(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {

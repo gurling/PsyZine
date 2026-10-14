@@ -1,6 +1,8 @@
 // PsyZine, 2026-10-11. GPL-3.0-or-later.
 package com.isaakhanimann.journal.ui.tabs.settings.appearance
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -18,7 +20,7 @@ import com.isaakhanimann.journal.ui.theme.*
 @Composable
 fun AppearanceScreen(viewModel: AppearanceViewModel = hiltViewModel()) {
     val theme by viewModel.theme.collectAsStateWithLifecycle()
-    Scaffold(topBar = { TopAppBar(title = { Text("Appearance") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("Appearance", maxLines = 1, overflow = TextOverflow.Ellipsis) }) }) { padding ->
         LazyColumn(contentPadding = padding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             item { Text("Choose a palette. Journal text keeps its familiar proportional type.", Modifier.padding(16.dp)) }
             viewModel.error?.let { message -> item { Text(message, Modifier.padding(16.dp), color = MaterialTheme.colorScheme.error) } }

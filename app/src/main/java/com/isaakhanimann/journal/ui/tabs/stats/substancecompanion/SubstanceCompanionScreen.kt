@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.stats.substancecompanion
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
@@ -113,7 +115,7 @@ fun SubstanceCompanionScreen(
             } else {
                 "${substanceCompanion.substanceName} ($consumerName)"
             }
-            TopAppBar(title = { Text(title) })
+            TopAppBar(title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         LazyColumn(

@@ -24,9 +24,9 @@ import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -42,10 +42,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.isaakhanimann.journal.ui.utils.ContentWithSideStripe
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.tooling.preview.PreviewParameter
 import androidx.compose.ui.unit.dp
@@ -54,6 +54,7 @@ import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCo
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 
+@OptIn(ExperimentalLayoutApi::class)
 @Preview(showBackground = true)
 @Composable
 fun ExperienceRow(
@@ -61,82 +62,74 @@ fun ExperienceRow(
     navigateToExperienceScreen: () -> Unit = {},
     isTimeRelativeToNow: Boolean = true
 ) {
-    Row(
-        modifier = Modifier
-            .clickable {
-                navigateToExperienceScreen()
-            }
-            .fillMaxWidth()
-            .height(IntrinsicSize.Min)
+    val ingestions = experienceWithIngestionsCompanionsAndRatings.ingestionsWithCompanions.sortedBy { it.ingestion.time }
+    val experience = experienceWithIngestionsCompanionsAndRatings.experience
+    ContentWithSideStripe(
+        stripeWidth = 11.dp,
+        modifier = Modifier.clickable { navigateToExperienceScreen() }.fillMaxWidth()
             .padding(horizontal = horizontalPadding, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically
+        stripe = { ColorRectangle(ingestions = ingestions) }
     ) {
-        val ingestions = experienceWithIngestionsCompanionsAndRatings.ingestionsWithCompanions.sortedBy { it.ingestion.time }
-        val experience = experienceWithIngestionsCompanionsAndRatings.experience
-        ColorRectangle(ingestions = ingestions)
-        Column {
-            Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                Text(
-                    text = experience.title,
-                    style = MaterialTheme.typography.titleMedium,
-                )
-                if (experience.isFavorite) {
-                    Icon(imageVector = Icons.Filled.Star, contentDescription = "Is favorite")
-                }
+        Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = experience.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            if (experience.isFavorite) {
+                Icon(imageVector = Icons.Filled.Star, contentDescription = "Is favorite")
             }
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val substanceNames = remember(ingestions) {
-                    ingestions.map { it.ingestion.substanceName }.distinct()
-                        .joinToString(separator = ", ")
-                }
-                if (substanceNames.isNotEmpty()) {
-                    Text(text = substanceNames)
-                } else {
-                    Text(
-                        text = "No substance yet",
-                    )
-                }
-                val rating = experienceWithIngestionsCompanionsAndRatings.rating?.sign
-                if (rating != null) {
-                    Text(text = rating)
-                }
-            }
-            val consumerNames = remember(ingestions) {
-                ingestions.mapNotNull { it.ingestion.consumerName }.distinct()
+        }
+        Row(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val substanceNames = remember(ingestions) {
+                ingestions.map { it.ingestion.substanceName }.distinct()
                     .joinToString(separator = ", ")
             }
-            if (consumerNames.isNotEmpty()) {
-                Text(text = "With: $consumerNames", style = MaterialTheme.typography.labelSmall)
+            if (substanceNames.isNotEmpty()) {
+                Text(text = substanceNames, modifier = Modifier.weight(1f))
+            } else {
+                Text(
+                    text = "No substance yet",
+                    modifier = Modifier.weight(1f),
+                )
             }
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val timeStyle = MaterialTheme.typography.labelMedium
-                if (isTimeRelativeToNow) {
-                    RelativeDateTextNew(
-                        dateTime = experienceWithIngestionsCompanionsAndRatings.sortInstant,
-                        style = timeStyle
-                    )
-                } else {
-                    Text(
-                        text = experienceWithIngestionsCompanionsAndRatings.sortInstant.getDateWithWeekdayText(),
-                        style = timeStyle
-                    )
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                val location = experience.location
-                if (location != null) {
-                    Text(
-                        text = location.name,
-                        style = MaterialTheme.typography.labelMedium,
-                        textAlign = TextAlign.End
-                    )
-                }
+            val rating = experienceWithIngestionsCompanionsAndRatings.rating?.sign
+            if (rating != null) {
+                Text(text = rating)
+            }
+        }
+        val consumerNames = remember(ingestions) {
+            ingestions.mapNotNull { it.ingestion.consumerName }.distinct()
+                .joinToString(separator = ", ")
+        }
+        if (consumerNames.isNotEmpty()) {
+            Text(text = "With: $consumerNames", style = MaterialTheme.typography.labelSmall)
+        }
+        FlowRow(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val timeStyle = MaterialTheme.typography.labelMedium
+            if (isTimeRelativeToNow) {
+                RelativeDateTextNew(
+                    dateTime = experienceWithIngestionsCompanionsAndRatings.sortInstant,
+                    style = timeStyle
+                )
+            } else {
+                Text(
+                    text = experienceWithIngestionsCompanionsAndRatings.sortInstant.getDateWithWeekdayText(),
+                    style = timeStyle
+                )
+            }
+            val location = experience.location
+            if (location != null) {
+                Text(
+                    text = location.name,
+                    style = MaterialTheme.typography.labelMedium
+                )
             }
         }
     }

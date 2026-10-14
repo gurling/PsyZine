@@ -1,6 +1,8 @@
 // PsyZine, 2026-10-11. GPL-3.0-or-later.
 package com.isaakhanimann.journal.ui.tabs.settings.about
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -29,7 +31,7 @@ fun AboutScreen() {
         license = null
         selectedNotice?.let { name -> license = withContext(Dispatchers.IO) { context.assets.open("licenses/$name").bufferedReader().use { it.readText() } } }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("About and licenses") }) }) { padding ->
+    Scaffold(topBar = { TopAppBar(title = { Text("About and licenses", maxLines = 1, overflow = TextOverflow.Ellipsis) }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("PsyZine ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
             Text("An independent local journal, based on PsychonautWiki Journal. Copyright © 2022–2025 Isaak Hanimann and contributors. PsyZine modifications: 11 October 2026.")

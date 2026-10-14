@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.timednote
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -49,7 +51,7 @@ fun TimedNoteScreenContentPreview() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add timed note") },
+                title = { Text("Add timed note", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconButton(onClick = { }) {
                         Icon(

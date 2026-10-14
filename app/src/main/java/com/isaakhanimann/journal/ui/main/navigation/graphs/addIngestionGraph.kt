@@ -123,13 +123,16 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
         }
         composableWithTransitions<ChooseDoseCustomUnitRoute> {
             ChooseDoseCustomUnitScreen(
+                navigateBack = { navController.popBackStack() },
                 navigateToChooseTimeAndMaybeColor = { administrationRoute: AdministrationRoute,
                                                       units: String?,
                                                       isEstimate: Boolean,
                                                       dose: Double?,
                                                       estimatedDoseStandardDeviation: Double?,
                                                       substanceName: String,
-                                                      customUnitId: Int? ->
+                                                      customUnitId: Int?,
+                                                      journalGeneration: String?,
+                                                      customUnitFingerprint: String? ->
                     navController.navigate(
                         FinishIngestionRoute(
                             administrationRoute = administrationRoute,
@@ -139,6 +142,8 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
                             estimatedDoseStandardDeviation = estimatedDoseStandardDeviation,
                             substanceName = substanceName,
                             customUnitId = customUnitId,
+                            journalGeneration = journalGeneration,
+                            customUnitFingerprint = customUnitFingerprint,
                         )
                     )
                 },
@@ -254,8 +259,9 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
         }
         composableWithTransitions<FinishAddCustomUnitRoute> {
             FinishAddCustomUnitScreen(
-                dismissAddCustomUnit = { customUnitId ->
-                    navController.navigate(ChooseDoseCustomUnitRoute(customUnitId = customUnitId)) {
+                onClose = { navController.popBackStack() },
+                dismissAddCustomUnit = { customUnitId, journalGeneration ->
+                    navController.navigate(ChooseDoseCustomUnitRoute(customUnitId = customUnitId, journalGeneration = journalGeneration)) {
                         popUpTo(AddIngestionSearchRoute)
                     }
                 },
@@ -277,7 +283,7 @@ data class CheckInteractionsRoute(val substanceName: String)
 data class CheckSaferUseRoute(val substanceName: String)
 
 @Serializable
-data class ChooseDoseCustomUnitRoute(val customUnitId: Int)
+data class ChooseDoseCustomUnitRoute(val customUnitId: Int, val journalGeneration: String? = null)
 
 @Serializable
 data class ChooseRouteOfAddIngestionRoute(val substanceName: String)
@@ -306,6 +312,8 @@ data class FinishIngestionRoute(
     val estimatedDoseStandardDeviation: Double?,
     val substanceName: String, // can be name of pw substance or custom substance
     val customUnitId: Int?,
+    val journalGeneration: String? = null,
+    val customUnitFingerprint: String? = null,
 )
 
 @Serializable

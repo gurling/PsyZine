@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.substance
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -41,7 +43,7 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 fun SaferStimulantsScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Safer stimulant use") })
+            TopAppBar(title = { Text("Safer stimulant use", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         },
     ) { padding ->
         Column(

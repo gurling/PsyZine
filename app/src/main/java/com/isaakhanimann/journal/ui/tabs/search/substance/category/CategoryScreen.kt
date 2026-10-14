@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.substance.category
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
@@ -70,7 +72,7 @@ fun CategoryScreen(category: Category?) {
         Scaffold(
             topBar = {
                 TopAppBar(
-                    title = { Text(category.name.replaceFirstChar { it.uppercase() }) },
+                    title = { Text(category.name.replaceFirstChar { it.uppercase() }, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     actions = {
                         if (category.url != null) {
                             TextButton(

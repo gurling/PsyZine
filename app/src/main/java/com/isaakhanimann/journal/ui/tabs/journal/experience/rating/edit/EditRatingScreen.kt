@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.rating.edit
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -96,7 +98,7 @@ fun EditRatingScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit Shulgin rating") },
+                title = { Text("Edit Shulgin rating", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconButton(
                         onClick = { onDelete() },

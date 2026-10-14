@@ -20,15 +20,14 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.components.ingestio
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.isaakhanimann.journal.ui.utils.ContentWithSideStripe
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -56,6 +55,7 @@ fun IngestionRowPreview(@PreviewParameter(IngestionRowPreviewProvider::class) in
 }
 
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun IngestionRow(
     ingestionElement: IngestionElement,
@@ -66,52 +66,49 @@ fun IngestionRow(
     val ingestionWithCompanionAndCustomUnit = ingestionElement.ingestionWithCompanionAndCustomUnit
     val ingestion = ingestionWithCompanionAndCustomUnit.ingestion
     val customUnit = ingestionWithCompanionAndCustomUnit.customUnit
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        modifier = modifier.height(intrinsicSize = IntrinsicSize.Min)
+    ContentWithSideStripe(
+        stripeWidth = 5.dp,
+        modifier = modifier,
+        stripe = { VerticalLine(color = ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
     ) {
-        VerticalLine(color = ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED)
-        Column {
-            time()
-            val title = if (customUnit != null) {
-                "${ingestion.substanceName}, ${customUnit.name}"
-            } else {
-                ingestion.substanceName
-            }
-            Text(
-                modifier = Modifier.weight(1f),
-                text = title,
-                style = MaterialTheme.typography.titleMedium
-            )
-            Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                val text = buildAnnotatedString {
-                    append(ingestionWithCompanionAndCustomUnit.doseDescription)
-                    withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                        if (customUnit == null) {
-                            append(" " + ingestion.administrationRoute.displayText.lowercase())
-                        } else {
-                            ingestionWithCompanionAndCustomUnit.customUnitDose?.calculatedDoseDescription?.let {
-                                append(" = $it ${ingestion.administrationRoute.displayText.lowercase()}")
-                            } ?: run {
-                                append(" = unknown dose ${ingestion.administrationRoute.displayText.lowercase()}")
-                            }
+        time()
+        val title = if (customUnit != null) {
+            "${ingestion.substanceName}, ${customUnit.name}"
+        } else {
+            ingestion.substanceName
+        }
+        Text(
+            text = title,
+            style = MaterialTheme.typography.titleMedium
+        )
+        FlowRow(
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            val text = buildAnnotatedString {
+                append(ingestionWithCompanionAndCustomUnit.doseDescription)
+                withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                    if (customUnit == null) {
+                        append(" " + ingestion.administrationRoute.displayText.lowercase())
+                    } else {
+                        ingestionWithCompanionAndCustomUnit.customUnitDose?.calculatedDoseDescription?.let {
+                            append(" = $it ${ingestion.administrationRoute.displayText.lowercase()}")
+                        } ?: run {
+                            append(" = unknown dose ${ingestion.administrationRoute.displayText.lowercase()}")
                         }
                     }
                 }
-                Text(text = text, style = MaterialTheme.typography.titleSmall)
-                val numDots = ingestionElement.numDots
-                if (numDots != null && !areDosageDotsHidden) {
-                    DotRows(numDots = numDots)
-                }
             }
-            val note = ingestion.notes
-            if (!note.isNullOrBlank()) {
-                Text(text = note, style = MaterialTheme.typography.bodySmall)
+            Text(text = text, style = MaterialTheme.typography.titleSmall)
+            val numDots = ingestionElement.numDots
+            if (numDots != null && !areDosageDotsHidden) {
+                DotRows(numDots = numDots)
             }
+        }
+        val note = ingestion.notes
+        if (!note.isNullOrBlank()) {
+            Text(text = note, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

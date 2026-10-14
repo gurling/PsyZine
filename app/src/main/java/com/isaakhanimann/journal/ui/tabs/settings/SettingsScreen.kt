@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.Intent
 import android.net.Uri
@@ -182,7 +184,7 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Settings") }
+                title = { Text("Settings", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             )
         },
         snackbarHost = { SnackbarHost(snackbarHostState) },
@@ -227,7 +229,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Hide dosage dots")
+                    Text(text = "Hide dosage dots", modifier = Modifier.weight(1f))
                     Switch(
                         checked = areDosageDotsHidden,
                         onCheckedChange = saveDosageDotsAreHidden
@@ -241,7 +243,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(text = "Hide timeline")
+                    Text(text = "Hide timeline", modifier = Modifier.weight(1f))
                     Switch(
                         checked = isTimelineHidden,
                         onCheckedChange = saveIsTimelineHidden
@@ -261,6 +263,7 @@ fun SettingsScreen(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(5.dp),
                         modifier = Modifier
+                            .weight(1f)
                             .clickable {
                                 showBottomSheet = true
                             }

@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.screen
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.res.Configuration
 import androidx.compose.foundation.horizontalScroll
@@ -73,7 +75,7 @@ fun TimelineScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(title) }
+                title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis) }
             )
         }
     ) { padding ->

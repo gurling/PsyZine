@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -41,7 +43,7 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 fun FAQScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("FAQ") })
+            TopAppBar(title = { Text("FAQ", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(

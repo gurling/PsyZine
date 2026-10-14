@@ -54,20 +54,11 @@ data class CustomUnit(
         } ?: "Unknown dose"
     }
 
-    fun getPluralizableUnit(): PluralizableUnit {
-        val plural = unitPlural
-        if (plural == null) {
-            val calculatedPlural =
-                if (unit != "mg" && unit != "g" && unit.lowercase() != "ml" && unit.lastOrNull() != 's') {
-                    unit + "s"
-                } else {
-                    unit
-                }
-            return PluralizableUnit(singular = unit, plural = calculatedPlural)
-        } else {
-            return PluralizableUnit(singular = unit, plural = plural)
-        }
-    }
+    fun getPluralizableUnit(): PluralizableUnit = PluralizableUnit(
+        singular = unit,
+        plural = unitPlural?.takeIf { it.isNotBlank() }
+            ?: com.isaakhanimann.journal.data.room.suggestedUnitPlural(unit)
+    )
 
     companion object {
         var mdmaSample = CustomUnit(

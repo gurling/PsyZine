@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.timednote.add
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -43,7 +45,7 @@ fun AddTimedNoteScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Add timed note") },
+                title = { Text("Add timed note", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconButton(onClick = {
                         viewModel.onDoneTap(navigateBack)

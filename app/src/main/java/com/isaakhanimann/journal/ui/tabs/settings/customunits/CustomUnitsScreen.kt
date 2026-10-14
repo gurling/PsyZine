@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -42,6 +44,8 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -64,8 +68,12 @@ fun CustomUnitsScreen(
     navigateToAddCustomUnit: () -> Unit,
     navigateToCustomUnitArchive: () -> Unit,
     ) {
+    val state = viewModel.unitsState.collectAsStateWithLifecycle().value
     CustomUnitsScreenContent(
-        filteredUnits = viewModel.filteredCustomUnitsFlow.collectAsStateWithLifecycle().value,
+        loading = state.loading,
+        error = state.error,
+        onRetry = viewModel::retry,
+        filteredUnits = state.units,
         navigateToEditCustomUnit = navigateToEditCustomUnit,
         navigateToAddCustomUnit = navigateToAddCustomUnit,
         navigateToCustomUnitArchive = navigateToCustomUnitArchive,
@@ -79,8 +87,8 @@ fun CustomUnitsScreen(
 fun CustomUnitsScreenPreview() {
     CustomUnitsScreenContent(
         filteredUnits = listOf(
-            CustomUnit.mdmaSample,
-            CustomUnit.twoCBSample
+            CustomUnit.mdmaSample.copy(id = 1),
+            CustomUnit.twoCBSample.copy(id = 2)
         ),
         navigateToEditCustomUnit = { _ -> },
         navigateToAddCustomUnit = {},
@@ -99,11 +107,14 @@ fun CustomUnitsScreenContent(
     navigateToCustomUnitArchive: () -> Unit,
     searchText: String,
     onSearch: (String) -> Unit,
+    loading: Boolean = false,
+    error: String? = null,
+    onRetry: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Custom units") },
+                title = { Text("Custom units", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     IconButton(onClick = navigateToCustomUnitArchive) {
                         Icon(Icons.Default.Inventory, contentDescription = "Go to archive")
@@ -147,7 +158,7 @@ fun CustomUnitsScreenContent(
                             }) {
                                 Icon(
                                     Icons.Default.Close,
-                                    contentDescription = "Close",
+                                    contentDescription = "Clear search",
                                 )
                             }
                         }
@@ -161,8 +172,14 @@ fun CustomUnitsScreenContent(
                 ),
                 singleLine = true
             )
-            if (filteredUnits.isEmpty()) {
-                if(searchText.isEmpty()) {
+            if (loading) {
+                CircularProgressIndicator(modifier = Modifier.padding(horizontalPadding))
+                Text("Loading custom units", modifier = Modifier.padding(horizontalPadding))
+            } else if (error != null) {
+                Text(error, modifier = Modifier.padding(horizontalPadding))
+                TextButton(onClick = onRetry) { Text("Retry") }
+            } else if (filteredUnits.isEmpty()) {
+                if(searchText.isBlank()) {
                     EmptyScreenDisclaimer(
                         title = "No custom units yet",
                         description = "Add your first unit"
@@ -175,7 +192,7 @@ fun CustomUnitsScreenContent(
                 }
             } else {
                 LazyColumn {
-                    items(filteredUnits) { customUnit ->
+                    items(filteredUnits, key = { it.id }) { customUnit ->
                         CustomUnitRow(
                             customUnit = customUnit,
                             navigateToEditCustomUnit = navigateToEditCustomUnit
@@ -203,11 +220,11 @@ fun CustomUnitRow(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "${customUnit.substanceName}, ${customUnit.name}",
+            text = "${customUnit.substanceName}, ${customUnit.name.ifBlank { "Unnamed unit (edit to correct)" }}",
             style = MaterialTheme.typography.titleMedium
         )
         Text(
-            text = "${customUnit.getDoseOfOneUnitDescription()} per ${customUnit.unit}",
+            text = "${customUnit.getDoseOfOneUnitDescription()} per ${customUnit.unit.ifBlank { "unit (edit to correct)" }}",
             style = MaterialTheme.typography.titleSmall
         )
         if (customUnit.note.isNotBlank()) {
