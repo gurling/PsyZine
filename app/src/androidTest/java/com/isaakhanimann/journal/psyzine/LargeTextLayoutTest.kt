@@ -290,7 +290,9 @@ class LargeTextLayoutTest {
         compose.onNode(hasText("Uncertainty") and hasSetTextAction()).performScrollTo().assertIsDisplayed()
         capture(captureName)
         assertNoTextOverflow(ellipsizedTitles = setOf(title), scrollableValues = setOf(longUnit))
-        compose.onNodeWithText("Standard deviation in $longUnit.").assertIsDisplayed()
+        // The merged field also includes the converted-dose preview, which can
+        // extend below the viewport. Check the visible description itself.
+        compose.onNodeWithText("Standard deviation in $longUnit.", useUnmergedTree = true).assertIsDisplayed()
     }
 
     private fun scrollToBottom() {
