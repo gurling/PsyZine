@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.interactions
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -140,7 +142,7 @@ fun CheckInteractionsScreen(
     navigateToNext: () -> Unit
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("$substanceName interactions") }) },
+        topBar = { TopAppBar(title = { Text("$substanceName interactions", maxLines = 1, overflow = TextOverflow.Ellipsis) }) },
         floatingActionButton = {
             NextFAB(navigateToNext)
         }

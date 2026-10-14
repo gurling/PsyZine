@@ -1,6 +1,8 @@
 // PsyZine, 2026-10-11. GPL-3.0-or-later.
 package com.isaakhanimann.journal.ui.tabs.journal.experience.edit
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -30,7 +32,7 @@ fun EditExperienceScreen(navigateBack: () -> Unit, viewModel: EditExperienceView
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(20)) { viewModel.acquire(it) }
     val files = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { viewModel.acquire(it) }
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Edit experience") }, navigationIcon = {
+        TopAppBar(title = { Text("Edit experience", maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = {
             IconButton(onClick = { back() }, enabled = !viewModel.saving) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Close editor") }
         }, actions = { TextButton(onClick = { viewModel.save(navigateBack) }, enabled = viewModel.canSave) { Text(if (viewModel.saving) "Saving…" else "Save") } })
     }) { padding ->

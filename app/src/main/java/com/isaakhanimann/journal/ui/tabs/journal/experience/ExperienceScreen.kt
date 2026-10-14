@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
@@ -786,7 +788,7 @@ private fun ExperienceTopBar(
     addIngestion: () -> Unit
 ) {
     TopAppBar(
-        title = { Text(oneExperienceScreenModel.title) },
+        title = { Text(oneExperienceScreenModel.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         actions = {
             var areTimeOptionsExpanded by remember { mutableStateOf(false) }
             IconButton(onClick = { areTimeOptionsExpanded = true }) {

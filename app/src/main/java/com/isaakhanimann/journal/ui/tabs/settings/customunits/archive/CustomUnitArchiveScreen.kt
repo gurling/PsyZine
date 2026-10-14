@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.customunits.archive
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -27,6 +29,9 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
@@ -44,8 +49,12 @@ fun CustomUnitArchiveScreen(
     viewModel: CustomUnitArchiveViewModel = hiltViewModel(),
     navigateToEditCustomUnit: (customUnitId: Int) -> Unit,
 ) {
+    val state = viewModel.unitsState.collectAsStateWithLifecycle().value
     CustomUnitArchiveScreenContent(
-        customUnits = viewModel.customUnitsFlow.collectAsStateWithLifecycle().value,
+        loading = state.loading,
+        error = state.error,
+        onRetry = viewModel::retry,
+        customUnits = state.units,
         navigateToEditCustomUnit = navigateToEditCustomUnit,
     )
 }
@@ -56,6 +65,7 @@ fun CustomUnitArchiveScreenPreview() {
     CustomUnitArchiveScreenContent(
         customUnits = listOf(
             CustomUnit(
+                id = 1,
                 substanceName = "Substance 1",
                 name = "Spoon",
                 administrationRoute = AdministrationRoute.ORAL,
@@ -69,6 +79,7 @@ fun CustomUnitArchiveScreenPreview() {
                 note = ""
             ),
             CustomUnit(
+                id = 2,
                 substanceName = "Substance 2",
                 name = "Red pill",
                 administrationRoute = AdministrationRoute.ORAL,
@@ -91,10 +102,13 @@ fun CustomUnitArchiveScreenPreview() {
 fun CustomUnitArchiveScreenContent(
     customUnits: List<CustomUnit>,
     navigateToEditCustomUnit: (customUnitId: Int) -> Unit,
+    loading: Boolean = false,
+    error: String? = null,
+    onRetry: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Custom unit archive") })
+            TopAppBar(title = { Text("Custom unit archive", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Box(
@@ -107,7 +121,7 @@ fun CustomUnitArchiveScreenContent(
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                items(customUnits) { customUnit ->
+                items(customUnits, key = { it.id }) { customUnit ->
                     CustomUnitRow(
                         customUnit = customUnit,
                         navigateToEditCustomUnit = navigateToEditCustomUnit
@@ -115,7 +129,11 @@ fun CustomUnitArchiveScreenContent(
                     HorizontalDivider()
                 }
             }
-            if (customUnits.isEmpty()) {
+            if (loading) {
+                Column { CircularProgressIndicator(); Text("Loading archived units") }
+            } else if (error != null) {
+                Column { Text(error); TextButton(onClick = onRetry) { Text("Retry") } }
+            } else if (customUnits.isEmpty()) {
                 EmptyScreenDisclaimer(
                     title = "No archived units yet",
                     description = "Archived units don't show up when adding ingestions"

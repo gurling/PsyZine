@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -48,7 +50,7 @@ fun ExplainTimelineScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Timeline info") },
+                title = { Text("Timeline info", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         },
     ) { padding ->

@@ -18,10 +18,15 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose.customunit
 
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
 import androidx.compose.animation.AnimatedVisibility
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -50,8 +55,21 @@ import com.isaakhanimann.journal.data.room.nonnegativeDoubleOrNull
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.withFrameNanos
+import com.isaakhanimann.journal.data.room.CustomUnitField
+import com.isaakhanimann.journal.data.room.numericInputError
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.CustomUnitEditorStatus
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.add.unitFieldFocus
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
@@ -80,14 +98,26 @@ fun ChooseDoseCustomUnitScreen(
         dose: Double?,
         estimatedDoseStandardDeviation: Double?,
         substanceName: String,
-        customUnitId: Int?
+        customUnitId: Int?,
+        journalGeneration: String?,
+        customUnitFingerprint: String?
     ) -> Unit,
     navigateToCreateCustomUnit: (route: AdministrationRoute, substanceName: String) -> Unit,
-    viewModel: ChooseDoseCustomUnitViewModel = hiltViewModel()
+    viewModel: ChooseDoseCustomUnitViewModel = hiltViewModel(),
+    navigateBack: () -> Unit = {}
 ) {
+    CustomUnitEditorStatus(viewModel, navigateBack)
+    if (!viewModel.ready) return
+    val navigate: (CustomUnit, Double?, Double?, Boolean, String, String) -> Unit = { unit, dose, uncertainty, estimate, generation, fingerprint ->
+        navigateToChooseTimeAndMaybeColor(unit.administrationRoute, unit.unit, estimate, dose, uncertainty,
+            unit.substanceName, unit.id, generation, fingerprint)
+    }
     viewModel.customUnit?.let { customUnitUnwrapped ->
         ChooseDoseCustomUnitScreen(
             customUnit = customUnitUnwrapped,
+            errors = viewModel.errors,
+            validationAttempt = viewModel.validationAttempt,
+            enabled = viewModel.canSave,
             roaDose = viewModel.roaDose,
             doseText = viewModel.doseText,
             doseRemark = viewModel.doseRemark,
@@ -96,34 +126,13 @@ fun ChooseDoseCustomUnitScreen(
             estimatedDoseDeviationText = viewModel.estimatedDoseDeviationText,
             onChangeEstimatedDoseDeviationText = viewModel::onEstimatedDoseDeviationChange,
             estimatedDoseDeviation = viewModel.estimatedDoseDeviation,
-            isValidDose = viewModel.isValidDose,
             isEstimate = viewModel.isEstimate,
             onChangeIsEstimate = {
-                viewModel.isEstimate = it
+                viewModel.onChangeOfIsEstimate(it)
             },
-            navigateToNext = {
-                navigateToChooseTimeAndMaybeColor(
-                    customUnitUnwrapped.administrationRoute,
-                    customUnitUnwrapped.unit,
-                    viewModel.isEstimate,
-                    viewModel.dose,
-                    viewModel.estimatedDoseDeviation,
-                    customUnitUnwrapped.substanceName,
-                    customUnitUnwrapped.id
-                )
-            },
+            navigateToNext = { viewModel.next(navigate = navigate) },
             navigateToCreateCustomUnit = navigateToCreateCustomUnit,
-            useUnknownDoseAndNavigate = {
-                navigateToChooseTimeAndMaybeColor(
-                    customUnitUnwrapped.administrationRoute,
-                    customUnitUnwrapped.unit,
-                    false,
-                    null,
-                    null,
-                    customUnitUnwrapped.substanceName,
-                    customUnitUnwrapped.id
-                )
-            },
+            useUnknownDoseAndNavigate = { viewModel.next(unknown = true, navigate = navigate) },
             currentDoseClass = viewModel.currentDoseClass,
             customUnitCalculationText = viewModel.customUnitCalculationText,
         )
@@ -157,7 +166,6 @@ fun ChooseDoseCustomUnitScreenPreview(
         onChangeEstimatedDoseDeviationText = {},
         estimatedDoseDeviation = null,
         doseRemark = "This is a dose remark",
-        isValidDose = true,
         isEstimate = false,
         onChangeIsEstimate = {},
         navigateToNext = {},
@@ -180,7 +188,6 @@ fun ChooseDoseCustomUnitScreen(
     estimatedDoseDeviationText: String,
     estimatedDoseDeviation: Double?,
     onChangeEstimatedDoseDeviationText: (String) -> Unit,
-    isValidDose: Boolean,
     isEstimate: Boolean,
     onChangeIsEstimate: (Boolean) -> Unit,
     navigateToNext: () -> Unit,
@@ -188,16 +195,22 @@ fun ChooseDoseCustomUnitScreen(
     useUnknownDoseAndNavigate: () -> Unit,
     currentDoseClass: DoseClass?,
     customUnitCalculationText: String?,
+    errors: Map<CustomUnitField, String> = emptyMap(),
+    validationAttempt: Int = 0,
+    enabled: Boolean = true,
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text(customUnit.name) })
+            TopAppBar(title = { Text(customUnit.name, maxLines = 1, overflow = TextOverflow.Ellipsis) })
         },
         floatingActionButton = {
-            if (isValidDose) {
+            run {
                 ExtendedFloatingActionButton(
-                    modifier = Modifier.imePadding(),
-                    onClick = navigateToNext,
+                    modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } }
+                        .then(if (enabled) Modifier else Modifier.semantics { disabled() }),
+                    onClick = { if (enabled) navigateToNext() },
                     icon = {
                         Icon(
                             Icons.AutoMirrored.Filled.NavigateNext,
@@ -212,6 +225,9 @@ fun ChooseDoseCustomUnitScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
+                .padding(bottom = fabHeight + 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             LinearProgressIndicator(
@@ -268,17 +284,28 @@ fun ChooseDoseCustomUnitScreen(
                         vertical = 10.dp
                     )
                 ) {
-                    if (roaDose != null && customUnit.dose != null) {
+                    if (roaDose != null && customUnit.dose?.let { it.isFinite() && it > 0 } == true) {
                         CustomUnitRoaDoseView(roaDose, customUnit)
                     }
                     val focusManager = LocalFocusManager.current
                     val focusRequester = remember { FocusRequester() }
-                    val textStyle = MaterialTheme.typography.titleMedium
-                    LaunchedEffect(Unit) {
-                        focusRequester.requestFocus()
+                    val uncertaintyFocus = remember { FocusRequester() }
+                    var doseBlurred by remember { mutableStateOf(false) }
+                    var uncertaintyBlurred by remember { mutableStateOf(false) }
+                    val doseError = errors[CustomUnitField.DOSE] ?: numericInputError(doseText, "Dose", true)?.takeIf { doseBlurred }
+                    val uncertaintyError = errors[CustomUnitField.UNCERTAINTY] ?: numericInputError(estimatedDoseDeviationText, "Uncertainty")?.takeIf { uncertaintyBlurred }
+                    LaunchedEffect(validationAttempt) {
+                        if (validationAttempt > 0) {
+                            withFrameNanos { }
+                            if (errors.containsKey(CustomUnitField.DOSE)) focusRequester.requestFocus()
+                            else if (errors.containsKey(CustomUnitField.UNCERTAINTY)) uncertaintyFocus.requestFocus()
+                        }
                     }
+                    val textStyle = MaterialTheme.typography.titleMedium
+
                     val pluralizableUnit = customUnit.getPluralizableUnit()
                     OutlinedTextField(
+                        enabled = enabled,
                         value = doseText,
                         onValueChange = {
                             onChangeDoseText(
@@ -289,34 +316,34 @@ fun ChooseDoseCustomUnitScreen(
                             )
                         },
                         textStyle = textStyle,
-                        label = { Text("Dose", style = textStyle) },
-                        isError = !isValidDose,
-                        trailingIcon = {
-                            Text(
-                                text = pluralizableUnit.justUnit(dose ?: 1.0),
-                                style = textStyle,
-                                modifier = Modifier.padding(horizontal = horizontalPadding)
-                            )
+                        label = { Text("Dose") },
+                        isError = doseError != null,
+                        supportingText = {
+                            Column {
+                                Text("Amount in ${pluralizableUnit.justUnit(dose ?: 1.0)}.")
+                                Text(doseError ?: "Enter an amount, or choose Log unknown dose.")
+                            }
                         },
                         keyboardActions = KeyboardActions(onDone = {
                             focusManager.clearFocus()
                         }),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .focusRequester(focusRequester)
+                            .unitFieldFocus(focusRequester) { doseBlurred = true }
                     )
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
-                        Switch(checked = isEstimate, onCheckedChange = onChangeIsEstimate)
+                        Switch(enabled = enabled, checked = isEstimate, onCheckedChange = onChangeIsEstimate)
                         Text("Estimate", style = MaterialTheme.typography.titleMedium)
                     }
                     AnimatedVisibility(visible = isEstimate) {
                         Column {
                             OutlinedTextField(
+                                enabled = enabled,
                                 value = estimatedDoseDeviationText,
                                 onValueChange = {
                                     onChangeEstimatedDoseDeviationText(
@@ -327,21 +354,20 @@ fun ChooseDoseCustomUnitScreen(
                                     )
                                 },
                                 textStyle = textStyle,
-                                label = { Text("Estimated standard deviation", style = textStyle) },
-                                trailingIcon = {
-                                    Text(
-                                        text = pluralizableUnit.justUnit(estimatedDoseDeviation ?: 1.0),
-                                        style = textStyle,
-                                        modifier = Modifier.padding(horizontal = horizontalPadding)
-                                    )
-                                },
+                                label = { Text("Uncertainty") },
                                 keyboardActions = KeyboardActions(onDone = {
                                     focusManager.clearFocus()
                                 }),
-                                isError = estimatedDoseDeviationText.isNotBlank() && estimatedDoseDeviationText.nonnegativeDoubleOrNull() == null,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                isError = uncertaintyError != null,
+                                supportingText = {
+                                    Column {
+                                        Text("Standard deviation in ${pluralizableUnit.justUnit(estimatedDoseDeviation ?: 1.0)}.")
+                                        uncertaintyError?.let { Text(it) }
+                                    }
+                                },
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier.fillMaxWidth().unitFieldFocus(uncertaintyFocus) { uncertaintyBlurred = true }
                             )
                             val mean = doseText.nonnegativeDoubleOrNull()
                             val standardDeviation = estimatedDoseDeviationText.nonnegativeDoubleOrNull()
@@ -359,10 +385,10 @@ fun ChooseDoseCustomUnitScreen(
                     }
                 }
             }
-            TextButton(onClick = useUnknownDoseAndNavigate) {
+            TextButton(enabled = enabled, onClick = useUnknownDoseAndNavigate) {
                 Text(text = "Log unknown dose")
             }
-            TextButton(onClick = {
+            TextButton(enabled = enabled, onClick = {
                 navigateToCreateCustomUnit(
                     customUnit.administrationRoute,
                     customUnit.substanceName

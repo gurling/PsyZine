@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.substance
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.res.Configuration.UI_MODE_NIGHT_YES
 import androidx.compose.animation.AnimatedVisibility
@@ -159,7 +161,7 @@ fun SubstanceScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(substance.name) },
+                title = { Text(substance.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     TextButton(
                         onClick = { uriHandler.openUri(substance.url) },

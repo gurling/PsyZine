@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.safer
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +49,7 @@ fun VolumetricDosingScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Volumetric liquid dosing") },
+                title = { Text("Volumetric liquid dosing", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     TextButton(
                         onClick = { uriHandler.openUri(VOLUMETRIC_DOSE_ARTICLE_URL) },

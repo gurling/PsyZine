@@ -153,7 +153,14 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         }
     }
 
-    suspend fun delete(customUnit: CustomUnit) { check(experienceDao.delete(customUnit) == 1) { "This record was deleted. Close this screen." } }
+    /** Call within the caller's guarded transaction; a used definition must remain for historical doses. */
+    suspend fun delete(customUnit: CustomUnit) {
+        val current = getCustomUnitWithIngestions(customUnit.id)
+            ?: throw com.isaakhanimann.journal.data.room.CustomUnitProblem("This custom unit was deleted. Close this screen and choose another unit.")
+        if (current.ingestions.isNotEmpty()) throw com.isaakhanimann.journal.data.room.UsedCustomUnit(current.ingestions.size)
+        check(experienceDao.delete(customUnit) == 1) { "This record was deleted. Close this screen." }
+    }
+
 
     suspend fun deleteUnusedSubstanceCompanions() =
         experienceDao.deleteUnusedSubstanceCompanions()

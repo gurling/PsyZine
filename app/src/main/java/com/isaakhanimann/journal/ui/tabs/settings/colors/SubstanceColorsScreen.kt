@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings.colors
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -89,7 +91,7 @@ fun SubstanceColorsScreenContent(
 ) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Substance colors") })
+            TopAppBar(title = { Text("Substance colors", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         },
     ) { padding ->
         LazyColumn(

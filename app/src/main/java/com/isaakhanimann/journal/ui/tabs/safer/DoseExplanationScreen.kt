@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.safer
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -44,7 +46,7 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 fun DoseExplanationScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Dosage classification") })
+            TopAppBar(title = { Text("Dosage classification", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(

@@ -172,6 +172,7 @@ fun AllTimelines(
     var dragPoint by remember(model) { mutableStateOf<Offset?>(null) }
     var hoverPoint by remember(model) { mutableStateOf<Offset?>(null) }
     var canvasWidthPx by remember { mutableStateOf(0) }
+    var canvasHeightPx by remember { mutableStateOf(0) }
     var visibleLeft by remember { mutableStateOf(0f) }
     var visibleRight by remember { mutableStateOf(0f) }
     var accessibleX by remember(model) { mutableStateOf<Float?>(null) }
@@ -208,7 +209,10 @@ fun AllTimelines(
             Key.Escape -> { accessibleX = null; true }
             else -> false
         }
-    }.focusable().onSizeChanged { canvasWidthPx = it.width }.onGloballyPositioned {
+    }.focusable().onSizeChanged {
+        canvasWidthPx = it.width
+        canvasHeightPx = it.height
+    }.onGloballyPositioned {
         val origin = it.localToWindow(Offset.Zero)
         val visible = it.boundsInWindow()
         visibleLeft = (visible.left - origin.x).coerceAtLeast(0f)
@@ -318,22 +322,26 @@ fun AllTimelines(
                 visibleLeft + margin, max(visibleLeft + margin, right - margin - panelWidth))
             Surface(
                 modifier = Modifier.offset { IntOffset(panelX.roundToInt(), margin.roundToInt()) }
-                    .width(with(density) { panelWidth.toDp() }).heightIn(max = 140.dp).testTag("timeline_readout"),
+                    .width(with(density) { panelWidth.toDp() })
+                    .heightIn(max = with(density) { (canvasHeightPx - 2 * margin).coerceAtLeast(1f).toDp() })
+                    .testTag("timeline_readout"),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = RoundedCornerShape(12.dp),
                 shadowElevation = 4.dp
             ) {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(10.dp)) {
+                Column(modifier = Modifier.padding(10.dp)) {
                     Text(cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
                         style = MaterialTheme.typography.labelLarge)
-                    readouts.forEach { readout ->
-                        Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.startTime.getShortTimeText()}",
-                            style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
-                        val percentage = readout.peakFraction?.let { "${(it * 100).roundToInt()}% of peak" }
-                            ?: "Peak percentage unavailable"
-                        val equivalent = readout.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" }
-                            ?: "mg equivalent unavailable"
-                        Text("$percentage · $equivalent", style = MaterialTheme.typography.bodySmall)
+                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                        readouts.forEach { readout ->
+                            Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.startTime.getShortTimeText()}",
+                                style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                            val percentage = readout.peakFraction?.let { "${(it * 100).roundToInt()}% of peak" }
+                                ?: "Peak percentage unavailable"
+                            val equivalent = readout.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" }
+                                ?: "mg equivalent unavailable"
+                            Text("$percentage · $equivalent", style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                     Text("Per-ingestion timeline estimate", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))

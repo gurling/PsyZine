@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.saferuse
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -44,7 +46,7 @@ fun CheckSaferUseScreen(
     viewModel: SaferUseViewModel = hiltViewModel()
 ) {
     Scaffold(
-        topBar = { TopAppBar(title = { Text("${viewModel.substanceName} safer use") }) },
+        topBar = { TopAppBar(title = { Text("${viewModel.substanceName} safer use", maxLines = 1, overflow = TextOverflow.Ellipsis) }) },
         floatingActionButton = {
             NextFAB(navigateToNext)
         }

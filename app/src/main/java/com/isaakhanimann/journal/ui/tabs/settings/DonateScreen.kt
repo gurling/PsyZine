@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.settings
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -49,7 +51,7 @@ import androidx.compose.ui.unit.dp
 fun DonateScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Support the original author") })
+            TopAppBar(title = { Text("Support the original author", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(

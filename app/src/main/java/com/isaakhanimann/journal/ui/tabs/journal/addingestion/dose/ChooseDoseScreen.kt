@@ -18,6 +18,22 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.dose
 
+import com.isaakhanimann.journal.data.room.numericInputError
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+
+import androidx.compose.foundation.layout.FlowRow
+
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.layout.consumeWindowInsets
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -199,7 +215,7 @@ fun ChooseDoseScreenPreview2() {
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun ChooseDoseScreen(
     navigateToVolumetricDosingScreen: () -> Unit,
@@ -227,14 +243,16 @@ fun ChooseDoseScreen(
     onChangeOfUnits: (units: String) -> Unit,
     navigateToCreateCustomUnit: () -> Unit,
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("$substanceName ${administrationRoute.displayText} dose") })
+            TopAppBar(title = { Text("$substanceName ${administrationRoute.displayText} dose", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         },
         floatingActionButton = {
             if (isValidDose) {
                 ExtendedFloatingActionButton(
-                    modifier = Modifier.imePadding(),
+                    modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } },
                     onClick = navigateToNext,
                     icon = {
                         Icon(
@@ -250,6 +268,9 @@ fun ChooseDoseScreen(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
+                .padding(bottom = fabHeight + 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
             LinearProgressIndicator(
@@ -344,19 +365,18 @@ fun ChooseDoseScreen(
                             )
                         },
                         textStyle = textStyle,
-                        label = { Text("Pure Dose", style = textStyle) },
+                        label = { Text("Pure dose") },
                         isError = !isValidDose,
-                        trailingIcon = {
-                            Text(
-                                text = units,
-                                style = textStyle,
-                                modifier = Modifier.padding(horizontal = horizontalPadding)
-                            )
+                        supportingText = {
+                            Column {
+                                Text("Amount in ${units.ifBlank { "the chosen unit" }}.")
+                                numericInputError(doseText, "Dose")?.let { Text(it) }
+                            }
                         },
                         keyboardActions = KeyboardActions(onDone = {
                             focusManager.clearFocus()
                         }),
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                         singleLine = true,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -372,8 +392,9 @@ fun ChooseDoseScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Row(
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                        FlowRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalArrangement = Arrangement.spacedBy(4.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             OutlinedButton(onClick = { onChangeOfUnits("µg") }) {
@@ -410,19 +431,18 @@ fun ChooseDoseScreen(
                                     )
                                 },
                                 textStyle = textStyle,
-                                label = { Text("Estimated standard deviation", style = textStyle) },
-                                trailingIcon = {
-                                    Text(
-                                        text = units,
-                                        style = textStyle,
-                                        modifier = Modifier.padding(horizontal = horizontalPadding)
-                                    )
+                                label = { Text("Uncertainty") },
+                                supportingText = {
+                                    Column {
+                                        Text("Standard deviation in ${units.ifBlank { "the chosen unit" }}.")
+                                        numericInputError(estimatedDoseStandardDeviationText, "Uncertainty")?.let { Text(it) }
+                                    }
                                 },
                                 keyboardActions = KeyboardActions(onDone = {
                                     focusManager.clearFocus()
                                 }),
                                 isError = estimatedDoseStandardDeviationText.isNotBlank() && estimatedDoseStandardDeviationText.nonnegativeDoubleOrNull() == null,
-                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
                             )

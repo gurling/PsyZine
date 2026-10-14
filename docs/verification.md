@@ -1,6 +1,6 @@
 # PsyZine verification and acceptance
 
-Record updated: 12 October 2026. Current patch evidence and remaining gates: [audit-patch-verification.md](audit-patch-verification.md). Historical sections below retain their original scope and dates. PsyLog target: `0c29a70fa1ced6106c8379b2c02541699d61f966`. See [the complete parity checklist](psylog-parity.md) for F01–F22 and D01–D12, and [data migration](data-migration.md) for storage/restore behavior. Unmerged PsyLog PR #6 is excluded.
+Record updated: 14 October 2026. Current patch evidence and remaining gates: [audit-patch-verification.md](audit-patch-verification.md). Subsequent [custom-unit verification](custom-unit-verification.md), [large-text verification](large-text-verification.md) and the owner-authorized [physical Pixel check](pixel-large-text-verification.md) include five passing APK variants, 195 JVM tests and 97 passing Android 17 UI checks with downloaded evidence, plus in-place Pixel installation and repeat physical checks at 115% and 130% fonts with exact journal/preference retention. The later graph-cursor and substance-statistics detail check reproduces and fixes caption/tolerance wrapping, installs the fix and verifies eight focused physical component checks. Historical sections below retain their original scope and dates. PsyLog target: `0c29a70fa1ced6106c8379b2c02541699d61f966`. See [the complete parity checklist](psylog-parity.md) for F01–F22 and D01–D12, and [data migration](data-migration.md) for storage/restore behavior. Unmerged PsyLog PR #6 is excluded.
 
 The host/source results below were obtained during implementation, before the later build/signing/publication changes. They are not an APK build. See [the current actual Gradle and GitHub execution record](build-publication.md).
 
@@ -90,6 +90,10 @@ Expected debug identity is `app.psyzine.debug`; Play debug is `app.psyzine.play.
 | `PsyZineUiRegressionTest` | Theme selection/disabled preview behavior; accessible themed date selection retaining local time; viewer initial-page clamp/paging/close; synthetic captures for all 13 palettes. |
 | `WidgetParityTest` | Glance row displays the expected formatted substance/dose/route/phase. |
 | `ExperienceEditorUiTest` | Failed save retains draft and does not navigate; discard confirmation/keep-editing; successful save dismisses only after commit. |
+
+Custom-unit validation, guarded mutations and recovery checks are documented in [custom-unit verification](custom-unit-verification.md).
+
+Large-font/display-size layout changes, platform scaling checks and remaining physical-device gaps are documented in [large-text verification](large-text-verification.md).
 
 ## Manual acceptance matrix
 

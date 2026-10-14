@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.search.custom
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Done
@@ -45,7 +47,7 @@ fun AddCustomSubstanceAndContinueScreen(
     com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Add custom substance") })
+            TopAppBar(title = { Text("Add custom substance", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         },
         floatingActionButton = {
             if (viewModel.isValid) {

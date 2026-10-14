@@ -18,13 +18,16 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.calendar
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -110,7 +113,7 @@ fun CalendarJournalScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Journal") },
+                title = { Text("Journal", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     val coroutineScope = rememberCoroutineScope()
                     TextButton(onClick = {
@@ -223,53 +226,56 @@ fun Day(
     today: LocalDate = LocalDate.now()
 ) {
     if (day.position == DayPosition.MonthDate) {
-        val aspectRatioModifier = Modifier.aspectRatio(1f) // This is important for square sizing!
-        val modifier = if (experienceInfos.experienceIds.count() == 1) {
-            aspectRatioModifier.clickable {
-                navigateToExperiencePopNothing(experienceInfos.experienceIds.first())
+        BoxWithConstraints {
+            // Keep square cells at ordinary sizes, but let enlarged text grow the row.
+            val daySizeModifier = Modifier.fillMaxWidth().heightIn(min = maxOf(maxWidth, 48.dp))
+            val modifier = if (experienceInfos.experienceIds.count() == 1) {
+                daySizeModifier.clickable {
+                    navigateToExperiencePopNothing(experienceInfos.experienceIds.first())
+                }
+            } else if (experienceInfos.experienceIds.count() > 1) {
+                daySizeModifier.clickable {
+                    chooseBetweenExperiences(experienceInfos.experienceIds)
+                }
+            } else {
+                daySizeModifier
             }
-        } else if (experienceInfos.experienceIds.count() > 1) {
-            aspectRatioModifier.clickable {
-                chooseBetweenExperiences(experienceInfos.experienceIds)
-            }
-        } else {
-            aspectRatioModifier
-        }
-        val isToday = day.date == today
-        val dayText = day.date.dayOfMonth.toString()
-        Box(
-            modifier = modifier
-                .padding(4.dp)
-                .background(
-                    if (isToday) MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f) else Color.Transparent,
-                    shape = RoundedCornerShape(20)
-                ).semantics {
-                    contentDescription = dayText + " " + day.date.month.name
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (isToday) {
-                    Text(
-                        text = dayText,
-                    )
-                } else if (experienceInfos.experienceIds.isEmpty()) {
-                    Text(
-                        text = dayText,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                } else {
-                    Text(
-                        text = dayText,
+            val isToday = day.date == today
+            val dayText = day.date.dayOfMonth.toString()
+            Box(
+                modifier = modifier
+                    .padding(4.dp)
+                    .background(
+                        if (isToday) MaterialTheme.colorScheme.secondary.copy(alpha = 0.5f) else Color.Transparent,
+                        shape = RoundedCornerShape(20)
+                    ).semantics {
+                        contentDescription = dayText + " " + day.date.month.name
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    if (isToday) {
+                        Text(
+                            text = dayText,
+                        )
+                    } else if (experienceInfos.experienceIds.isEmpty()) {
+                        Text(
+                            text = dayText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = dayText,
+                        )
+                    }
+                    HorizontalColorRectangle(
+                        modifier = Modifier
+                            .height(7.dp)
+                            .fillMaxWidth(fraction = 0.7f)
+                            .clip(RoundedCornerShape(2.dp)),
+                        colors = experienceInfos.colors
                     )
                 }
-                HorizontalColorRectangle(
-                    modifier = Modifier
-                        .height(7.dp)
-                        .fillMaxWidth(fraction = 0.7f)
-                        .clip(RoundedCornerShape(2.dp)),
-                    colors = experienceInfos.colors
-                )
             }
         }
     }

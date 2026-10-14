@@ -74,14 +74,17 @@ jobs:
         if: always()
         run: rm -f "$RUNNER_TEMP/psyzine-disposable.jks"
 
+  large-text:
+    uses: ./.github/workflows/large-text-checks.yml
+
   instrumented:
     runs-on: ubuntu-24.04
-    strategy:
-      fail-fast: false
-      matrix:
-        api: [26, 29, 30, 32, 33, 35]
+    timeout-minutes: 45
     env:
       PSYZINE_SIGNING_MODE: unpublished
+      PSYZINE_DEVELOPMENT_KEYSTORE: ${{ github.workspace }}/.local/signing/ordinary-disposable.jks
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.local/ci-release-avds
+      ANDROID_USER_HOME: ${{ github.workspace }}/.local/ci-android-user
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
@@ -90,35 +93,35 @@ jobs:
           java-version: '17'
           cache: gradle
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
-      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android 17 SDK and runtime
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "emulator" "system-images;android-37.0;google_apis_ps16k;x86_64"
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libpulse0 libx11-6 libxcb1 libgl1
       - name: Enable KVM
+        run: bash tools/enable-emulator-kvm.sh
+      - name: Build unpublished instrumentation APKs
         run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - name: Prepare disposable unpublished signing
-        run: |
-          export PSYZINE_DEVELOPMENT_KEYSTORE="$RUNNER_TEMP/psyzine-disposable.jks"
-          echo "PSYZINE_DEVELOPMENT_KEYSTORE=$PSYZINE_DEVELOPMENT_KEYSTORE" >> "$GITHUB_ENV"
           bash tools/prepare-development-signing.sh --unpublished-ci
-      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
-        with:
-          api-level: ${{ matrix.api }}
-          arch: x86_64
-          target: default
-          disable-animations: true
-          script: bash tools/run-device-checks.sh --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
+          ./gradlew --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :app:assembleDirectDebug :app:assembleDirectDebugAndroidTest
+      - name: Boot isolated Android 17 emulator
+        run: bash tools/start-android-17-emulator.sh PsyZineOrdinary37
+      - name: Run ordinary device tests
+        run: bash tools/run-device-checks.sh --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
-          name: instrumented-api-${{ matrix.api }}
+          name: instrumented-api-37
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
             screenshots/
-      - name: Report failed device tests
-        if: failure()
-        run: python3 tools/report-check-failures.py
+            build-logs/
+      - name: Stop emulator and remove disposable key
+        if: always()
+        run: |
+          adb -s emulator-5554 emu kill || true
+          rm -f "$PSYZINE_DEVELOPMENT_KEYSTORE"
 
   newer-android:
     if: github.event_name == 'workflow_dispatch' && inputs.extra_api != ''
@@ -214,16 +217,17 @@ jobs:
   compatibility-upgrade:
     if: github.event_name == 'workflow_dispatch' && (inputs.verify_compatibility || inputs.publish_compatibility) && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
+    timeout-minutes: 60
     strategy:
       fail-fast: false
       matrix:
-        api: [26, 29, 30, 32, 33, 35]
-        baseline: [code1]
-        include:
-          - api: 35
-            baseline: code2
+        api: [37]
+        baseline: [code1, code2, code3]
     environment: compatibility
     env:
+      ANDROID_AVD_HOME: ${{ github.workspace }}/.local/ci-upgrade-avds
+      ANDROID_USER_HOME: ${{ github.workspace }}/.local/ci-android-user
+      GH_TOKEN: ${{ github.token }}
       PSYZINE_SIGNING_MODE: compatibility
       PSYZINE_COMPAT_KEYSTORE_BASE64: ${{ secrets.PSYZINE_COMPAT_KEYSTORE_BASE64 }}
       PSYZINE_COMPAT_KEY_ALIAS: ${{ secrets.PSYZINE_COMPAT_KEY_ALIAS }}
@@ -240,7 +244,11 @@ jobs:
           java-version: '17'
           cache: gradle
       - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
-      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Android 17 SDK and runtime
+        run: |
+          sdkmanager "platforms;android-35" "build-tools;35.0.0" "emulator" "system-images;android-37.0;google_apis_ps16k;x86_64"
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y libpulse0 libx11-6 libxcb1 libgl1
       - name: Set runner signing path
         run: echo "PSYZINE_COMPAT_KEYSTORE_FILE=$RUNNER_TEMP/psyzine-compat.jks" >> "$GITHUB_ENV"
       - name: Restore mandatory pinned compatibility identity
@@ -248,17 +256,11 @@ jobs:
       - name: Build reviewed baseline and consecutive candidates
         run: bash tools/build-upgrade-fixtures.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process
       - name: Enable KVM
-        run: |
-          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
-          sudo udevadm control --reload-rules
-          sudo udevadm trigger --name-match=kvm
-      - uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
-        with:
-          api-level: ${{ matrix.api }}
-          arch: x86_64
-          target: default
-          disable-animations: true
-          script: bash tools/verify-in-place-upgrade.sh "$(adb devices | awk '/^emulator-.*device$/ {print $1}')" artifacts/upgrade/baseline-${{ matrix.baseline }}.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
+        run: bash tools/enable-emulator-kvm.sh
+      - name: Boot isolated Android 17 emulator
+        run: bash tools/start-android-17-emulator.sh PsyZineUpgrade37
+      - name: Verify retained journal and consecutive upgrades
+        run: bash tools/verify-in-place-upgrade.sh emulator-5554 artifacts/upgrade/baseline-${{ matrix.baseline }}.apk artifacts/upgrade/upgrade-test.apk artifacts/upgrade/candidate.apk artifacts/upgrade/next-candidate.apk
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
@@ -268,13 +270,16 @@ jobs:
             artifacts/upgrade/FIXTURE_APKS.json
             artifacts/upgrade/diagnostics/
           if-no-files-found: error
+      - name: Stop emulator
+        if: always()
+        run: adb -s emulator-5554 emu kill || true
       - name: Remove runner signing container
         if: always()
         run: rm -f "$PSYZINE_COMPAT_KEYSTORE_FILE"
 
   compatibility-publish:
     if: github.event_name == 'workflow_dispatch' && inputs.publish_compatibility && github.ref == 'refs/heads/main'
-    needs: [checks, instrumented, compatibility-build, compatibility-upgrade]
+    needs: [checks, instrumented, large-text, compatibility-build, compatibility-upgrade]
     runs-on: ubuntu-24.04
     environment: compatibility
     concurrency:

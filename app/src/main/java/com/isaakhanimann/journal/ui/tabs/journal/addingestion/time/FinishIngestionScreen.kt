@@ -202,7 +202,7 @@ fun FinishIngestionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("$substanceName ingestion") }
+                title = { Text("$substanceName ingestion", maxLines = 1, overflow = TextOverflow.Ellipsis) }
             )
         },
         floatingActionButton = {

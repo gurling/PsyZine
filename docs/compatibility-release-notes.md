@@ -1,20 +1,18 @@
-# PsyZine Compatibility 1.0.2-compat.3
+# PsyZine Compatibility 1.0.3-compat.4
 
-Testing compatibility pre-release, signed with the retained PsyZine identity. The owner-approved testing exception does not establish content-rights clearance. Production retains its rights gate.
+Testing compatibility pre-release signed with the retained PsyZine identity.
 
-- Preserve dose and uncertainty precision when editing ingestions.
-- Reject stale journal edits after restore or deletion and keep failed saves open.
-- Validate negative, non-finite and overflowing numeric input safely; preserve unknown doses.
-- Correct midnight/DST calendar boundaries and calendar-month/year statistics; count records with missing companion metadata.
-- Add six indexes in schema 9 without rewriting records or purging legacy orphans.
-- Load photo rows lazily, bound thumbnail decoding to two operations and recover from allocation failures.
-- Load reference data asynchronously, cache search names and suspend UI clocks/subscriptions while stopped.
-- Add accessible chart summaries, bounded timeline cursor actions and theme-aware calendar gradients.
-- Repair upgrade-history checkout, verify explicit schema versions and wait for completed backup exports.
-- Verify downloaded draft assets before making the release public.
+- Add clear, field-specific custom-unit errors for missing labels, invalid numbers, unsafe calculations and storage failures.
+- Preserve custom-unit drafts and plural labels; guard edits, archive actions and final ingestion saves against restored or changed records.
+- Fix new-unit initialization so valid substance/route selections load reliably.
+- Improve large-text layouts for settings, journal rows, dose fields, rating descriptions and navigation; keep Done/Next clear of the keyboard.
+- Keep the complete “Per-ingestion timeline estimate” caption visible while dragging the graph, including near its edges.
+- Correct tolerance-label and experience-title/date wrapping in substance statistics details.
 
-Obtainium selects exactly one Direct Compatible Release APK through the README channel configuration. It retains `app.psyzine.debug`, minification and `debuggable=false`. Matching package and retained certificate are both required for an in-place update. Never uninstall, clear data or use a downgrade flag to bypass rejection.
+The Direct Compatible Release APK retains `app.psyzine.debug`, the existing certificate, minification and `debuggable=false`. Schema 9 is unchanged from the previous compatibility release. Obtainium's README channel filter selects this APK.
 
-Publication requires all five variants, build/unit/lint/APK checks, the full ordinary API matrix, two independent clean signed builds, six code1 → code3 → unpublished code4 upgrade checks, an additional API35 code2 minified baseline, matching source/checksums and historical version-code review. Evidence accompanies the Actions run and BUILD_RESULTS.json. Code4 is never published as an empty follow-up release.
+Release verification uses Android 17/API 37, including 130%, 150% and 200% platform fonts, ordinary instrumentation, two independent clean signed builds and code1/code2/published-code3 → code4 → unpublished-code5 upgrade fixtures. The fixtures check journal rows/IDs/generation, photos, preferences, UID, Keystore decryption and completed photo-inclusive backups. Code5 remains an unpublished test fixture.
 
-Full owner-supervised phone/Obtainium, camera, reboot, TalkBack, large-font, RTL and tablet acceptance remain separate. Verify two complete backups and settings omitted by portable backups before the scheduled Pixel upgrade. Rollback uses a forward fix with a higher versionCode and schema-9 support.
+Physical Pixel 6a checks verify the reported large-text and graph/statistics issues. Full TalkBack, physical photo acquisition, landscape/tablet and Pixel 10 Pro XL/Obtainium acceptance remain separate. No phone installation is part of this publication. Preserve important journals and settings with verified backups before an owner-supervised upgrade.
+
+The owner-approved testing exception does not establish content-rights clearance. Production retains its rights gate; GPL source and attribution accompany this testing release.

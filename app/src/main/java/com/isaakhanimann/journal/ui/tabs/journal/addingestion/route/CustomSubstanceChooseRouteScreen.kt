@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.addingestion.route
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,7 +52,7 @@ fun CustomChooseRouteScreenPreview() {
 fun CustomSubstanceChooseRouteScreen(onRouteTap: (AdministrationRoute) -> Unit) {
     Scaffold(
         topBar = {
-            TopAppBar(title = { Text("Route") })
+            TopAppBar(title = { Text("Route", maxLines = 1, overflow = TextOverflow.Ellipsis) })
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {

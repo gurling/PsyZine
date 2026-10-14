@@ -18,6 +18,24 @@
 
 package com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion
 
+import com.isaakhanimann.journal.data.room.numericInputError
+
+import androidx.compose.ui.platform.LocalDensity
+
+import androidx.compose.ui.layout.onSizeChanged
+
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+
+import androidx.compose.foundation.layout.FlowRow
+
+import androidx.compose.foundation.layout.navigationBars
+
+import androidx.compose.foundation.layout.WindowInsets
+
+import androidx.compose.foundation.layout.consumeWindowInsets
+
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
@@ -183,7 +201,7 @@ fun EditIngestionScreenPreview() {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun EditIngestionScreen(
     note: String,
@@ -218,6 +236,8 @@ fun EditIngestionScreen(
     otherCustomUnits: List<CustomUnit>,
     addIngestionWithClonedTime: () -> Unit
 ) {
+    val density = LocalDensity.current
+    var fabHeight by remember { mutableStateOf(56.dp) }
     var isPresentingBottomSheet by rememberSaveable { mutableStateOf(false) }
     val skipPartiallyExpanded by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -226,7 +246,7 @@ fun EditIngestionScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Edit ingestion") },
+                title = { Text("Edit ingestion", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 actions = {
                     var isShowingDeleteDialog by remember { mutableStateOf(false) }
                     AnimatedVisibility(visible = isShowingDeleteDialog) {
@@ -267,7 +287,7 @@ fun EditIngestionScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                modifier = Modifier.imePadding(),
+                modifier = Modifier.consumeWindowInsets(WindowInsets.navigationBars).imePadding().onSizeChanged { fabHeight = with(density) { it.height.toDp() } },
                 onClick = onDone,
                 icon = {
                     Icon(
@@ -281,8 +301,11 @@ fun EditIngestionScreen(
     ) { padding ->
         Column(
             modifier = Modifier
-                .verticalScroll(rememberScrollState())
                 .padding(padding)
+                .consumeWindowInsets(padding)
+                .imePadding()
+                .padding(bottom = fabHeight + 32.dp)
+                .verticalScroll(rememberScrollState())
                 .padding(horizontal = horizontalPadding)
         ) {
             Spacer(modifier = Modifier.height(3.dp))
@@ -321,13 +344,18 @@ fun EditIngestionScreen(
                                 onDoseChange(it.replace(oldChar = ',', newChar = '.'))
                             },
                             label = { Text(text = "Dose") },
-                            trailingIcon = { Text(text = units) },
+                            supportingText = {
+                                Column {
+                                    Text("Amount in ${units.ifBlank { "the chosen unit" }}.")
+                                    numericInputError(dose, "Dose")?.let { Text(it) }
+                                }
+                            },
                             modifier = Modifier.fillMaxWidth(),
                             keyboardActions = KeyboardActions(onDone = {
                                 focusManager.clearFocus()
                             }),
                             isError = dose.nonnegativeDoubleOrNull() == null,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                             singleLine = true
                         )
                         Row(
@@ -349,18 +377,18 @@ fun EditIngestionScreen(
                                             )
                                         )
                                     },
-                                    label = { Text("Estimated standard deviation") },
-                                    trailingIcon = {
-                                        Text(
-                                            text = units,
-                                            modifier = Modifier.padding(horizontal = horizontalPadding)
-                                        )
+                                    label = { Text("Uncertainty") },
+                                    supportingText = {
+                                        Column {
+                                            Text("Standard deviation in ${units.ifBlank { "the chosen unit" }}.")
+                                            numericInputError(estimatedDoseStandardDeviation, "Uncertainty")?.let { Text(it) }
+                                        }
                                     },
                                     keyboardActions = KeyboardActions(onDone = {
                                         focusManager.clearFocus()
                                     }),
                                     isError = estimatedDoseStandardDeviation.isNotBlank() && estimatedDoseStandardDeviation.nonnegativeDoubleOrNull() == null,
-                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )

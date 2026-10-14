@@ -22,8 +22,11 @@ code, base = read_version()
 for apk in (baseline, candidate, following):
     if apk['applicationId'] != 'app.psyzine.debug' or apk['signerCertificateSha256'] != [pins()['app.psyzine.debug']]:
         raise SystemExit('Wrong fixture package or certificate')
-if not ((baseline['versionCode'] == 1 and baseline['debuggable']) or (baseline['versionCode'] == 2 and not baseline['debuggable'])):
-    raise SystemExit('Baseline must be reviewed code1 Direct Debug or minified code2 compatibility')
+published = json.loads(Path('config/upgrade-baselines.json').read_text())['code3']
+if not ((baseline['versionCode'] == 1 and baseline['debuggable']) or
+        (baseline['versionCode'] == 2 and not baseline['debuggable']) or
+        (baseline['versionCode'] == 3 and not baseline['debuggable'] and baseline['sha256'] == published['sha256'])):
+    raise SystemExit('Baseline must be reviewed code1/code2 or the pinned published code3 compatibility APK')
 if candidate['versionCode'] != code or following['versionCode'] != code + 1 or code <= baseline['versionCode']:
     raise SystemExit('Candidate codes do not prove two increasing updates')
 if candidate['debuggable'] or following['debuggable']:
@@ -55,22 +58,27 @@ trap 'capture_failure "$?"' EXIT
 "${adb_cmd[@]}" install "$test_apk"
 run_test() {
     local method="$1" code="$2" schema="$3" output_file="$4"
-    "${adb_cmd[@]}" shell am instrument -w --no-window-animation \
+    "${adb_cmd[@]}" shell am instrument -w -r --no-window-animation \
         -e class "com.isaakhanimann.journal.psyzine.InPlaceUpgradeTest#$method" \
         -e psyzineUpgradeFixture true -e expectedVersionCode "$code" -e expectedSchemaVersion "$schema" \
         app.psyzine.debug.test/androidx.test.runner.AndroidJUnitRunner | tee "$output_file"
     # am instrument may exit zero for a failing test, so require its explicit result.
     python3 - "$output_file" <<'PY'
 from pathlib import Path
-import re, sys
+import sys
+sys.path.insert(0, 'tools')
+from instrumentation_result import require_passes
 result = Path(sys.argv[1]).read_text()
-if not re.search(r'^OK \(1 test\)', result, re.MULTILINE) or 'FAILURES!!!' in result or 'INSTRUMENTATION_FAILED' in result:
-    raise SystemExit('Upgrade instrumentation did not pass exactly one test')
+require_passes(result, 1)
 PY
 }
 baseline_code="$(python3 -c 'import json; print(json.load(open("artifacts/upgrade/FIXTURE_APKS.json"))[0]["versionCode"])')"
-run_test seedVersionOneFixture "$baseline_code" 8 artifacts/upgrade/seed.log
-run_test verifyRetainedFixtureAndKeystore "$baseline_code" 8 artifacts/upgrade/baseline-verify.log
+baseline_schema=8
+if [[ "$baseline_code" == 3 ]]; then
+    baseline_schema="$(python3 -c 'import json; print(json.load(open("config/upgrade-baselines.json"))["code3"]["schemaVersion"])')"
+fi
+run_test seedVersionOneFixture "$baseline_code" "$baseline_schema" artifacts/upgrade/seed.log
+run_test verifyRetainedFixtureAndKeystore "$baseline_code" "$baseline_schema" artifacts/upgrade/baseline-verify.log
 if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
     python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${baseline_code}.json"
 fi

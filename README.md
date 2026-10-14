@@ -6,7 +6,7 @@ The PsyLog port is pinned to [`0c29a70fa1ced6106c8379b2c02541699d61f966`](https:
 
 ## Install testing builds
 
-The default Obtainium testing channel is **Direct Compatible Release**: a non-debuggable, minified build that keeps package `app.psyzine.debug` and the retained local signing identity. The current candidate is `1.0.2-compat.3` / code `3`, asset `PsyZine-Direct-Compatible-Release-v1.0.2-compat.3.apk`. Check [GitHub pre-releases](https://github.com/gurling/PsyZine/releases) for published builds.
+The default Obtainium testing channel is **Direct Compatible Release**: a non-debuggable, minified build that keeps package `app.psyzine.debug` and the retained local signing identity. The current candidate is `1.0.3-compat.4` / code `4`, asset `PsyZine-Direct-Compatible-Release-v1.0.3-compat.4.apk`. Check [GitHub pre-releases](https://github.com/gurling/PsyZine/releases) for published builds.
 
 [<img src="docs/images/get-it-on-obtainium.png" alt="Get it on Obtainium" height="80">](https://apps.obtainium.imranr.dev/redirect?r=obtainium://app/%7B%22id%22%3A%22app.psyzine.debug%22%2C%22url%22%3A%22https%3A%2F%2Fgithub.com%2Fgurling%2FPsyZine%22%2C%22author%22%3A%22gurling%22%2C%22name%22%3A%22PsyZine%22%2C%22additionalSettings%22%3A%22%7B%5C%22includePrereleases%5C%22%3Atrue%2C%5C%22filterReleaseTitlesByRegEx%5C%22%3A%5C%22%5EPsyZine%20Compatibility%20%5C%22%2C%5C%22apkFilterRegEx%5C%22%3A%5C%22%5EPsyZine-Direct-Compatible-Release-v%5B0-9%5D%2B%5C%5C%5C%5C.%5B0-9%5D%2B%5C%5C%5C%5C.%5B0-9%5D%2B-compat%5C%5C%5C%5C.%5B0-9%5D%2B%5C%5C%5C%5C.apk%24%5C%22%2C%5C%22versionDetection%5C%22%3Afalse%2C%5C%22releaseTitleAsVersion%5C%22%3Afalse%7D%22%7D)
 
@@ -24,7 +24,7 @@ bash tools/build-apks.sh
 ./gradlew :app:connectedDirectDebugAndroidTest
 ```
 
-The direct release installs as `app.psyzine`, direct debug as `app.psyzine.debug`, Play release as `app.psyzine.play`, and Play debug as `app.psyzine.play.debug`. All variants use the retained internal Kotlin namespace and Room schema path. Versions come from [version.properties](version.properties), currently `1.0.2` / code `3`. Direct Compatible Release also uses `app.psyzine.debug`; there is no Play compatibility variant. Keep the direct ID and independent signing certificate stable for upgrades. Never install a different signing key over an existing journal.
+The direct release installs as `app.psyzine`, direct debug as `app.psyzine.debug`, Play release as `app.psyzine.play`, and Play debug as `app.psyzine.play.debug`. All variants use the retained internal Kotlin namespace and Room schema path. Versions come from [version.properties](version.properties), currently `1.0.3` / code `4`. Direct Compatible Release also uses `app.psyzine.debug`; there is no Play compatibility variant. Keep the direct ID and independent signing certificate stable for upgrades. Never install a different signing key over an existing journal.
 
 Source, issue and sharing links default to `https://github.com/gurling/PsyZine` through generated BuildConfig. A fork can override them with `-PpsyzineSourceUrl=https://github.com/OWNER/REPOSITORY`; an explicitly blank property shows a development notice in About. No upstream support address is presented as PsyZine support. The retained donation page explicitly supports the original author.
 

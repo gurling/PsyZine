@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.safer
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -47,7 +49,7 @@ fun SaferHallucinogensScreen() {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Safer hallucinogens") },
+                title = { Text("Safer hallucinogens", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         },
     ) { padding ->

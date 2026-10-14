@@ -18,6 +18,8 @@
 
 package com.isaakhanimann.journal.ui.tabs.safer
 
+import androidx.compose.ui.text.style.TextOverflow
+
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
@@ -80,7 +82,7 @@ fun SaferUseScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Safer use") },
+                title = { Text("Safer use", maxLines = 1, overflow = TextOverflow.Ellipsis) },
             )
         },
     ) { padding ->

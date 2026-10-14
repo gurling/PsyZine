@@ -21,21 +21,17 @@ package com.isaakhanimann.journal.ui.tabs.settings.customunits.archive
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
-import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
+import com.isaakhanimann.journal.ui.tabs.settings.customunits.*
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel
-class CustomUnitArchiveViewModel @Inject constructor(
-    experienceRepository: ExperienceRepository,
-) : ViewModel() {
-
-    val customUnitsFlow: StateFlow<List<CustomUnit>> = experienceRepository.getCustomUnitsFlow(true).stateIn(
-        initialValue = emptyList(),
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(5000)
-    )
+class CustomUnitArchiveViewModel @Inject constructor(experienceRepository: ExperienceRepository) : ViewModel() {
+    private val retries = MutableStateFlow(0)
+    fun retry() { retries.value++ }
+    val unitsState = retries.flatMapLatest { experienceRepository.getCustomUnitsFlow(true).unitListState() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CustomUnitListState())
 }
