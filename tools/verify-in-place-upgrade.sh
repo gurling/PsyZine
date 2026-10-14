@@ -58,17 +58,18 @@ trap 'capture_failure "$?"' EXIT
 "${adb_cmd[@]}" install "$test_apk"
 run_test() {
     local method="$1" code="$2" schema="$3" output_file="$4"
-    "${adb_cmd[@]}" shell am instrument -w --no-window-animation \
+    "${adb_cmd[@]}" shell am instrument -w -r --no-window-animation \
         -e class "com.isaakhanimann.journal.psyzine.InPlaceUpgradeTest#$method" \
         -e psyzineUpgradeFixture true -e expectedVersionCode "$code" -e expectedSchemaVersion "$schema" \
         app.psyzine.debug.test/androidx.test.runner.AndroidJUnitRunner | tee "$output_file"
     # am instrument may exit zero for a failing test, so require its explicit result.
     python3 - "$output_file" <<'PY'
 from pathlib import Path
-import re, sys
+import sys
+sys.path.insert(0, 'tools')
+from instrumentation_result import require_passes
 result = Path(sys.argv[1]).read_text()
-if not re.search(r'^OK \(1 test\)', result, re.MULTILINE) or 'FAILURES!!!' in result or 'INSTRUMENTATION_FAILED' in result:
-    raise SystemExit('Upgrade instrumentation did not pass exactly one test')
+require_passes(result, 1)
 PY
 }
 baseline_code="$(python3 -c 'import json; print(json.load(open("artifacts/upgrade/FIXTURE_APKS.json"))[0]["versionCode"])')"
