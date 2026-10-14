@@ -1,6 +1,6 @@
 # Large-text layout fixes and verification
 
-Implementation branch: `fix/custom-unit-validation`. Android 17 CI verified commit `9d7fa21d627924c4b1fb10ae67521153966dc1ea`; production changes are in `c67a62b5`. This work follows the custom-unit fixes and retains schema 9, application identities, versions, signing, journal data and all 13 palettes. No phone installation or release was changed.
+Implementation branch: `fix/custom-unit-validation`. Initial layout changes are in `c67a62b5`, with initial Android 17 evidence at `9d7fa21d627924c4b1fb10ae67521153966dc1ea`. The subsequent [physical Pixel check](pixel-large-text-verification.md) exposed and fixed a new-unit composition/Room initialization race in `87b5ad340664f8d0299d0af4ae95503bdc103f0a`. That source passes 81 Android 17 CI checks and was installed in place on the Pixel. Schema 9, application identities, versions, signing, journal data and all 13 palettes are retained. No release was published by this follow-up.
 
 ## Changes
 
@@ -30,6 +30,8 @@ The earlier API-35 software emulator used the emulator-only `ro.hw_timeout_multi
 
 ## Recorded results, 14 October 2026
 
+- Latest source `87b5ad34` passes all five APK builds/verifiers, 195 JVM tests and 25 release-policy tests. [CI run 38601334240](https://github.com/gurling/PsyZine/actions/runs/38601334240) passes **81 UI checks**: the original 42 platform checks plus 39 controlled checks including the new snapshot regression. The downloaded artifact and all extracted file hashes were verified. The final protected-key local Direct Debug APK hash is `670051a12ee6066293a6c4421fd24d474cbfe14f24b5d64ca91fbd669a3c05cd`; the installed Pixel APK matches exactly. Private physical evidence and remaining limits are summarized [here](pixel-large-text-verification.md).
+- The following detailed record retains the initial 80-check run and its original APK hashes; it predates the physical initialization-race fix.
 - All five variants build and pass lint with zero errors. Package/version/debuggable flags, permissions, SDK levels, certificate pins, signatures, ZIP integrity and alignment pass APK verification. Lint warnings remain: 84 per debug variant and 64 per release variant.
 - JVM suites: 65 Direct Debug, 65 Play Debug and 65 Direct Compatible Release tests, **195 total**, zero failures/errors/skips. All **25 release-policy tests**, workflow lint, shell lint and diff checks pass.
 - [Android 17 CI run 38583953357](https://github.com/gurling/PsyZine/actions/runs/38583953357) passes **80 UI tests**, zero failures/skips. The downloaded runner summaries and individual success status counts agree with all four profile totals below. API 37, 16KB pages and KVM acceleration were checked before installation. Fifteen controlled error-state captures cover all 13 palettes and both system-theme appearances in RTL.
@@ -79,8 +81,8 @@ Use `bash tools/build-apks.sh` for all five APKs, JVM suites, lint and signed AP
 
 ## Limits
 
-Physical Pixel rendering, TalkBack, hardware keyboard navigation, landscape/tablet layouts and a complete visual sweep of every screen remain unverified. Single-line toolbar truncation and partially visible offscreen tabs are intentional; those tabs remain scrollable and selectable. No claim is made that every UI surface is free of clipping.
+The [physical Pixel check](pixel-large-text-verification.md) verifies sampled rendering, validation and the real keyboard at the owner's original 115% and subsequently increased 130% settings. TalkBack, hardware keyboard navigation, landscape/tablet layouts and a complete visual sweep of every screen remain unverified. Single-line toolbar truncation and partially visible offscreen tabs are intentional; those tabs remain scrollable and selectable. No claim is made that every UI surface is free of clipping.
 
 Synthetic logs/captures stay ignored under `build-logs/` and `artifacts/text-scaling/`. Native screenshots are preferred; if the software emulator cannot capture one, the test saves a Compose-root image. Root images exclude system chrome/keyboard, so keyboard acceptance comes from the independent visibility/coordinate assertions. Actual ADB before/after captures also confirm the main journal toolbar retains all four action icons.
 
-VersionCode 3 is unchanged and already published. The local verification APK record is marked `publicationAllowed=false`; publishing these fixes requires a new reviewed version and the normal release gates. Source pushes for CI do not publish a release or update the Pixel.
+VersionCode 3 is unchanged and already published. The initial dirty-source build was marked `publicationAllowed=false`; the subsequent clean build passes signing/source eligibility, while version-history and protected publication gates still apply. Publishing these fixes requires a new reviewed version. Source pushes for CI do not publish a release; the physical installation was separately authorized by the owner.

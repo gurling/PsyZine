@@ -15,6 +15,7 @@ Implementation branch: `fix/custom-unit-validation`. Database schema remains 9; 
 
 ## Evidence
 
+- The [physical Pixel check](pixel-large-text-verification.md) verifies sampled layouts and error messages at the owner's original 115% and subsequently increased 130% settings, with exact journal/ID/generation/preference retention across installation. It exposed a composition/Room race when opening a new unit for a valid substance. Immutable navigation inputs fix it in `87b5ad34`; the deterministic regression fails before and passes after on the Pixel. The expanded [Android 17 CI run](https://github.com/gurling/PsyZine/actions/runs/38601334240) passes all **23 custom-unit regressions**, within **81 total UI checks**, zero failures/skips.
 - All five APK variants built; all five lint reports contain zero errors. SDK, package/version/debuggable flags, permissions, signatures/certificate pins, ZIP integrity and alignment passed `tools/verify-apks.py`.
 - Direct Debug, Play Debug and Direct Compatible Release JVM suites: **65 tests each, 195 total**, zero failures/errors/skips. Nine new numeric/validation/token/error-flow tests supplement existing suites.
 - APIs 26 and 35: **42 focused instrumentation tests each, 84 total**, zero failures, including all **22 new custom-unit regressions** on each API, plus mutation sessions, schema/data parity, accessibility, lifecycle and existing editor checks.
@@ -26,6 +27,6 @@ Logs and synthetic captures are ignored under `build-logs/`, `artifacts/custom-u
 
 ## Remaining manual acceptance
 
-Actual TalkBack spoken feedback, physical-device keyboard/navigation, process kill by Android, and a physical installation were not verified. Automated tests cover SavedState recovery, Compose focus/click semantics, large fonts, RTL, and theme error states. No phone data, settings, installation or release was changed.
+The later owner-authorized [Pixel installation](pixel-large-text-verification.md) verifies the sampled UI and its onscreen keyboard; journal data/preferences remain intact and the temporary screen-awake setting was restored. Actual TalkBack spoken feedback, physical hardware keyboard, arbitrary process kill by Android and a complete manual screen/palette sweep remain unverified. Automated tests cover SavedState recovery, Compose focus/click semantics, large fonts, RTL, and theme error states. No release was published by these fixes.
 
 The original palette/error checks above tested error visibility and action semantics; they did not verify every label or the keyboard layout. Subsequent [large-text verification](large-text-verification.md) adds platform font/display-size runs, measured text bounds and actual IME visibility checks. Number fields now use short “Dose per unit”/“Dose” and “Uncertainty” labels with the full unit context in wrapping supporting text, and the scrolling viewport reserves room for Done/Next.
