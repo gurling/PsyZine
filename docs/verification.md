@@ -1,6 +1,6 @@
 # PsyZine verification and acceptance
 
-Record updated: 12 October 2026. Current patch evidence and remaining gates: [audit-patch-verification.md](audit-patch-verification.md). Historical sections below retain their original scope and dates. PsyLog target: `0c29a70fa1ced6106c8379b2c02541699d61f966`. See [the complete parity checklist](psylog-parity.md) for F01–F22 and D01–D12, and [data migration](data-migration.md) for storage/restore behavior. Unmerged PsyLog PR #6 is excluded.
+Record updated: 14 October 2026. Current patch evidence and remaining gates: [audit-patch-verification.md](audit-patch-verification.md). Subsequent [custom-unit verification](custom-unit-verification.md) and [large-text verification](large-text-verification.md) include five passing APK variants, 195 JVM tests and 80 passing Android 17 UI checks with downloaded evidence. Historical sections below retain their original scope and dates. PsyLog target: `0c29a70fa1ced6106c8379b2c02541699d61f966`. See [the complete parity checklist](psylog-parity.md) for F01–F22 and D01–D12, and [data migration](data-migration.md) for storage/restore behavior. Unmerged PsyLog PR #6 is excluded.
 
 The host/source results below were obtained during implementation, before the later build/signing/publication changes. They are not an APK build. See [the current actual Gradle and GitHub execution record](build-publication.md).
 

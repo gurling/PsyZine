@@ -1,6 +1,6 @@
 # Large-text layout fixes and verification
 
-Implementation branch: `fix/custom-unit-validation`. This work follows the custom-unit fixes and retains schema 9, application identities, versions, signing, journal data and all 13 palettes. No phone installation or release was changed.
+Implementation branch: `fix/custom-unit-validation`. Android 17 CI verified commit `9d7fa21d627924c4b1fb10ae67521153966dc1ea`; production changes are in `c67a62b5`. This work follows the custom-unit fixes and retains schema 9, application identities, versions, signing, journal data and all 13 palettes. No phone installation or release was changed.
 
 ## Changes
 
@@ -22,7 +22,7 @@ Tests use a 480 × 1066 virtual display. Display densities of 195 and 240 produc
 
 Platform runs set Android's `font_scale` and display density, then assert that the Compose density reflects that setting. Controlled runs keep the OS at 100%/160dpi and inject a Compose density for component stress tests. The dose-reference matrix checks 100%, 130%, 150% and 200% at 320dp/393dp in both LTR and RTL. This controlled matrix supplements actual platform scaling; it does not substitute for it. Android 14+ uses [nonlinear font scaling](https://developer.android.com/about/versions/14/features#non-linear-font-scaling).
 
-`LargeTextLayoutTest` checks measured line bounds and retained text, switch/favorite visibility, calendar dates, all statistics tabs, long unit names, wrapping notes, all six rating choices, final scroll sections and save-button separation. Its keyboard case opens the real emulator IME and compares field/button window coordinates with the visible display frame. `MainActivityLargeTextTest` uses the actual activity, visits all five tabs, checks full navigation labels and scrolls to a settings control. The real-activity test changes synthetic preferences and generated capture folders; repository tests mutate only emulator fixtures.
+`LargeTextLayoutTest` checks measured line bounds and retained text, switch/favorite visibility, calendar dates, all statistics tabs, long unit names, wrapping notes, all six rating choices, final scroll sections and save-button separation. Its keyboard case opens the real emulator IME and compares field/button window coordinates with the visible display frame. The ordinary-dose fixture also opens and awaits the IME before scrolling; the uncertainty field and its complete supporting description must both remain visible. Supporting-text assertions target the text node rather than its merged field. `MainActivityLargeTextTest` uses the actual activity, visits all five tabs, checks full navigation labels and scrolls to a settings control. The real-activity test changes synthetic preferences and generated capture folders; repository tests mutate only emulator fixtures.
 
 `CustomUnitRegressionTest` repeats validation, guarded writes and draft recovery, and captures error states for all 13 palettes plus light/dark system appearances at 200% in RTL. `UiAccessibilityRegressionTest` checks chart summaries and bounded timeline cursor actions. These are Compose semantics checks; they do not establish actual TalkBack spoken feedback.
 
@@ -32,24 +32,32 @@ The earlier API-35 software emulator used the emulator-only `ro.hw_timeout_multi
 
 - All five variants build and pass lint with zero errors. Package/version/debuggable flags, permissions, SDK levels, certificate pins, signatures, ZIP integrity and alignment pass APK verification. Lint warnings remain: 84 per debug variant and 64 per release variant.
 - JVM suites: 65 Direct Debug, 65 Play Debug and 65 Direct Compatible Release tests, **195 total**, zero failures/errors/skips. All **25 release-policy tests**, workflow lint, shell lint and diff checks pass.
+- [Android 17 CI run 38583953357](https://github.com/gurling/PsyZine/actions/runs/38583953357) passes **80 UI tests**, zero failures/skips. The downloaded runner summaries and individual success status counts agree with all four profile totals below. API 37, 16KB pages and KVM acceleration were checked before installation. Fifteen controlled error-state captures cover all 13 palettes and both system-theme appearances in RTL.
 - Earlier completed emulator runs: API 26 has 13 maximum-platform-font checks, 37 controlled/custom-unit/accessibility checks and one focused rating regression; API 35 has 13 maximum-platform-font checks and one focused rating regression. **65 passing UI tests** are recorded. The core runs preceded the final isolated rating-row change; that new regression passed separately on both APIs. The original rating reproduction failed with five clipped descriptions and is excluded from passing totals.
 - The incomplete API-35 130% run was stopped when the owner requested newer Android versions. It is excluded from passing totals, and no further older-version runs were started.
-- **Android 17 is not yet verified locally.** Three launches with Emulator 37.2.12 and the API-37 revision-7 16KB image crashed with exit 139 before Android booted or ADB became available. Attempts used software graphics, SwiftShader with Vulkan disabled, and a single-core SwiftShader configuration. `/dev/kvm` is absent (`emulator -accel-check` returns 8). These are emulator failures; the app was never installed or tested on Android 17 in those attempts.
+- Earlier unaccelerated local Android 17 launches failed: three attempts with Emulator 37.2.12 and the API-37 revision-7 16KB image crashed with exit 139 before Android booted or ADB became available. Attempts used software graphics, SwiftShader with Vulkan disabled, and a single-core SwiftShader configuration. `/dev/kvm` is absent (`emulator -accel-check` returns 8). The app was never installed in those local attempts; the accelerated CI run above supplies Android 17 runtime evidence.
 
-The final local Direct Debug APK SHA-256 is `7f0d59fd5752e94c1d8afbe4d82552e8239ffeeafa35f761cd6310d64d54a25d`. The staged app matches the final all-variant build. Staged test hashes, source hashes, raw logs, configurations and captures are retained in ignored artifacts. Subsequent test-host changes make keyboard and notification setup self-contained for ordinary CI; they compile successfully and do not change production code.
+The final local Direct Debug APK SHA-256 is `7f0d59fd5752e94c1d8afbe4d82552e8239ffeeafa35f761cd6310d64d54a25d`. The staged app matches the final all-variant build. Staged test hashes, source hashes, raw logs, configurations and captures are retained in ignored artifacts. Subsequent test-host and CI changes do not change production code.
 
 ## Android 17 CI route
 
 [Android 17 large-text checks](../.github/workflows/large-text-checks.yml) uses an accelerated fresh API-37/16KB emulator and builds unpublished test APKs against SDK 35. It runs [run-large-text-checks.sh](../tools/run-large-text-checks.sh), which refuses physical serials, requires an emulator on API 36+, and refuses an existing PsyZine installation before installing or mutating fixtures.
 
-| Profile | Platform font/display setting | Intended checks |
+| Profile | Platform font/display setting | Passing checks |
 | --- | --- | ---: |
 | Maximum | 200%, 240dpi, 320dp portrait width | 14 |
 | Intermediate | 130%, 195dpi, about 393dp portrait width | 14 |
 | Larger | 150%, 240dpi, 320dp portrait width | 14 |
 | Controlled | OS 100%/160dpi, component density overrides | 38 |
 
-The intended total is **80 tests**. Only an inspected successful CI result establishes those passes. The harness rejects skipped cases and failed/missing runner summaries, records APK hashes/source commit and saves native/component captures with each profile's settings. It does not run physical-device acceptance or publish a release.
+The verified total is **80 tests**. The downloaded artifact contains 26 PNGs for each platform profile and 52 for the controlled profile. Its ZIP SHA-256 matches GitHub's digest `9d12d09801fd5c92352d6880e421f4bad2fe4b6f457f826374f484d2732d4232`; ZIP integrity and hashes for all 152 extracted files pass. Representative native/component captures were visually inspected: the 200% keyboard layout, 130% ordinary-dose description, 150% rating descriptions, 200% main journal and journal row, and light/dark RTL custom-unit errors. Partially visible scroll content is distinguished from text clipping. These samples supplement the measured assertions; they are not a visual review of every screen.
+
+The CI artifact's `verification.json` records these unpublished, disposable-key APK hashes:
+
+- Direct Debug: `a971b57d423a13fd77b1c847b0f01fd7bac55a0ba61841c049470812f905d901`.
+- Instrumentation: `f5fc1cef89a5fb1f11e4687220857a04441647caf233268f4c788ee0fe62339d`.
+
+The harness rejects skipped cases and failed/missing runner summaries, records APK hashes/source commit and saves native/component captures with each profile's settings. CI uses explicit SDK executable/AVD paths, installed emulator runtime libraries and a settled, checked KVM device. The fresh-install check lists packages, so an expected absent package does not terminate the script as `pm path` does. Six simulated guard checks verify rejection of physical serials, older APIs, existing installations and ADB errors, and progression for fresh emulators with either QEMU marker. Earlier failed startup/test runs are retained separately and excluded from passing totals. No physical-device acceptance or release publication runs in this workflow.
 
 ## Reproduction
 
