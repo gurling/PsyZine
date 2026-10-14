@@ -1,0 +1,71 @@
+name: Android 17 large-text checks
+
+on:
+  push:
+    branches: ['fix/custom-unit-validation']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: large-text-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android-17:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      PSYZINE_SIGNING_MODE: unpublished
+      PSYZINE_DEVELOPMENT_KEYSTORE: ${{ github.workspace }}/.local/signing/large-text-disposable.jks
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+      - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4
+      - name: Install build SDK and Android 17 image
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0" "emulator" "system-images;android-37.0;google_apis_ps16k;x86_64"
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm && test -w /dev/kvm
+      - name: Build unpublished test APKs
+        run: |
+          bash tools/prepare-development-signing.sh --unpublished-ci
+          ./gradlew --no-daemon --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process :app:assembleDirectDebug :app:assembleDirectDebugAndroidTest
+      - name: Boot isolated Android 17 emulator
+        run: |
+          mkdir -p build-logs
+          echo no | avdmanager create avd --name PsyZineLargeText37 --package "system-images;android-37.0;google_apis_ps16k;x86_64"
+          emulator -avd PsyZineLargeText37 -port 5554 -no-window -no-audio -no-boot-anim -no-snapshot -accel on -gpu software -memory 4096 -cores 2 > build-logs/emulator-large-text-37.log 2>&1 &
+          timeout 480 adb -s emulator-5554 wait-for-device
+          ready=false
+          for attempt in $(seq 1 96); do
+            if [[ "$(adb -s emulator-5554 shell getprop sys.boot_completed | tr -d '\r')" == 1 ]]; then ready=true; break; fi
+            echo "Waiting for Android 17 boot ($attempt/96)"
+            sleep 5
+          done
+          test "$ready" == true
+          test "$(adb -s emulator-5554 shell getprop ro.build.version.sdk | tr -d '\r')" == 37
+          test "$(adb -s emulator-5554 shell getconf PAGE_SIZE | tr -d '\r')" == 16384
+      - name: Verify platform and controlled text scaling
+        run: bash tools/run-large-text-checks.sh emulator-5554
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: android-17-large-text-${{ github.sha }}
+          path: |
+            build-logs/
+            screenshots/large-text/
+          if-no-files-found: error
+      - name: Stop emulator and remove disposable key
+        if: always()
+        run: |
+          adb -s emulator-5554 emu kill || true
+          rm -f "$PSYZINE_DEVELOPMENT_KEYSTORE"
