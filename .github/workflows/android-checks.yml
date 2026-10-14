@@ -44,7 +44,7 @@ jobs:
       - name: Build, test, lint and verify unpublished variants
         env:
           PSYZINE_SIGNING_MODE: unpublished
-          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ github.workspace }}/.local/signing/ordinary-disposable.jks
+          PSYZINE_DEVELOPMENT_KEYSTORE: ${{ runner.temp }}/psyzine-disposable.jks
         run: bash tools/build-apks.sh --max-workers=2 -Pkotlin.compiler.execution.strategy=in-process -PpsyzineSourceUrl="https://github.com/$GITHUB_REPOSITORY"
       - name: Package corresponding source
         run: |
