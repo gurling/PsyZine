@@ -32,6 +32,21 @@ With the real FUTO keyboard visible, the complete Done button has bounds `[732,1
 
 The draft was discarded. Stopped-app snapshots before and after the repeat have exactly matching schema-9 table contents, including IDs/generation, and both stored preference files. The new 130% font setting, density and display size were retained; temporary stay-awake was restored to its original value. The journal was left open. Sensitive evidence remains ignored under `artifacts/pixel-font-step-check/` and was not uploaded.
 
+## Graph cursor and substance-statistics follow-up
+
+The owner identified two additional interaction paths after the sampled tab sweep: holding/dragging on the experience graph and opening a substance's statistics detail. On the same Pixel at 130%, the transient readout visibly clipped the last line of “Per-ingestion timeline estimate”; the statistics tolerance card split “zero:” across lines. The earlier tab captures did not cover these paths.
+
+Commit `8360ca6b7d206789bd41212db46af9cbbe7aec53` replaces the readout's fixed 140dp height cap with the available graph height and keeps its estimate caption outside the scrolling ingestion list. Tolerance labels use their natural text width while descriptions wrap in the remaining space. Experience titles and dates flow onto separate rows when they cannot share a line.
+
+Four isolated synthetic component regressions fail against the previous installed app at 200% component fonts. All four pass after the fix at the real 130% platform setting and again at 200% component fonts, **eight passing checks**, without changing system font settings or writing journal data. They check dragging to the edge, complete caption visibility, multiple ingestions, unsplit tolerance labels and long experience titles/dates.
+
+Native before/after captures verify the actual center/left/right graph readout, expanded timeline and statistics detail. The caption is complete, the readout stays within the graph's horizontal edges, releasing touch hides it, and the tolerance label remains intact. Two fresh stopped-app private snapshots were verified before the update. After installation and testing, schema-9 table contents, IDs/generation, both stored preference files and the primary-profile UID still match exactly. The temporary test package was removed; the 130% font and display settings were retained and stay-awake restored.
+
+The installed Direct Debug `1.0.2`/code 3 APK matches the clean five-variant build at this commit: SHA-256 `98d57eba04d7623cb48e999883e05381293c904192394443ed8afbdfcbc1358e`. All five variants pass build/lint/APK verification, all 195 JVM tests pass and all 25 release-policy tests pass. Private evidence stays ignored under `artifacts/pixel-graph-detail-check/`. No release was published.
+
+[Android 17 CI run 38610648415](https://github.com/gurling/PsyZine/actions/runs/38610648415) passes **97 checks**, zero failures/skips: 18 each at 130%, 150% and 200% platform fonts, plus 43 controlled checks. Downloaded runner summaries, individual success counts, settings and source records agree. The artifact ZIP matches GitHub SHA-256 `db619618cb9d715934dcf0f2636c0483d1a16c74d79d4e91949bf9a2241167b1`; ZIP integrity and all 172 extracted files were checked. The downloaded 200% caption and long-title/date captures were reviewed. The test activity toolbar obscured the top of the tolerance capture. Test-only follow-up `8a1d03ad` hides that toolbar; all four cases pass again at each font setting. Toolbar-free 200% caption, tolerance and title/date captures were reviewed, and another before/after snapshot confirms unchanged journal tables/preferences. The application APK is unchanged by this fixture correction.
+
+
 ## Automated evidence and limits
 
 All five APK variants build and pass signature/package/version/alignment verification; all lint reports have zero errors. Three JVM suites pass 65 tests each, **195 total**; all **25 release-policy tests** pass.
