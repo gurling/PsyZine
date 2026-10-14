@@ -5,12 +5,21 @@ project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "$project_dir"
 serial="${1:?Pass the serial of a fresh Android 16+ emulator}"
 case "$serial" in emulator-*) ;; *) echo 'This check requires a fresh emulator.' >&2; exit 2 ;; esac
+mkdir -p build-logs
+exec > >(tee build-logs/large-text-harness.log) 2>&1
+trap 'echo "Large-text harness failed at line $LINENO" >&2' ERR
 adb_device=(adb -s "$serial")
-test "$("${adb_device[@]}" shell getprop ro.kernel.qemu | tr -d '\r')" = 1
+kernel_qemu="$("${adb_device[@]}" shell getprop ro.kernel.qemu | tr -d '\r')"
+boot_qemu="$("${adb_device[@]}" shell getprop ro.boot.qemu | tr -d '\r')"
+echo "Emulator markers: kernel=$kernel_qemu boot=$boot_qemu"
+[[ "$kernel_qemu" = 1 || "$boot_qemu" = 1 ]]
 sdk="$("${adb_device[@]}" shell getprop ro.build.version.sdk | tr -d '\r')"
+echo "Android SDK: $sdk"
 [[ "$sdk" =~ ^[0-9]+$ ]] && (( sdk >= 36 ))
-existing_package="$("${adb_device[@]}" shell pm path app.psyzine.debug | tr -d '\r')"
-if [[ "$existing_package" == package:* ]]; then
+# `pm path` returns a failure status for the expected absent package. Listing
+# packages succeeds on a fresh emulator and still propagates ADB/service errors.
+existing_packages="$("${adb_device[@]}" shell pm list packages app.psyzine.debug | tr -d '\r')"
+if [[ "$existing_packages" == *package:app.psyzine.debug* ]]; then
     echo 'Use a fresh emulator: an existing PsyZine installation must be retained.' >&2
     exit 2
 fi
