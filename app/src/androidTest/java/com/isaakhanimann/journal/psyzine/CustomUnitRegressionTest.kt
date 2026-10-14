@@ -82,6 +82,26 @@ class CustomUnitRegressionTest {
         return model
     }
     private fun sql(statement: String) = runBlocking { withContext(Dispatchers.IO) { db.openHelper.writableDatabase.execSQL(statement) } }
+    @Test fun creationReadsRouteInputsBeforeCompositionSnapshotIsApplied() {
+        // Hilt can create the editor during composition, before its state writes
+        // become visible to the Room transaction's background dispatcher.
+        val snapshot = androidx.compose.runtime.snapshots.Snapshot.takeMutableSnapshot()
+        lateinit var model: FinishAddCustomUnitViewModel
+        try {
+            compose.runOnIdle {
+                snapshot.enter {
+                    model = FinishAddCustomUnitViewModel(repo, substances, guard,
+                        SavedStateHandle(mapOf("substanceName" to "2C-B", "administrationRoute" to AdministrationRoute.INSUFFLATED)))
+                    models.put("composition-add", model)
+                }
+            }
+            compose.waitUntil(30000) { model.ready || model.saveError != null }
+            assertNull(model.saveError)
+            assertTrue(model.ready)
+            assertEquals(substances.getSubstance("2C-B")!!.getRoa(AdministrationRoute.INSUFFLATED)!!.roaDose, model.roaDose)
+            assertEquals("mg", model.originalUnit)
+        } finally { snapshot.dispose() }
+    }
     private fun useUnit() = runBlocking {
         db.experienceDao().insert(Experience(42, "fixture", "", sortDate = Instant.EPOCH, location = null))
         db.experienceDao().insert(Ingestion(1, stored.substanceName, Instant.EPOCH, administrationRoute = stored.administrationRoute,
