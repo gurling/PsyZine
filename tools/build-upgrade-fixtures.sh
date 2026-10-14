@@ -43,6 +43,31 @@ git archive 0f1249d0d52868c8ef42776828598675474e03ea | tar -x -C "$code2_dir"
     PSYZINE_DEVELOPMENT_KEYSTORE="$baseline_key" ./gradlew --no-daemon --console=plain :app:assembleDirectCompatibleRelease "$@"
 ) 2>&1 | tee artifacts/upgrade/baseline-code2-build.log
 cp "$code2_dir/app/build/outputs/apk/direct/compatibleRelease/app-direct-compatibleRelease.apk" artifacts/upgrade/baseline-code2.apk
+# Use the actual published minified schema-9 APK, pinned independently of a moving release.
+code3_dir="$fixture_dir/code3"
+mkdir -p "$code3_dir"
+read -r code3_tag code3_file < <(python3 -c 'import json; p=json.load(open("config/upgrade-baselines.json"))["code3"]; print(p["tag"], p["filename"])')
+gh release download "$code3_tag" --repo gurling/PsyZine --pattern "$code3_file" --pattern BUILD_RESULTS.json --pattern SHA256SUMS --dir "$code3_dir"
+python3 - "$code3_dir" <<'PY'
+from pathlib import Path
+import json, sys
+sys.path.insert(0, 'tools')
+from apk_inspection import inspect_apk, verify_checksums
+from release_policy import pins
+p = json.load(open('config/upgrade-baselines.json'))['code3']
+directory = Path(sys.argv[1])
+verify_checksums(directory, allow_missing=True)
+report = json.loads((directory / 'BUILD_RESULTS.json').read_text())
+actual = inspect_apk(directory / p['filename'])
+record = next(r for r in report['apks'] if r['filename'] == p['filename'])
+if report['commit'] != p['commit'] or any(actual[k] != record[k] for k in actual):
+    raise SystemExit('Published baseline source/report mismatch')
+if (actual['sha256'] != p['sha256'] or actual['applicationId'] != 'app.psyzine.debug' or
+        actual['versionCode'] != 3 or actual['versionName'] != '1.0.2-compat.3' or actual['debuggable'] or
+        actual['signerCertificateSha256'] != [pins()['app.psyzine.debug']]):
+    raise SystemExit('Published baseline identity mismatch')
+PY
+cp "$code3_dir/$code3_file" artifacts/upgrade/baseline-code3.apk
 ./gradlew --no-daemon --console=plain :app:assembleDirectCompatibleRelease "$@" 2>&1 | tee artifacts/upgrade/candidate-build.log
 cp app/build/outputs/apk/direct/compatibleRelease/app-direct-compatibleRelease.apk artifacts/upgrade/candidate.apk
 # Override only for an unpublished follow-up fixture; never publish it.
