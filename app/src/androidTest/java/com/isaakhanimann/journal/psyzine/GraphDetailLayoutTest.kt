@@ -10,7 +10,8 @@ import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.SemanticsActions
 import androidx.compose.ui.test.*
-import androidx.compose.ui.test.junit4.createComposeRule
+import androidx.activity.ComponentActivity
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.dp
@@ -27,13 +28,18 @@ import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 import org.junit.Rule
 import org.junit.Test
+import org.junit.Before
 import org.junit.Assert.*
 import java.io.File
 import java.time.Instant
 
 /** Synthetic composables only: no database, preferences or device settings are changed. */
 class GraphDetailLayoutTest {
-    @get:Rule val compose = createComposeRule()
+    @get:Rule val compose = createAndroidComposeRule<ComponentActivity>()
+
+    @Before fun hideTestHostToolbar() {
+        compose.runOnUiThread { compose.activity.actionBar?.hide() }
+    }
 
     @Test fun draggingTimelineKeepsCompleteEstimateCaptionVisible() {
         showTimeline(1)
