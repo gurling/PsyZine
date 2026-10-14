@@ -48,15 +48,15 @@ methods=(
     ingestionEditorFieldsKeepLongUnitsAndNotesReadable
     ratingDescriptionsRemainReadableAndSelectable
 )
-platform_classes=com.isaakhanimann.journal.psyzine.MainActivityLargeTextTest
+platform_classes=com.isaakhanimann.journal.psyzine.MainActivityLargeTextTest,com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest
 for method in "${methods[@]}"; do platform_classes+=",$test_class#$method"; done
-controlled_classes="$test_class,com.isaakhanimann.journal.psyzine.CustomUnitRegressionTest,com.isaakhanimann.journal.psyzine.UiAccessibilityRegressionTest"
+controlled_classes="com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,$test_class,com.isaakhanimann.journal.psyzine.CustomUnitRegressionTest,com.isaakhanimann.journal.psyzine.UiAccessibilityRegressionTest"
 run_profile() {
     local profile="$1" font="$2" density="$3" mode="$4"
-    local classes="$controlled_classes" expected=39
+    local classes="$controlled_classes" expected=43
     local args=() folders=(large-text-captures custom-unit-captures)
     if [[ "$mode" = platform ]]; then
-        classes="$platform_classes"; expected=14
+        classes="$platform_classes"; expected=18
         args=(-e platformFontScale true -e expectedFontScale "$font")
         folders=(large-text-captures main-large-text-captures)
     fi
@@ -94,7 +94,7 @@ import hashlib, json, subprocess, sys
 from pathlib import Path
 files = ['app/build/outputs/apk/direct/debug/app-direct-debug.apk',
          'app/build/outputs/apk/androidTest/direct/debug/app-direct-debug-androidTest.apk']
-record = {'serial': sys.argv[1], 'sdk': int(sys.argv[2]), 'passingTests': 81,
+record = {'serial': sys.argv[1], 'sdk': int(sys.argv[2]), 'passingTests': 97,
           'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
           'apks': {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in files}}
 Path('screenshots/large-text/verification.json').write_text(json.dumps(record, indent=2) + '\n')

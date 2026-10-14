@@ -20,7 +20,8 @@ package com.isaakhanimann.journal.ui.tabs.search.substance.roa
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,40 +56,9 @@ fun ToleranceSection(
     if (tolerance != null || crossTolerances.isNotEmpty()) {
         Column(modifier) {
             if (tolerance != null) {
-                val labelWidth = 40.dp
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    if (tolerance.full != null) {
-                        Text(
-                            text = "full:",
-                            modifier = Modifier.width(labelWidth)
-                        )
-                        Text(text = tolerance.full)
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    if (tolerance.half != null) {
-                        Text(
-                            text = "half:",
-                            modifier = Modifier.width(labelWidth)
-                        )
-                        Text(text = tolerance.half)
-                    }
-                }
-                Row(
-                    verticalAlignment = Alignment.Top
-                ) {
-                    if (tolerance.zero != null) {
-                        Text(
-                            text = "zero:",
-                            modifier = Modifier.width(labelWidth)
-                        )
-                        Text(text = tolerance.zero)
-                    }
-                }
+                tolerance.full?.let { ToleranceLine("full:", it) }
+                tolerance.half?.let { ToleranceLine("half:", it) }
+                tolerance.zero?.let { ToleranceLine("zero:", it) }
                 Text(text = "* zero is the time until tolerance is like the first time.", style = MaterialTheme.typography.bodySmall)
             }
             if (crossTolerances.isNotEmpty()) {
@@ -100,4 +70,16 @@ fun ToleranceSection(
 
     }
 
+}
+
+@Composable
+private fun ToleranceLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Text(label, softWrap = false)
+        Text(value, modifier = Modifier.weight(1f))
+    }
 }

@@ -24,6 +24,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.isaakhanimann.journal.ui.theme.LocalPsyZinePalette
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -99,7 +101,7 @@ fun SubstanceCompanionPreview(@PreviewParameter(SubstanceCompanionScreenPreviewP
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun SubstanceCompanionScreen(
     substanceCompanion: SubstanceCompanion,
@@ -140,9 +142,9 @@ fun SubstanceCompanionScreen(
                 TimeArrowUp(timeText = burst.timeUntil)
                 ElevatedCard(modifier = Modifier.padding(vertical = 5.dp)) {
                     Column(modifier = Modifier.padding(horizontal = horizontalPadding)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
+                        FlowRow(
                             horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 5.dp)
