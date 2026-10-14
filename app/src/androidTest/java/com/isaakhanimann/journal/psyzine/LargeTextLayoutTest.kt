@@ -251,6 +251,13 @@ class LargeTextLayoutTest {
                 isShowingUnitsField = true, units = longUnit, onChangeOfUnits = {}, navigateToCreateCustomUnit = {})
         } }
         compose.onNodeWithContentDescription("Expand").performScrollTo().performClick()
+        compose.onNode(hasText("Pure dose") and hasSetTextAction()).performScrollTo().performClick()
+        // This screen requests focus on entry. Wait for its asynchronous IME
+        // opening before measuring or scrolling the final visible viewport.
+        val decor = compose.activity.window.decorView
+        compose.waitUntil(60000) {
+            androidx.core.view.ViewCompat.getRootWindowInsets(decor)?.isVisible(androidx.core.view.WindowInsetsCompat.Type.ime()) == true
+        }
         checkDoseFields("ordinary-dose-fields", "Synthetic substance Oral dose")
     }
 
@@ -287,12 +294,16 @@ class LargeTextLayoutTest {
 
     private val longUnit = "very long synthetic measurement units"
     private fun checkDoseFields(captureName: String, title: String) {
-        compose.onNode(hasText("Uncertainty") and hasSetTextAction()).performScrollTo().assertIsDisplayed()
+        val field = compose.onNode(hasText("Uncertainty") and hasSetTextAction())
+        field.performScrollTo().assertIsDisplayed()
+        val description = compose.onNodeWithText("Standard deviation in $longUnit.", useUnmergedTree = true)
+        // Include the supporting text in the scroll target; scrolling just to the
+        // editable field does not promise to reveal content below its bounds.
+        description.performScrollTo().assertIsDisplayed()
+        field.assertIsDisplayed()
         capture(captureName)
         assertNoTextOverflow(ellipsizedTitles = setOf(title), scrollableValues = setOf(longUnit))
-        // The merged field also includes the converted-dose preview, which can
-        // extend below the viewport. Check the visible description itself.
-        compose.onNodeWithText("Standard deviation in $longUnit.", useUnmergedTree = true).assertIsDisplayed()
+        description.assertIsDisplayed()
     }
 
     private fun scrollToBottom() {
