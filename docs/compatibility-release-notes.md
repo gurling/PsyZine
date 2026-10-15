@@ -8,6 +8,7 @@ Testing compatibility pre-release signed with the retained PsyZine identity.
 - Improve large-text layouts for settings, journal rows, dose fields, rating descriptions and navigation; keep Done/Next clear of the keyboard.
 - Keep the complete “Per-ingestion timeline estimate” caption visible while dragging the graph, including near its edges.
 - Correct tolerance-label and experience-title/date wrapping in substance statistics details.
+- Preserve navigation state and Back handling when opening photos or changing the navigation layout.
 
 The Direct Compatible Release APK retains `app.psyzine.debug`, the existing certificate, minification and `debuggable=false`. Schema 9 is unchanged from the previous compatibility release. Obtainium's README channel filter selects this APK.
 

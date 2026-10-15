@@ -48,15 +48,15 @@ methods=(
     ingestionEditorFieldsKeepLongUnitsAndNotesReadable
     ratingDescriptionsRemainReadableAndSelectable
 )
-platform_classes=com.isaakhanimann.journal.psyzine.MainActivityLargeTextTest,com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest
+platform_classes=com.isaakhanimann.journal.psyzine.MainActivityLargeTextTest,com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,com.isaakhanimann.journal.psyzine.NavigationScaffoldRegressionTest
 for method in "${methods[@]}"; do platform_classes+=",$test_class#$method"; done
-controlled_classes="com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,$test_class,com.isaakhanimann.journal.psyzine.CustomUnitRegressionTest,com.isaakhanimann.journal.psyzine.UiAccessibilityRegressionTest"
+controlled_classes="com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,$test_class,com.isaakhanimann.journal.psyzine.CustomUnitRegressionTest,com.isaakhanimann.journal.psyzine.UiAccessibilityRegressionTest,com.isaakhanimann.journal.psyzine.NavigationScaffoldRegressionTest"
 run_profile() {
     local profile="$1" font="$2" density="$3" mode="$4"
-    local classes="$controlled_classes" expected=43
+    local classes="$controlled_classes" expected=44
     local args=() folders=(large-text-captures custom-unit-captures)
     if [[ "$mode" = platform ]]; then
-        classes="$platform_classes"; expected=18
+        classes="$platform_classes"; expected=19
         args=(-e platformFontScale true -e expectedFontScale "$font")
         folders=(large-text-captures main-large-text-captures)
     fi

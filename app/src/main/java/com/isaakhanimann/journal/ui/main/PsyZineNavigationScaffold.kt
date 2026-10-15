@@ -26,6 +26,11 @@ fun PsyZineNavigationScaffold(
     items: List<PsyZineNavigationItem>,
     content: @Composable () -> Unit
 ) {
+    // Keep the NavHost and its back callbacks alive when a photo hides the bar or
+    // font/window changes select a different scaffold. Ordinary content lambdas
+    // at separate call sites dispose and recreate that navigation composition.
+    val currentContent by rememberUpdatedState(content)
+    val movableContent = remember { movableContentOf { currentContent() } }
     BoxWithConstraints {
         val density = LocalDensity.current
         val style = MaterialTheme.typography.labelMedium
@@ -56,14 +61,14 @@ fun PsyZineNavigationScaffold(
                         )
                     }
                 }
-            }) { padding -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { content() } }
+            }) { padding -> Box(Modifier.padding(padding).consumeWindowInsets(padding)) { movableContent() } }
         } else {
             NavigationSuiteScaffold(layoutType = layoutType, navigationSuiteItems = {
                 items.forEach { item ->
                     item(selected = item.selected, onClick = item.onClick,
                         icon = { Icon(item.icon, contentDescription = item.name) }, label = { Text(item.name) })
                 }
-            }, content = content)
+            }, content = movableContent)
         }
     }
 }
