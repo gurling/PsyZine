@@ -28,6 +28,7 @@ class NavigationScaffoldRegressionTest {
         var layout by mutableStateOf(NavigationSuiteType.NavigationBar)
         var creations = 0
         var disposals = 0
+        var selectedTab = ""
         lateinit var navigate: (String) -> Unit
         compose.setContent {
             PsyZineTheme {
@@ -35,7 +36,7 @@ class NavigationScaffoldRegressionTest {
                 navigate = { controller.navigate(it) }
                 Box(Modifier.width(240.dp)) {
                     PsyZineNavigationScaffold(layout, listOf("Journal", "Stats", "Drugs", "Safer", "Settings").map {
-                        PsyZineNavigationItem(it, Icons.Default.Star, false, {})
+                        PsyZineNavigationItem(it, Icons.Default.Star, false, { selectedTab = it })
                     }) {
                         remember { creations++ }
                         DisposableEffect(Unit) { onDispose { disposals++ } }
@@ -62,7 +63,9 @@ class NavigationScaffoldRegressionTest {
             compose.runOnIdle { layout = type }
             compose.onNodeWithText("Journal destination").assertIsDisplayed()
         }
+        compose.onNode(isSelectable() and hasText("Settings")).performScrollTo().performClick()
         compose.runOnIdle {
+            assertEquals("Settings tab is unreachable", "Settings", selectedTab)
             assertEquals("Navigation content was recreated", 1, creations)
             assertEquals("Navigation content was disposed", 0, disposals)
         }

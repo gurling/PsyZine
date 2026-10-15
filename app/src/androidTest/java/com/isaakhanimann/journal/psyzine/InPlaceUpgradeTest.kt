@@ -228,9 +228,21 @@ class InPlaceUpgradeTest {
         device.findObject(By.desc("Close photo viewer")).click()
         check(device.wait(Until.hasObject(By.desc("Edit options")), 10000)) { "Photo viewer did not return to the entry" }
         device.pressBack()
-        val settings = device.wait(Until.findObject(By.text("Settings")), 10000)
-            ?: error("Journal navigation did not return after closing the entry")
-        settings.click()
+        check(device.wait(Until.gone(By.desc("Edit options")), 10000) &&
+            device.wait(Until.hasObject(By.text("Journal")), 10000)) { "Journal navigation did not return after closing the entry" }
+        // At narrow widths the full-size tab labels intentionally scroll. The
+        // Settings tab can be offscreen even after navigation correctly returns.
+        repeat(6) {
+            if (device.findObject(By.text("Settings"))?.visibleBounds?.isEmpty != false) {
+                val navigation = device.findObjects(By.pkg(context.packageName).scrollable(true))
+                    .filter { it.visibleBounds.centerY() > device.displayHeight / 2 }
+                    .minByOrNull { it.visibleBounds.height() }
+                    ?: error("Settings is hidden and the navigation scroll container is missing")
+                navigation.scroll(Direction.RIGHT, 0.8f, 500)
+                device.waitForIdle()
+            }
+        }
+        clickWhenReady(By.text("Settings"))
         check(device.wait(Until.hasObject(By.text("Appearance")), 10000)) { "Settings screen did not open" }
         repeat(12) {
             if (!device.hasObject(By.text("Back up journal and photos"))) {
