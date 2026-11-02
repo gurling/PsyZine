@@ -5,6 +5,7 @@
 - Build search results from one coherent journal snapshot, with cancellable filtering off the main thread and deterministic ordering.
 - Search substances, definitions, experiences, ingestions and favorites. Preserve the search context when opening or editing a result.
 - Invalidate open journal screens after a restore so stale IDs cannot select replacement records.
+- Keep photo viewers and expanded timelines in their calling search context. Read their content and generation atomically, and recheck saved sessions after resume.
 - Store reusable definitions with nested components, explicit quantities, tags and primary memberships. Reject invalid graphs and retain readable records when metadata is missing.
 - Keep legacy name ambiguity visible without silently changing stored subject identities.
 - Exchange versioned definition libraries and journal backups, including tolerance-period preferences.

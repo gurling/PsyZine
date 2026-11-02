@@ -107,7 +107,10 @@ fun MainScreen(
             )
         }
         PsyZineNavigationScaffold(
-            layoutType = if (navBackStackEntry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
+            layoutType = if (navBackStackEntry?.destination?.let {
+                it.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() ||
+                    it.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.SearchPhotoViewerRoute>()
+            } == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
             items = items
         ) {
             NavHost(

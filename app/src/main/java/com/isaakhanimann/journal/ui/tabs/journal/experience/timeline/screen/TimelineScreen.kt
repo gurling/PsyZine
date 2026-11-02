@@ -56,8 +56,21 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 
 @Composable
 fun TimelineScreen(
-    viewModel: TimelineScreenViewModel = hiltViewModel()
+    viewModel: TimelineScreenViewModel = hiltViewModel(),
+    navigateBack: () -> Unit = {},
 ) {
+    val record by viewModel.recordState.collectAsStateWithLifecycle()
+    if (record.loading) {
+        Column(Modifier.padding(24.dp)) {
+            LinearProgressIndicator()
+            Text("Loading timeline")
+        }
+        return
+    }
+    if (record.error != null) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack, record.error!!)
+        return
+    }
     TimelineScreen(
         title = viewModel.consumerName,
         timelineDisplayOption = viewModel.timelineDisplayOptionFlow.collectAsStateWithLifecycle().value,

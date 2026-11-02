@@ -60,9 +60,9 @@ class JournalEditorSession(private val scope: CoroutineScope, private val guard:
 }
 
 @Composable
-fun JournalRecordUnavailable(back: () -> Unit) {
+fun JournalRecordUnavailable(back: () -> Unit, message: String = "This record is unavailable. Go back and choose it again.") {
     androidx.compose.foundation.layout.Column(androidx.compose.ui.Modifier.padding(24.dp)) {
-        androidx.compose.material3.Text("This record is unavailable. Go back and choose it again.")
+        androidx.compose.material3.Text(message)
         androidx.compose.material3.TextButton(onClick = back) { androidx.compose.material3.Text("Back") }
     }
 }

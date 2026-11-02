@@ -21,6 +21,7 @@ class JournalSearchNavigationUiTest {
     @get:Rule val compose = createAndroidComposeRule<MainActivity>()
     private var db: AppDatabase? = null
     private var createdId: Int? = null
+    private var createdPhoto: java.io.File? = null
     private fun tab(name: String): SemanticsNodeInteraction {
         val matcher = isSelectable() and hasText(name)
         val node = compose.onNode(matcher)
@@ -53,6 +54,7 @@ class JournalSearchNavigationUiTest {
             createdId?.let { database.experienceDao().deleteEverythingOfExperience(it) }
             database.close()
         }
+        createdPhoto?.delete()
     }
     @Test fun recordDetailsAndEditsReturnToSearchWithSavedScopeAndQuery() {
         ready()
@@ -97,5 +99,56 @@ class JournalSearchNavigationUiTest {
         val saved = runBlocking { database.experienceDao().getIngestion(ingestionId)!! }
         assertEquals("$title edited note", saved.notes)
         assertEquals(0.0001.toRawBits(), saved.dose!!.toRawBits())
+    }
+
+    @Test fun photosAndExpandedTimelinesKeepTheSearchOriginAndReturnToItsQuery() {
+        ready()
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val key = UUID.randomUUID().toString().take(8)
+        val title = "Local viewer $key"
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, "experiences_db").build().also { db = it }
+        val storage = com.isaakhanimann.journal.data.attachments.AttachmentStorage(context)
+        val photoId = UUID.randomUUID().toString()
+        val path = storage.relative(photoId, "image/png")
+        val image = storage.file(path).also { createdPhoto = it }
+        val bitmap = android.graphics.Bitmap.createBitmap(2, 2, android.graphics.Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(android.graphics.Color.BLUE)
+        image.outputStream().use { bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it) }
+        bitmap.recycle()
+        runBlocking {
+            val id = database.experienceDao().insert(Experience(0, title, "", Instant.EPOCH, Instant.EPOCH, false, null)).toInt()
+            createdId = id
+            database.experienceDao().insert(Ingestion(0, "Caffeine", Instant.EPOCH,
+                administrationRoute = AdministrationRoute.ORAL, dose = 100.0, isDoseAnEstimate = false,
+                estimatedDoseStandardDeviation = null, units = "mg", experienceId = id, notes = null,
+                stomachFullness = null, consumerName = null, customUnitId = null))
+            database.photoAttachmentDao().insert(listOf(com.isaakhanimann.journal.data.room.attachments.PhotoAttachment(
+                photoId, id, path, "image/png", 2, 2, image.length(), Instant.EPOCH, 0, storage.hash(image))))
+        }
+        tab("Drugs").performClick()
+        scope("Experiences")
+        compose.onNode(hasSetTextAction()).performTextInput(key)
+        androidx.test.espresso.Espresso.closeSoftKeyboard()
+        compose.waitUntil(15000) { compose.onAllNodes(hasText(title) and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithText(title).performClick()
+        compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Open photo 1 of 1")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNodeWithContentDescription("Open photo 1 of 1").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Photo 1 of 1. Pinch to zoom.")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onAllNodes(isSelectable() and hasText("Journal")).assertCountEquals(0)
+        compose.onAllNodes(isSelectable() and hasText("Drugs")).assertCountEquals(0)
+        compose.onNodeWithContentDescription("Close photo viewer").performClick()
+        compose.waitUntil(15000) { compose.onAllNodes(isSelectable() and hasText("Drugs")).fetchSemanticsNodes().isNotEmpty() }
+        tab("Drugs").assertIsSelected()
+        compose.onNodeWithContentDescription("Expand timeline").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodes(hasText("Loading timeline")).fetchSemanticsNodes().isEmpty() }
+        compose.onNodeWithText(com.isaakhanimann.journal.ui.YOU).assertIsDisplayed()
+        tab("Drugs").assertIsSelected()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Edit options")).fetchSemanticsNodes().isNotEmpty() }
+        tab("Drugs").assertIsSelected()
+        androidx.test.espresso.Espresso.pressBack()
+        compose.waitUntil(15000) { compose.onAllNodes(hasTestTag("journal-search-scopes")).fetchSemanticsNodes().isNotEmpty() }
+        compose.onNode(hasSetTextAction()).assertTextContains(key)
+        tab("Drugs").assertIsSelected()
     }
 }

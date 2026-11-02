@@ -21,9 +21,17 @@ import kotlinx.serialization.Serializable
 @Serializable data class SearchEditRatingRoute(val ratingId: Int, val journalGeneration: String)
 @Serializable data class SearchAddTimedNoteRoute(val experienceId: Int, val journalGeneration: String)
 @Serializable data class SearchEditTimedNoteRoute(val timedNoteId: Int, val experienceId: Int, val journalGeneration: String)
+@Serializable data class SearchPhotoViewerRoute(val experienceId: Int, val index: Int, val journalGeneration: String)
+@Serializable data class SearchTimelineRoute(val consumerName: String, val experienceId: Int, val journalGeneration: String)
 
 /** Reuse feature screens while retaining the search result's calling stack and generation. */
 fun NavGraphBuilder.journalSearchGraph(navController: NavHostController) {
+    composableWithTransitions<SearchPhotoViewerRoute> {
+        com.isaakhanimann.journal.ui.tabs.journal.experience.photos.PhotoViewerScreen(navigateBack = { navController.popBackStack() })
+    }
+    composableWithTransitions<SearchTimelineRoute> {
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.screen.TimelineScreen(navigateBack = { navController.popBackStack() })
+    }
     composableWithTransitions<SearchEditExperienceRoute> { EditExperienceScreen(navigateBack = { navController.popBackStack() }) }
     composableWithTransitions<SearchAddRatingRoute> { AddRatingScreen(navigateBack = { navController.popBackStack() }) }
     composableWithTransitions<SearchEditRatingRoute> { EditRatingScreen(navigateBack = { navController.popBackStack() }) }
@@ -37,7 +45,7 @@ fun NavGraphBuilder.journalSearchGraph(navController: NavHostController) {
         val route = entry.toRoute<SearchExperienceRoute>()
         val id = route.experienceId
         ExperienceScreen(
-            navigateToPhoto = { navController.navigate(PhotoViewerRoute(id, it)) },
+            navigateToPhoto = { navController.navigate(SearchPhotoViewerRoute(id, it, route.journalGeneration)) },
             navigateToAddIngestionSearch = { navController.navigate(AddIngestionRoute) },
             navigateToExplainTimeline = { navController.navigate(ExplainTimelineOnSearchTabRoute) },
             navigateToEditExperienceScreen = { navController.navigate(SearchEditExperienceRoute(id, route.journalGeneration)) },
@@ -46,7 +54,7 @@ fun NavGraphBuilder.journalSearchGraph(navController: NavHostController) {
             navigateToAddRatingScreen = { navController.navigate(SearchAddRatingRoute(id, route.journalGeneration)) },
             navigateToAddTimedNoteScreen = { navController.navigate(SearchAddTimedNoteRoute(id, route.journalGeneration)) },
             navigateToEditRatingScreen = { navController.navigate(SearchEditRatingRoute(it, route.journalGeneration)) },
-            navigateToTimelineScreen = { navController.navigate(TimelineScreenRoute(it, id)) },
+            navigateToTimelineScreen = { navController.navigate(SearchTimelineRoute(it, id, route.journalGeneration)) },
             navigateToEditTimedNoteScreen = { navController.navigate(SearchEditTimedNoteRoute(it, id, route.journalGeneration)) },
         )
     }

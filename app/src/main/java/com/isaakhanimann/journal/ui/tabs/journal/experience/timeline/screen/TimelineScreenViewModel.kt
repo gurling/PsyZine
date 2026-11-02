@@ -21,16 +21,13 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.screen
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
-import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDuration
 import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
 import com.isaakhanimann.journal.ui.YOU
-import com.isaakhanimann.journal.ui.main.navigation.graphs.TimelineScreenRoute
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.hourLimitToSeparateIngestions
-import com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
 import com.isaakhanimann.journal.ui.tabs.journal.experience.TimelineDisplayOption
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.SavedTimeDisplayOption
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.TimeDisplayOption
@@ -55,7 +52,7 @@ import javax.inject.Inject
 
 @HiltViewModel
 class TimelineScreenViewModel @Inject constructor(
-    experienceRepo: ExperienceRepository,
+    records: com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository,
     private val substanceRepo: SubstanceRepository,
     userPreferences: UserPreferences,
     state: SavedStateHandle
@@ -68,14 +65,15 @@ class TimelineScreenViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(0)
         )
 
-    private val timelineRoute = state.toRoute<TimelineScreenRoute>()
-    private val experienceID = timelineRoute.experienceId
-    val consumerName = timelineRoute.consumerName
+    private val experienceID = state.journalRecordId("experienceId")
+    val consumerName = checkNotNull(state.get<String>("consumerName")) { "A timeline consumer is required." }
+    val recordState = com.isaakhanimann.journal.ui.utils.journalReadSession(viewModelScope, state) { generation ->
+        records.observeTimeline(experienceID, generation)
+    }
 
     private val ingestionsWithCompanionsFlow =
-        experienceRepo.getIngestionsWithCompanionsFlow(experienceID)
-            .map { ingestions ->
-                ingestions.filter {
+        recordState.map { record ->
+                record.value?.ingestions.orEmpty().filter {
                     if (consumerName == YOU) {
                         it.ingestion.consumerName == null
                     } else {
@@ -84,9 +82,9 @@ class TimelineScreenViewModel @Inject constructor(
                 }
             }
 
-    private val ratingsFlow = experienceRepo.getRatingsFlow(experienceID)
+    private val ratingsFlow = recordState.map { it.value?.ratings.orEmpty() }
 
-    private val timedNotesFlow = experienceRepo.getTimedNotesFlowSorted(experienceID)
+    private val timedNotesFlow = recordState.map { it.value?.timedNotes.orEmpty() }
 
     private val currentTimeFlow: Flow<Instant> = flow {
         while (true) {
