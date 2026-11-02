@@ -26,6 +26,7 @@ import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
 import androidx.room.RawQuery
+import com.isaakhanimann.journal.data.definitions.*
 import androidx.sqlite.db.SupportSQLiteQuery
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
@@ -89,8 +90,11 @@ interface ExperienceDao {
     @Query("SELECT * FROM experience WHERE sortDate >= :fromInstant AND sortDate < :toInstant ORDER BY sortDate DESC")
     suspend fun getSortedExperiencesWithIngestionsWithSortDateBetween(fromInstant: Instant, toInstant: Instant): List<ExperienceWithIngestions>
 
-    @Query("SELECT substanceName FROM ingestion ORDER BY time DESC LIMIT :limit")
+    @Query("SELECT substanceName FROM ingestion WHERE substanceName IS NOT NULL ORDER BY time DESC LIMIT :limit")
     fun getSortedLastUsedSubstanceNamesFlow(limit: Int): Flow<List<String>>
+
+    @Query("SELECT consumerName FROM Ingestion WHERE consumerName IS NOT NULL GROUP BY consumerName ORDER BY MAX(time) DESC, consumerName")
+    fun observeConsumerNames(): Flow<List<String>>
 
     @Transaction
     @Query("SELECT * FROM experience ORDER BY sortDate DESC")
@@ -139,7 +143,7 @@ interface ExperienceDao {
     suspend fun getCustomSubstance(id: Int): CustomSubstance?
 
     @Query("SELECT * FROM customsubstance WHERE name = :name")
-    suspend fun getCustomSubstance(name: String): CustomSubstance?
+    suspend fun getCustomSubstance(name: String?): CustomSubstance?
 
     @Query("SELECT * FROM ingestion WHERE substanceName = :substanceName ORDER BY time DESC")
     fun getSortedIngestionsFlow(substanceName: String): Flow<List<Ingestion>>
@@ -236,6 +240,37 @@ interface ExperienceDao {
     @Insert
     suspend fun insert(experience: Experience): Long
 
+    @Query("SELECT * FROM DoseComponent WHERE parentCustomUnitId = :id ORDER BY id")
+    suspend fun unitComponents(id: Int): List<DoseComponent>
+    @Query("DELETE FROM DoseComponent WHERE parentCustomUnitId = :id") suspend fun removeUnitComponents(id: Int)
+    @Query("DELETE FROM CustomRoaInfo WHERE customUnitId = :id") suspend fun removeUnitRoas(id: Int)
+    @Query("DELETE FROM SubstanceTagMembership WHERE subjectId = :subject") suspend fun removeSubjectTags(subject: String)
+    @Query("SELECT COUNT(*) FROM DoseComponent WHERE childCustomUnitId = :id") suspend fun definitionParents(id: Int): Int
+
+    @Transaction
+    suspend fun insertLegacyUnit(unit: CustomUnit): Int {
+        val id = insert(unit).toInt()
+        syncLegacyComponent(unit.copy(id = id))
+        return id
+    }
+    @Transaction
+    suspend fun updateLegacyUnit(unit: CustomUnit): Int {
+        val count = update(unit)
+        if (count == 1) syncLegacyComponent(unit)
+        return count
+    }
+    @Transaction
+    suspend fun syncLegacyComponent(unit: CustomUnit) {
+        if (unit.substanceName == null) return
+        val previous = unitComponents(unit.id)
+        check(previous.size <= 1) { "Edit this blend in the definition editor." }
+        val component = previous.firstOrNull()?.copy(substanceName = unit.substanceName, substanceUnit = unit.originalUnit,
+            dose = unit.dose, isEstimate = unit.isEstimate, estimatedDoseStandardDeviation = unit.estimatedDoseStandardDeviation)
+            ?: unit.legacyComponent() ?: return
+        removeUnitComponents(unit.id)
+        insertComponents(listOf(component))
+    }
+
     @Update
     suspend fun update(experience: Experience): Int
 
@@ -277,6 +312,10 @@ interface ExperienceDao {
 
     @Transaction
     suspend fun deleteEverything() {
+        clearMemberships()
+        clearTags()
+        clearComponents()
+        clearRoaInfos()
         deleteAllIngestions()
         deleteAllTimedNotes()
         deleteAllExperiences()
@@ -360,11 +399,11 @@ interface ExperienceDao {
     suspend fun insertIngestionExperienceAndCompanion(
         ingestion: Ingestion,
         experience: Experience,
-        substanceCompanion: SubstanceCompanion
+        substanceCompanion: SubstanceCompanion?
     ) {
         val id = insert(experience.copy(id = 0)).toInt()
         insert(ingestion.copy(experienceId = id))
-        insert(substanceCompanion)
+        substanceCompanion?.let { insert(it) }
     }
 
     @Query("DELETE FROM timednote WHERE experienceId = :experienceId")
@@ -421,7 +460,8 @@ interface ExperienceDao {
                     notes = ingestionSerializable.notes,
                     stomachFullness = ingestionSerializable.stomachFullness,
                     consumerName = ingestionSerializable.consumerName,
-                    customUnitId = ingestionSerializable.customUnitId
+                    customUnitId = ingestionSerializable.customUnitId,
+                    isHiddenInTimeline = ingestionSerializable.isHiddenInTimeline,
                 )
                 insert(newIngestion)
             }
@@ -441,7 +481,8 @@ interface ExperienceDao {
                     time = ratingSerializable.time,
                     creationDate = ratingSerializable.creationDate,
                     option = ratingSerializable.option,
-                    experienceId = experienceID
+                    experienceId = experienceID,
+                    isHiddenInTimeline = ratingSerializable.isHiddenInTimeline,
                 )
                 insert(newRating)
             }
@@ -449,33 +490,32 @@ interface ExperienceDao {
         journalExport.substanceCompanions.forEach { insert(it) }
         journalExport.customSubstances.forEach { insert(it) }
         journalExport.customUnits.forEach {
-            insert(
-                CustomUnit(
-                    id = it.id,
-                    substanceName = it.substanceName,
-                    name = it.name,
-                    creationDate = it.creationDate,
-                    administrationRoute = it.administrationRoute,
-                    dose = it.dose,
-                    estimatedDoseStandardDeviation = it.estimatedDoseStandardDeviation,
-                    isEstimate = it.isEstimate,
-                    isArchived = it.isArchived,
-                    unit = it.unit,
-                    unitPlural = it.unitPlural,
-                    originalUnit = it.originalUnit,
-                    note = it.note
-                )
-            )
+            insert(it.toEntity())
         }
+        journalExport.customUnits.forEach { unit ->
+            insertComponents(unit.doseComponents.ifEmpty { listOfNotNull(unit.toEntity().legacyComponent()) })
+            insertRoaInfos(unit.roaInfos)
+        }
+        journalExport.tags.forEach { insertTag(it) }
+        insertMemberships(journalExport.tagMemberships)
     }
+
+    @Insert suspend fun insertComponents(values: List<DoseComponent>)
+    @Insert suspend fun insertRoaInfos(values: List<CustomRoaInfo>)
+    @Insert suspend fun insertTag(value: SubstanceTag)
+    @Insert suspend fun insertMemberships(values: List<SubstanceTagMembership>)
+    @Query("DELETE FROM DoseComponent") suspend fun clearComponents()
+    @Query("DELETE FROM CustomRoaInfo") suspend fun clearRoaInfos()
+    @Query("DELETE FROM SubstanceTagMembership") suspend fun clearMemberships()
+    @Query("DELETE FROM SubstanceTag") suspend fun clearTags()
 
     @Transaction
     suspend fun insertIngestionAndCompanion(
         ingestion: Ingestion,
-        substanceCompanion: SubstanceCompanion
+        substanceCompanion: SubstanceCompanion?
     ) {
         insert(ingestion)
-        insert(substanceCompanion)
+        substanceCompanion?.let { insert(it) }
     }
 
     @Transaction
@@ -530,6 +570,11 @@ interface ExperienceDao {
 
     @Query("SELECT * FROM customunit ORDER BY creationDate DESC")
     fun getAllCustomUnitsFlow(): Flow<List<CustomUnit>>
+
+    @Transaction @Query("SELECT * FROM CustomUnit ORDER BY id")
+    suspend fun definitionContents(): List<DefinitionWithContent>
+    @Transaction @Query("SELECT * FROM CustomUnit ORDER BY id")
+    fun observeDefinitionContents(): Flow<List<DefinitionWithContent>>
 
     @Query("SELECT * FROM timednote WHERE experienceId =:experienceId")
     suspend fun getTimedNotes(experienceId: Int): List<TimedNote>

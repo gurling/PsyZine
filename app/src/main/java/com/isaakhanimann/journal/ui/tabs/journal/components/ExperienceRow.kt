@@ -85,7 +85,7 @@ fun ExperienceRow(
             modifier = Modifier.fillMaxWidth()
         ) {
             val substanceNames = remember(ingestions) {
-                ingestions.map { it.ingestion.substanceName }.distinct()
+                ingestions.map { it.displayName }.distinct()
                     .joinToString(separator = ", ")
             }
             if (substanceNames.isNotEmpty()) {

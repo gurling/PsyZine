@@ -38,8 +38,8 @@ class CustomUnitsViewModel @Inject constructor(experienceRepository: ExperienceR
     val unitsState = retries.flatMapLatest { experienceRepository.getCustomUnitsFlow(false).unitListState() }
         .combine(searchTextFlow) { result, search ->
             val query = search.trim()
-            result.copy(units = result.units.filter { custom -> query.isBlank() ||
+            result.copy(units = result.units.filter { custom -> custom.substanceName != null && (query.isBlank() ||
                 listOf(custom.name, custom.substanceName, custom.unit, custom.unitPlural ?: "", custom.note)
-                    .any { it.contains(query, ignoreCase = true) } })
+                    .any { it?.contains(query, ignoreCase = true) == true }) })
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CustomUnitListState())
 }

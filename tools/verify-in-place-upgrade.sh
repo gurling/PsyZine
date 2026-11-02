@@ -83,15 +83,16 @@ if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
     python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${baseline_code}.json"
 fi
 code="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[0])')"
+candidate_schema=10
 for apk in "$candidate" "$next"; do
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
     # No uninstall, data clearing, downgrade flag or signature workaround.
     "${adb_cmd[@]}" install -r "$apk"
-    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-verify.log"
-    run_test upgradedJournalPhotosAndBackupWork "$code" 9 "artifacts/upgrade/code${code}-smoke.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" "$candidate_schema" "artifacts/upgrade/code${code}-verify.log"
+    run_test upgradedJournalPhotosAndBackupWork "$code" "$candidate_schema" "artifacts/upgrade/code${code}-smoke.log"
     # Include the post-UI state in the retention check too.
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
-    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-post-ui.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" "$candidate_schema" "artifacts/upgrade/code${code}-post-ui.log"
     if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
         python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${code}.json"
     fi

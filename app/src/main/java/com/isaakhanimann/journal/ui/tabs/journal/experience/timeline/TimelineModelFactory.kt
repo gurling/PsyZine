@@ -23,7 +23,7 @@ object TimelineModelFactory {
                 }
                 val ingestion = oneElement.ingestionWithCompanionAndCustomUnit.ingestion
                 DataForOneEffectLine(
-                    substanceName = ingestion.substanceName,
+                    substanceName = oneElement.ingestionWithCompanionAndCustomUnit.displayName,
                     route = ingestion.administrationRoute,
                     roaDuration = oneElement.roaDuration,
                     height = getStrengthRelativeToCommonDose(

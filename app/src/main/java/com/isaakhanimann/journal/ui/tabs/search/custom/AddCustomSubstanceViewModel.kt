@@ -46,7 +46,8 @@ class AddCustomSubstanceViewModel @Inject constructor(
 
     fun addCustomSubstance(onDone: (customSubstanceName: String) -> Unit) {
         if (!isValid) return
-        session.run {
+        val savedName = name
+        session.run(onSuccess = { onDone(savedName) }) {
             guard.withSession(session.generation) {
             val customSubstance = CustomSubstance(
                 name = name,
@@ -54,7 +55,6 @@ class AddCustomSubstanceViewModel @Inject constructor(
                 description = description
             )
             experienceRepo.insert(customSubstance)
-            onDone(name)
             }
         }
     }

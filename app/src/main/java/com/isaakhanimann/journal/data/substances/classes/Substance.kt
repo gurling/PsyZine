@@ -41,7 +41,7 @@ data class Substance(
     val interactions: Interactions?,
     val roas: List<Roa>,
 ) {
-    fun getRoa(route: AdministrationRoute): Roa? {
+    fun getRoa(route: AdministrationRoute?): Roa? {
         return roas.firstOrNull { it.route == route }
     }
 

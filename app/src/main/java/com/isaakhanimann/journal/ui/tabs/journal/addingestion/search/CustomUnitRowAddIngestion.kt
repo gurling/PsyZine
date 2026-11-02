@@ -46,7 +46,7 @@ fun CustomUnitRowAddIngestion(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "${customUnit.substanceName} ${customUnit.administrationRoute.displayText.lowercase()}, ${customUnit.name}",
+            text = "${customUnit.substanceName.orEmpty()} ${customUnit.administrationRoute?.displayText?.lowercase().orEmpty()}, ${customUnit.name}",
             style = MaterialTheme.typography.titleMedium
         )
         Text(

@@ -72,10 +72,10 @@ fun IngestionRow(
         stripe = { VerticalLine(color = ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
     ) {
         time()
-        val title = if (customUnit != null) {
+        val title = if (customUnit != null && ingestion.substanceName != null) {
             "${ingestion.substanceName}, ${customUnit.name}"
         } else {
-            ingestion.substanceName
+            ingestionWithCompanionAndCustomUnit.displayName
         }
         Text(
             text = title,

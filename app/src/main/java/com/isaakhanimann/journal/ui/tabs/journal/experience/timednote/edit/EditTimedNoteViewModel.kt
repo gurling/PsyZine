@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.entities.TimedNote
@@ -57,7 +57,7 @@ class EditTimedNoteViewModel @Inject constructor(
     private var loadedLocal: LocalDateTime = loadedInstant.getLocalDateTime()
     var localDateTimeFlow = MutableStateFlow(loadedLocal)
     private var timedNote: TimedNote? = null
-    private val editTimedNoteRoute = state.toRoute<EditTimedNoteRoute>()
+    private val editTimedNoteRoute = EditTimedNoteRoute(state.journalRecordId("timedNoteId"), state.journalRecordId("experienceId"))
     val experienceId = editTimedNoteRoute.experienceId
 
     private val timedNoteId: Int

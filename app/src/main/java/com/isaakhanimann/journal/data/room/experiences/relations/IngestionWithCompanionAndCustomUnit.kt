@@ -42,6 +42,8 @@ data class IngestionWithCompanionAndCustomUnit(
     )
     var customUnit: CustomUnit?
 ) {
+    @get:androidx.room.Ignore
+    val displayName: String get() = ingestion.substanceName ?: customUnit?.name ?: "Missing substance (edit to correct)"
 
     val originalUnit: String? get() = customUnit?.originalUnit ?: ingestion.units
     val pureDose: Double? get() {

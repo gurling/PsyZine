@@ -53,6 +53,14 @@ class InPlaceUpgradeTest {
     private val tables = listOf("Experience", "Ingestion", "TimedNote", "ShulginRating", "CustomSubstance",
         "CustomUnit", "SubstanceCompanion", "photo_attachment", "journal_state")
     private val keyAlias = "psyzine-emulator-upgrade-fixture"
+    // Compare every baseline column across additive migrations. New columns are
+    // checked separately, rather than comparing arrays with different lengths.
+    private val legacyColumns = mapOf(
+        "Ingestion" to "id,substanceName,time,endTime,creationDate,administrationRoute,dose,isDoseAnEstimate,estimatedDoseStandardDeviation,units,experienceId,notes,stomachFullness,consumerName,customUnitId",
+        "CustomUnit" to "id,substanceName,name,creationDate,administrationRoute,dose,estimatedDoseStandardDeviation,isEstimate,isArchived,unit,unitPlural,originalUnit,note",
+        "SubstanceCompanion" to "substanceName,color",
+        "ShulginRating" to "id,time,creationDate,option,experienceId",
+    )
 
     private fun clickWhenReady(selector: BySelector, timeout: Long = 10000) {
         val deadline = System.currentTimeMillis() + timeout
@@ -110,7 +118,8 @@ class InPlaceUpgradeTest {
         database().use { db ->
             tables.forEach { table ->
                 val rows = JSONArray()
-                db.rawQuery("SELECT * FROM `$table` ORDER BY " + if (table == "SubstanceCompanion") "substanceName" else "id", null).use { cursor ->
+                val columns = legacyColumns[table] ?: "*"
+                db.rawQuery("SELECT $columns FROM `$table` ORDER BY " + if (table == "SubstanceCompanion") "substanceName" else "id", null).use { cursor ->
                     while (cursor.moveToNext()) {
                         val row = JSONArray()
                         cursor.columnNames.indices.forEach { index -> row.put(if (cursor.isNull(index)) JSONObject.NULL else cursor.getString(index)) }
@@ -204,11 +213,33 @@ class InPlaceUpgradeTest {
         @Suppress("DEPRECATION")
         assertEquals(arguments.getString("expectedVersionCode")!!.toInt(), context.packageManager.getPackageInfo(context.packageName, 0).versionCode)
         assertEquals(expected.getString("snapshot"), snapshot())
+        if (arguments.getString("expectedSchemaVersion")!!.toInt() >= 10) verifyNativeMigration()
         val key = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }.getKey(keyAlias, null)
         val cipher = Cipher.getInstance("AES/GCM/NoPadding").apply {
             init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, android.util.Base64.decode(expected.getString("iv"), android.util.Base64.NO_WRAP)))
         }
         assertEquals("Synthetic retained secret", String(cipher.doFinal(File(context.filesDir, "upgrade-ciphertext").readBytes())))
+    }
+
+    private fun verifyNativeMigration() {
+        database().use { db ->
+            db.rawQuery("SELECT substanceName,substanceUnit,childCustomUnitId,dose,isEstimate,estimatedDoseStandardDeviation,note,creationDate,isHiddenInTimeline FROM DoseComponent WHERE parentCustomUnitId = 73", null).use { row ->
+                assertTrue("Migrated component exists", row.moveToFirst())
+                assertEquals("Caffeine", row.getString(0)); assertEquals("mg", row.getString(1)); assertTrue(row.isNull(2))
+                assertEquals(10.5, row.getDouble(3), 0.0); assertEquals(1, row.getInt(4)); assertEquals(0.5, row.getDouble(5), 0.0)
+                assertEquals("Unit note", row.getString(6)); assertEquals(1700000000L, row.getLong(7)); assertEquals(0, row.getInt(8))
+                assertFalse("No duplicate migration components", row.moveToNext())
+            }
+            for (table in listOf("CustomRoaInfo", "SubstanceTag", "SubstanceTagMembership")) {
+                db.rawQuery("SELECT COUNT(*) FROM `$table`", null).use { row -> row.moveToFirst(); assertEquals("No invented $table records", 0, row.getInt(0)) }
+            }
+            for (table in listOf("Ingestion", "CustomUnit", "SubstanceCompanion", "ShulginRating")) {
+                db.rawQuery("SELECT COUNT(*) FROM `$table` WHERE isHiddenInTimeline != 0", null).use { row -> row.moveToFirst(); assertEquals("Legacy $table visibility retained", 0, row.getInt(0)) }
+            }
+            db.rawQuery("SELECT color,areTimelinesOfSubcomponentsShown,areTolerancesOfSubcomponentsShown,halfToleranceInDays,zeroToleranceInDays FROM CustomUnit WHERE id = 73", null).use { row ->
+                assertTrue(row.moveToFirst()); assertTrue(row.isNull(0)); assertEquals(0, row.getInt(1)); assertEquals(0, row.getInt(2)); assertTrue(row.isNull(3)); assertTrue(row.isNull(4))
+            }
+        }
     }
 
     @Test fun upgradedJournalPhotosAndBackupWork() {
@@ -312,6 +343,11 @@ class InPlaceUpgradeTest {
         destination.writeBytes(android.util.Base64.decode(encoded, android.util.Base64.DEFAULT))
         ZipFile(destination).use { archive ->
             val manifest = JSONObject(archive.getInputStream(archive.getEntry("manifest.json")).bufferedReader().use { it.readText() })
+            if (arguments.getString("expectedSchemaVersion")!!.toInt() >= 10) {
+                assertEquals(2, manifest.getInt("version"))
+                val components = manifest.getJSONObject("journal").getJSONArray("customUnits").getJSONObject(0).getJSONArray("doseComponents")
+                assertEquals(1, components.length()); assertEquals(10.5, components.getJSONObject(0).getDouble("dose"), 0.0)
+            }
             assertEquals("nord", manifest.getString("theme"))
             assertEquals(1, manifest.getJSONObject("journal").getJSONArray("experiences").length())
             val photos = manifest.getJSONArray("photos")

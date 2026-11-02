@@ -29,6 +29,8 @@ import java.io.FileOutputStream
 import java.time.Instant
 import java.util.UUID
 import java.util.zip.*
+import com.isaakhanimann.journal.data.definitions.*
+import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 
 @RunWith(AndroidJUnit4::class)
 class AttachmentBackupIntegrationTest {
@@ -39,6 +41,7 @@ class AttachmentBackupIntegrationTest {
     private lateinit var backup: JournalBackupRepository
     private lateinit var appearance: AppearanceRepository
     private lateinit var presentation: PresentationPreferences
+    private lateinit var userPreferences: com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences
     private lateinit var attachments: AttachmentRepository
     private lateinit var scope: CoroutineScope
     @Before fun setup() {
@@ -55,8 +58,9 @@ class AttachmentBackupIntegrationTest {
         scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         val store = PreferenceDataStoreFactory.create(scope = scope) { File(directory, "preferences.preferences_pb") }
         appearance = AppearanceRepository(store); presentation = PresentationPreferences(store)
+        userPreferences = com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store)
         backup = JournalBackupRepository(database, entries, storage, appearance, presentation, lock,
-            com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository(context, com.isaakhanimann.journal.data.substances.parse.SubstanceParser()), context)
+            com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository(context, com.isaakhanimann.journal.data.substances.parse.SubstanceParser()), context, userPreferences)
         attachments = AttachmentRepository(storage, AttachmentDraftStore(storage), processor, database, lock, context)
     }
     @After fun cleanup() { scope.cancel(); database.close(); directory.deleteRecursively() }
@@ -144,6 +148,56 @@ class AttachmentBackupIntegrationTest {
         assertEquals(ThemeId.NORD, appearance.theme.first()); assertFalse(presentation.settings.first().widgetDetails)
         assertFalse(presentation.settings.first().lockScreenDetails)
     }
+    @Test fun nativeDefinitionsTagsAndPhotosRoundTripWithoutFlattening() = runBlocking {
+        val original = seededPhoto()
+        database.experienceDao().insert(CustomUnit(7, null, "Synthetic blend", Instant.EPOCH, null, null, null,
+            false, false, "capsule", null, null, "definition note", color = "FUTURE_COLOR", halfToleranceInDays = 2.0))
+        database.definitionDao().insertComponents(listOf(DoseComponent(31, 7, "Synthetic", "mg", dose = 0.0001, note = "component note", isHiddenInTimeline = true)))
+        val tag = SubstanceTag(UUID.randomUUID().toString(), "Synthetic tag", "CITRUS_LEAF", 1000)
+        database.definitionDao().saveTag(tag)
+        database.definitionDao().insertMemberships(listOf(SubstanceTagMembership("custom:7", tag.id, true)))
+        val archive = File(directory, "native.psyzine")
+        userPreferences.saveToleranceStatsPeriod(TolerancePeriod.PAST_12M)
+        backup.export(Uri.fromFile(archive))
+        userPreferences.saveToleranceStatsPeriod(TolerancePeriod.PAST_3D)
+        assertNull(backup.restore(Uri.fromFile(archive)))
+        assertEquals(TolerancePeriod.PAST_12M, userPreferences.toleranceStatsPeriodFlow.first())
+        val unit = database.experienceDao().getCustomUnit(7)!!
+        assertNull(unit.substanceName); assertEquals("FUTURE_COLOR", unit.color)
+        assertEquals(2.0, unit.halfToleranceInDays!!, 0.0)
+        val component = database.definitionDao().components().single()
+        assertEquals(31, component.id); assertEquals(0.0001, component.dose!!, 0.0)
+        assertEquals("component note", component.note); assertTrue(component.isHiddenInTimeline)
+        assertEquals(listOf(tag), database.definitionDao().tags())
+        assertTrue(database.definitionDao().memberships().single().isPrimary)
+        assertEquals(original.sha256, database.photoAttachmentDao().all().single().sha256)
+    }
+
+    @Test fun oldAndFutureTolerancePreferencesKeepTheCurrentChoice() = runBlocking {
+        seededPhoto()
+        val valid = File(directory, "tolerance-settings.psyzine")
+        backup.export(Uri.fromFile(valid))
+        val content = ZipFile(valid).use { zip -> zip.entries().asSequence().associate { it.name to zip.getInputStream(it).use { input -> input.readBytes() } } }
+        for (future in listOf(false, true)) {
+            val manifest = org.json.JSONObject(content.getValue("manifest.json").toString(Charsets.UTF_8))
+            if (future) manifest.put("toleranceStatsPeriod", "FUTURE_UNSUPPORTED_PERIOD")
+            else { manifest.put("version", 1); manifest.remove("toleranceStatsPeriod") }
+            val archive = File(directory, "tolerance-$future.psyzine")
+            ZipOutputStream(archive.outputStream()).use { zip ->
+                content.forEach { (name, bytes) ->
+                    zip.putNextEntry(ZipEntry(name))
+                    zip.write(if (name == "manifest.json") manifest.toString().toByteArray(Charsets.UTF_8) else bytes)
+                    zip.closeEntry()
+                }
+            }
+            userPreferences.saveToleranceStatsPeriod(TolerancePeriod.PAST_3D)
+            val warning = backup.restore(Uri.fromFile(archive))
+            if (future) assertTrue(warning!!.contains("current period was retained")) else assertNull(warning)
+            assertEquals(TolerancePeriod.PAST_3D, userPreferences.toleranceStatsPeriodFlow.first())
+            assertNotNull(database.experienceDao().getExperience(1))
+        }
+    }
+
     @Test fun unsafeMissingExtraAndDamagedArchiveKeepOriginalJournal() = runBlocking {
         val original = seededPhoto(); val valid = File(directory, "valid.psyzine")
         backup.export(Uri.fromFile(valid))

@@ -32,6 +32,7 @@ import com.isaakhanimann.journal.ui.tabs.search.custom.EditCustomSubstanceScreen
 import com.isaakhanimann.journal.ui.tabs.search.substance.SubstanceScreen
 import com.isaakhanimann.journal.ui.tabs.search.substance.category.CategoryScreen
 import kotlinx.serialization.Serializable
+import com.isaakhanimann.journal.ui.tabs.settings.tags.*
 
 fun NavGraphBuilder.searchGraph(navController: NavHostController) {
     navigation<DrugsTopLevelRoute>(
@@ -47,7 +48,12 @@ fun NavGraphBuilder.searchGraph(navController: NavHostController) {
                 },
                 navigateToAddCustomSubstanceScreen = {
                     navController.navigate(AddCustomSubstanceRouteOnSearchGraph)
-                }
+                },
+                manageTags = { navController.navigate(TagsRoute()) },
+                subjectTags = { navController.navigate(SubjectTagsRoute(it.key)) },
+                onDefinitionTap = { id, generation -> navController.navigate(com.isaakhanimann.journal.ui.tabs.settings.definitions.DefinitionEditRoute(id, generation, "Drugs")) },
+                onExperienceTap = { id, generation -> generation?.let { navController.navigate(SearchExperienceRoute(id, it)) } },
+                onIngestionTap = { id, generation -> generation?.let { navController.navigate(SearchEditIngestionRoute(id, it)) } },
             )
         }
         composableWithTransitions<SubstanceRoute> {
@@ -89,6 +95,7 @@ fun NavGraphBuilder.searchGraph(navController: NavHostController) {
         composableWithTransitions<ExplainTimelineOnSearchTabRoute> { ExplainTimelineScreen() }
 
         composableWithTransitions<DosageExplanationRouteOnSearchTab> { DoseExplanationScreen() }
+        journalSearchGraph(navController)
 
     }
 }

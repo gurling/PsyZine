@@ -4,7 +4,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.edit
 import android.net.Uri
 import androidx.compose.runtime.*
 import androidx.lifecycle.*
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.attachments.*
 import com.isaakhanimann.journal.data.room.attachments.PhotoAttachment
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
@@ -18,7 +18,7 @@ import javax.inject.Inject
 @HiltViewModel
 class EditExperienceViewModel @Inject constructor(private val entries: ExperienceRepository,
     val attachments: AttachmentRepository, private val state: SavedStateHandle) : ViewModel() {
-    private val route = state.toRoute<EditExperienceRoute>()
+    private val route = EditExperienceRoute(state.journalRecordId("experienceId"))
     val experienceId = route.experienceId
     var draft by mutableStateOf<AttachmentDraft?>(null); private set
     var savedPhotos by mutableStateOf<List<PhotoAttachment>>(emptyList()); private set

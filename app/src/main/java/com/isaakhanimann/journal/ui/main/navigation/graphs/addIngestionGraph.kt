@@ -37,6 +37,7 @@ import com.isaakhanimann.journal.ui.tabs.safer.RouteExplanationScreen
 import com.isaakhanimann.journal.ui.tabs.search.custom.AddCustomSubstanceAndContinueScreen
 import com.isaakhanimann.journal.ui.tabs.settings.customunits.add.FinishAddCustomUnitScreen
 import kotlinx.serialization.Serializable
+import com.isaakhanimann.journal.ui.tabs.settings.definitions.DefinitionDoseDestination
 
 fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
     navigation<AddIngestionRoute>(
@@ -121,7 +122,8 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
                 },
             )
         }
-        composableWithTransitions<ChooseDoseCustomUnitRoute> {
+        composableWithTransitions<ChooseDoseCustomUnitRoute> { entry ->
+            DefinitionDoseDestination(legacy = {
             ChooseDoseCustomUnitScreen(
                 navigateBack = { navController.popBackStack() },
                 navigateToChooseTimeAndMaybeColor = { administrationRoute: AdministrationRoute,
@@ -144,6 +146,7 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
                             customUnitId = customUnitId,
                             journalGeneration = journalGeneration,
                             customUnitFingerprint = customUnitFingerprint,
+                            startAtNow = entry.toRoute<ChooseDoseCustomUnitRoute>().startAtNow,
                         )
                     )
                 },
@@ -156,6 +159,7 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
                     )
                 }
             )
+            }, finish = { navController.navigate(it) }, back = { navController.popBackStack() })
         }
         composableWithTransitions<ChooseRouteOfAddIngestionRoute> { backStackEntry ->
             val route = backStackEntry.toRoute<ChooseRouteOfAddIngestionRoute>()
@@ -283,7 +287,7 @@ data class CheckInteractionsRoute(val substanceName: String)
 data class CheckSaferUseRoute(val substanceName: String)
 
 @Serializable
-data class ChooseDoseCustomUnitRoute(val customUnitId: Int, val journalGeneration: String? = null)
+data class ChooseDoseCustomUnitRoute(val customUnitId: Int, val journalGeneration: String? = null, val startAtNow: Boolean = false)
 
 @Serializable
 data class ChooseRouteOfAddIngestionRoute(val substanceName: String)
@@ -314,6 +318,8 @@ data class FinishIngestionRoute(
     val customUnitId: Int?,
     val journalGeneration: String? = null,
     val customUnitFingerprint: String? = null,
+    val definitionFingerprint: String? = null,
+    val startAtNow: Boolean = false,
 )
 
 @Serializable

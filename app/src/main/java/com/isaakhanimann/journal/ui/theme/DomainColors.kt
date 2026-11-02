@@ -12,7 +12,7 @@ object DomainColors {
             n.contains("RED") || n in listOf("RUST", "CINNABAR", "TOMATO", "MAROON", "AUBURN") -> 6
             n.contains("ORANGE") || n.contains("BROWN") || n in listOf("CORAL", "BRONZE") -> 5
             n.contains("GOLD") || n in listOf("YELLOW", "KHAKI", "OLIVE") -> 4
-            n.contains("GREEN") || n.contains("LIME") || n.contains("OLIVE") -> 3
+            n.contains("GREEN") || n.contains("LIME") || n.contains("OLIVE") || n == "CITRUS_LEAF" -> 3
             n in listOf("MINT", "TEAL", "CYAN", "DARK_TURQUOISE") -> 2
             n.contains("PINK") || n.contains("MAGENTA") || n in listOf("FUCHSIA", "JAZZBERRY_JAM") -> 7
             n.contains("VIOLET") || n.contains("LAVENDER") || n in listOf("PURPLE", "INDIGO", "HELIOTROPE", "BYZANTIUM") -> 1

@@ -15,6 +15,8 @@ class JournalSessionGuard @Inject constructor(
     private val database: AppDatabase,
     private val mutationLock: JournalMutationLock,
 ) {
+    val generations get() = database.photoAttachmentDao().observeGeneration()
+
     suspend fun currentGeneration(): String = database.withTransaction {
         database.photoAttachmentDao().generation() ?: UUID.randomUUID().toString().also {
             database.photoAttachmentDao().setGeneration(JournalState(generation = it))

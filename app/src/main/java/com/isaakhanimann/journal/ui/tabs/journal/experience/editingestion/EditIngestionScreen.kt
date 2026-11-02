@@ -119,6 +119,10 @@ fun EditIngestionScreen(
     navigateBack: () -> Unit
 ) {
     com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!viewModel.session.ready) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack)
+        return
+    }
     EditIngestionScreen(
         note = viewModel.note,
         onNoteChange = { viewModel.note = it },

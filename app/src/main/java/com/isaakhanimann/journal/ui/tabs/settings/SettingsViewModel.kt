@@ -44,15 +44,15 @@ class SettingsViewModel @Inject constructor(
     private val presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences,
 ) : ViewModel() {
 
-    fun saveDosageDotsAreHidden(value: Boolean) = viewModelScope.launch {
+    fun saveDosageDotsAreHidden(value: Boolean) = savePresentation {
         userPreferences.saveDosageDotsAreHidden(value)
     }
 
-    fun saveAreSubstanceHeightsIndependent(value: Boolean) = viewModelScope.launch {
+    fun saveAreSubstanceHeightsIndependent(value: Boolean) = savePresentation {
         userPreferences.saveAreSubstanceHeightsIndependent(value)
     }
 
-    fun saveIsTimelineHidden(value: Boolean) = viewModelScope.launch {
+    fun saveIsTimelineHidden(value: Boolean) = savePresentation {
         userPreferences.saveIsTimelineHidden(value)
     }
 

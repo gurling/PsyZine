@@ -77,6 +77,30 @@ class JournalMutationRegressionTest {
         assertEquals("original",entries.getIngestionFlow(1).first()!!.ingestion.notes)
         assertFalse(entries.getExperience(42)!!.isFavorite)
     }
+    @Test fun contextualEditorsRejectStaleSearchGenerationAndInvalidateOpenSessions() = runBlocking<Unit> {
+        val originalGeneration = guard.currentGeneration()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val open = JournalEditorSession(scope, guard, SavedStateHandle(mapOf("journalGeneration" to originalGeneration)))
+            open.load { checkNotNull(entries.getExperience(42)) }
+            withTimeout(10000) { while (!open.ready) delay(10) }
+            db.withTransaction {
+                db.experienceDao().deleteEverythingAndInvalidate("reused-search-ids")
+                db.experienceDao().insert(entry.copy(title = "Replacement"))
+                db.experienceDao().insert(ingestion.copy(notes = "Replacement note"))
+            }
+            withTimeout(10000) { while (open.ready) delay(10) }
+            assertNotNull(open.error)
+            var wrote = false
+            open.run { wrote = true }
+            assertFalse(wrote)
+            val stale = JournalEditorSession(scope, guard, SavedStateHandle(mapOf("journalGeneration" to originalGeneration)))
+            stale.load { fail("Old result must not load the replacement record") }
+            withTimeout(10000) { while (stale.loading) delay(10) }
+            assertFalse(stale.ready); assertNotNull(stale.error)
+            assertEquals("Replacement note", entries.getIngestionFlow(1).first()!!.ingestion.notes)
+        } finally { scope.cancel(); scope.coroutineContext[Job]!!.join() }
+    }
     @Test fun deletedParentRejectsOldChildrenWithoutChangingGeneration() = runBlocking<Unit> {
         val generation = guard.currentGeneration()
         entries.deleteEverythingOfExperience(42,generation)
@@ -109,7 +133,8 @@ class JournalMutationRegressionTest {
             db.experienceDao().update(ingestion.copy(isDoseAnEstimate=false))
             lateinit var vm: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { vm=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }
-            withTimeout(10000) { while(!vm.session.ready) delay(10) }
+            withTimeout(10000) { while(vm.session.loading) delay(10) }
+            assertTrue(vm.session.error, vm.session.ready)
             val done=CompletableDeferred<Unit>()
             instrumentation.runOnMainSync { vm.note="only note changed"; vm.onDoneTap { done.complete(Unit) } }
             withTimeout(10000) { done.await() }
@@ -119,7 +144,8 @@ class JournalMutationRegressionTest {
             db.experienceDao().update(saved.copy(customUnitId=999))
             lateinit var missing: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { missing=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }
-            withTimeout(10000) { while(!missing.session.ready) delay(10) }
+            withTimeout(10000) { while(missing.session.loading) delay(10) }
+            assertTrue(missing.session.error, missing.session.ready)
             var closed=false
             instrumentation.runOnMainSync { missing.note="must not clear unit"; missing.onDoneTap { closed=true } }
             withTimeout(10000) { while(missing.session.error==null) delay(10) }

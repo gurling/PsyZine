@@ -26,13 +26,16 @@ import com.isaakhanimann.journal.data.room.experiences.entities.SubstanceCompani
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import kotlinx.serialization.Serializable
 import java.time.Instant
+import com.isaakhanimann.journal.data.definitions.*
 
 @Serializable
 data class JournalExport(
     val experiences: List<ExperienceSerializable> = emptyList(),
     val substanceCompanions: List<SubstanceCompanion> = emptyList(),
     val customSubstances: List<CustomSubstance> = emptyList(),
-    val customUnits: List<CustomUnitSerializable> = emptyList()
+    val customUnits: List<CustomUnitSerializable> = emptyList(),
+    val tags: List<SubstanceTag> = emptyList(),
+    val tagMemberships: List<SubstanceTagMembership> = emptyList(),
 )
 
 @Serializable
@@ -51,30 +54,39 @@ data class ExperienceSerializable(
 @Serializable
 data class CustomUnitSerializable (
     val id: Int = 0,
-    val substanceName: String,
+    val substanceName: String? = null,
     val name: String,
     @Serializable(with= InstantSerializer::class) val creationDate: Instant = Instant.now(),
-    val administrationRoute: AdministrationRoute,
+    val administrationRoute: AdministrationRoute? = null,
     var dose: Double? = null,
     var estimatedDoseStandardDeviation: Double? = null,
-    var isEstimate: Boolean,
-    var isArchived: Boolean,
+    var isEstimate: Boolean = false,
+    var isArchived: Boolean = false,
     var unit: String,
-    var unitPlural: String?,
-    val originalUnit: String,
-    var note: String
+    var unitPlural: String? = null,
+    val originalUnit: String? = null,
+    var note: String = "",
+    val color: String? = null,
+    val isHiddenInTimeline: Boolean = false,
+    val areTimelinesOfSubcomponentsShown: Boolean = false,
+    val areTolerancesOfSubcomponentsShown: Boolean = false,
+    val halfToleranceInDays: Double? = null,
+    val zeroToleranceInDays: Double? = null,
+    val doseComponents: List<DoseComponent> = emptyList(),
+    val roaInfos: List<CustomRoaInfo> = emptyList(),
 )
 
 @Serializable
 data class RatingSerializable(
     @Serializable(with= ShulginRatingOptionSerializer::class) val option: ShulginRatingOption,
     @Serializable(with= InstantSerializer::class) var time: Instant? = null,
-    @Serializable(with= InstantSerializer::class) var creationDate: Instant? = Instant.now()
+    @Serializable(with= InstantSerializer::class) var creationDate: Instant? = Instant.now(),
+    val isHiddenInTimeline: Boolean = false,
 )
 
 @Serializable
 data class IngestionSerializable(
-    val substanceName: String,
+    val substanceName: String? = null,
     @Serializable(with= InstantSerializer::class) var time: Instant,
     @Serializable(with= InstantSerializer::class) var endTime: Instant?,
     @Serializable(with= InstantSerializer::class) var creationDate: Instant? = Instant.now(),
@@ -86,7 +98,8 @@ data class IngestionSerializable(
     var notes: String? = null,
     var stomachFullness: StomachFullness? = null,
     var consumerName: String? = null,
-    var customUnitId: Int? = null
+    var customUnitId: Int? = null,
+    val isHiddenInTimeline: Boolean = false,
 )
 
 @Serializable

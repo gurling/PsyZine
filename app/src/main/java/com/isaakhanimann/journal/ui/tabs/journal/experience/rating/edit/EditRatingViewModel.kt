@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.ShulginRating
 import com.isaakhanimann.journal.data.room.experiences.entities.ShulginRatingOption
@@ -54,7 +54,7 @@ class EditRatingViewModel @Inject constructor(
     var isOverallRatingFlow = MutableStateFlow(false)
 
     init {
-        val editRatingRoute = state.toRoute<EditRatingRoute>()
+        val editRatingRoute = EditRatingRoute(state.journalRecordId("ratingId"))
         val ratingId = editRatingRoute.ratingId
         this.ratingId = ratingId
         session.load {

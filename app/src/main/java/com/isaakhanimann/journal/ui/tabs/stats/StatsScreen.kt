@@ -61,6 +61,7 @@ import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,6 +85,7 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 fun StatsScreen(
     viewModel: StatsViewModel = hiltViewModel(),
     navigateToSubstanceCompanion: (substanceName: String, consumerName: String?) -> Unit,
+    navigateToTolerance: () -> Unit = {},
 ) {
     StatsScreen(
         navigateToSubstanceCompanion = navigateToSubstanceCompanion,
@@ -91,6 +93,7 @@ fun StatsScreen(
         statsModel = viewModel.statsModelFlow.collectAsStateWithLifecycle().value,
         onChangeConsumerName = viewModel::onChangeConsumer,
         consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsStateWithLifecycle().value,
+        navigateToTolerance = navigateToTolerance,
     )
 }
 
@@ -120,6 +123,7 @@ fun StatsScreen(
     statsModel: StatsModel,
     onChangeConsumerName: (String?) -> Unit,
     consumerNamesSorted: List<String>,
+    navigateToTolerance: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -175,138 +179,143 @@ fun StatsScreen(
             )
         },
     ) { padding ->
-        if (!statsModel.areThereAnyIngestions) {
-            EmptyScreenDisclaimer(
-                title = "Nothing to show yet",
-                description = "Start logging your ingestions to see an overview of your consumption pattern."
-            )
-        } else {
-            Column(modifier = Modifier.padding(padding)) {
-                BoxWithConstraints(Modifier.fillMaxWidth()) {
-                    val style = MaterialTheme.typography.titleSmall
-                    val measurer = rememberTextMeasurer()
-                    val density = LocalDensity.current
-                    val labelWidth = TimePickerOption.entries.maxOf {
-                        measurer.measure(it.displayText, style = style, softWrap = false).size.width
-                    }
-                    val tabWidth = with(density) { labelWidth.toDp() } + 36.dp
-                    val tabs: @Composable () -> Unit = {
-                        TimePickerOption.entries.forEachIndexed { index, option ->
-                            Tab(
-                                text = { Text(option.displayText, style = style, maxLines = 1) },
-                                selected = statsModel.selectedOption.tabIndex == index,
-                                onClick = { onTapOption(option) }
-                            )
-                        }
-                    }
-                    if (maxWidth >= tabWidth * TimePickerOption.entries.size) {
-                        TabRow(statsModel.selectedOption.tabIndex, contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
-                    } else {
-                        ScrollableTabRow(statsModel.selectedOption.tabIndex, edgePadding = 0.dp,
-                            contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
-                    }
-                }
-                if (statsModel.statItems.isNotEmpty()) {
-                    val isDarkTheme = LocalPsyZinePalette.current
-                    Column {
-                        Text(
-                            text = "Experiences since ${statsModel.startDateText}",
-                            style = MaterialTheme.typography.titleMedium,
-                            modifier = Modifier.padding(start = 10.dp, top = 5.dp)
-                        )
-                        Text(
-                            text = "Substance counted once per experience",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(
-                                start = 10.dp,
-                                bottom = 10.dp
-                            )
-                        )
-                        BarChart(
-                            buckets = statsModel.chartBuckets,
-                            startDateText = statsModel.startDateText
-                        )
-                        HorizontalDivider()
-                        LazyColumn {
-                            items(statsModel.statItems) { subStat ->
-                                Column {
-                                    ContentWithSideStripe(
-                                        stripeWidth = 11.dp,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                navigateToSubstanceCompanion(
-                                                    subStat.substanceName,
-                                                    statsModel.consumerName
-                                                )
-                                            }
-                                            .padding(
-                                                horizontal = horizontalPadding,
-                                                vertical = 5.dp
-                                            ),
-                                        stripe = {
-                                            Surface(
-                                            shape = RoundedCornerShape(3.dp),
-                                            color = subStat.color.getComposeColor(
-                                                isDarkTheme
-                                            ),
-                                            modifier = Modifier
-                                                .width(11.dp)
-                                                .fillMaxHeight()
-                                            ) {}
-                                        }
-                                    ) {
-                                        FlowRow(
-                                            modifier = Modifier.fillMaxWidth(),
-                                            horizontalArrangement = Arrangement.SpaceBetween,
-                                            verticalArrangement = Arrangement.spacedBy(4.dp)
-                                        ) {
-                                            Column {
-                                                Text(
-                                                    text = subStat.substanceName,
-                                                    style = MaterialTheme.typography.titleMedium
-                                                )
-                                                val addOn =
-                                                    if (subStat.experienceCount == 1) " experience" else " experiences"
-                                                Text(
-                                                    text = subStat.experienceCount.toString() + addOn,
-                                                )
-                                            }
-                                            Column(horizontalAlignment = Alignment.End) {
-                                                val cumulativeDose = subStat.totalDose
-                                                if (cumulativeDose != null) {
-                                                    if (cumulativeDose.isEstimate) {
-                                                        if (cumulativeDose.estimatedDoseStandardDeviation != null) {
-                                                            Text(text = "total ${cumulativeDose.dose.toReadableString()}±${cumulativeDose.estimatedDoseStandardDeviation.toReadableString()} ${cumulativeDose.units}")
-                                                        } else {
-                                                            Text(text = "total ~${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
-                                                        }
-                                                    } else {
-                                                        Text(text = "total ${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
-
-                                                    }
-                                                } else {
-                                                    Text(text = "total dose unknown")
-                                                }
-                                                subStat.routeCounts.forEach {
-                                                    Text(
-                                                        text = "${it.administrationRoute.displayText.lowercase()} ${it.count}x ",
-                                                    )
-                                                }
-                                            }
-                                        }
-
-                                    }
-                                    HorizontalDivider()
+        Column(Modifier.fillMaxSize().padding(padding)) {
+            TextButton(onClick = navigateToTolerance, modifier = Modifier.padding(horizontal = horizontalPadding)) { Text("Tolerance") }
+            Box(Modifier.weight(1f)) {
+                if (!statsModel.areThereAnyIngestions) {
+                    EmptyScreenDisclaimer(
+                        title = "Nothing to show yet",
+                        description = "Start logging your ingestions to see an overview of your consumption pattern."
+                    )
+                } else {
+                    Column(modifier = Modifier.fillMaxSize()) {
+                        BoxWithConstraints(Modifier.fillMaxWidth()) {
+                            val style = MaterialTheme.typography.titleSmall
+                            val measurer = rememberTextMeasurer()
+                            val density = LocalDensity.current
+                            val labelWidth = TimePickerOption.entries.maxOf {
+                                measurer.measure(it.displayText, style = style, softWrap = false).size.width
+                            }
+                            val tabWidth = with(density) { labelWidth.toDp() } + 36.dp
+                            val tabs: @Composable () -> Unit = {
+                                TimePickerOption.entries.forEachIndexed { index, option ->
+                                    Tab(
+                                        text = { Text(option.displayText, style = style, maxLines = 1) },
+                                        selected = statsModel.selectedOption.tabIndex == index,
+                                        onClick = { onTapOption(option) }
+                                    )
                                 }
                             }
+                            if (maxWidth >= tabWidth * TimePickerOption.entries.size) {
+                                TabRow(statsModel.selectedOption.tabIndex, contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
+                            } else {
+                                ScrollableTabRow(statsModel.selectedOption.tabIndex, edgePadding = 0.dp,
+                                    contentColor = MaterialTheme.colorScheme.onSurface, tabs = tabs)
+                            }
+                        }
+                        if (statsModel.statItems.isNotEmpty()) {
+                            val isDarkTheme = LocalPsyZinePalette.current
+                            Column {
+                                Text(
+                                    text = "Experiences since ${statsModel.startDateText}",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    modifier = Modifier.padding(start = 10.dp, top = 5.dp)
+                                )
+                                Text(
+                                    text = "Substance counted once per experience",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(
+                                        start = 10.dp,
+                                        bottom = 10.dp
+                                    )
+                                )
+                                BarChart(
+                                    buckets = statsModel.chartBuckets,
+                                    startDateText = statsModel.startDateText
+                                )
+                                HorizontalDivider()
+                                LazyColumn {
+                                    items(statsModel.statItems) { subStat ->
+                                        Column {
+                                            ContentWithSideStripe(
+                                                stripeWidth = 11.dp,
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        navigateToSubstanceCompanion(
+                                                            subStat.substanceName,
+                                                            statsModel.consumerName
+                                                        )
+                                                    }
+                                                    .padding(
+                                                        horizontal = horizontalPadding,
+                                                        vertical = 5.dp
+                                                    ),
+                                                stripe = {
+                                                    Surface(
+                                                    shape = RoundedCornerShape(3.dp),
+                                                    color = subStat.color.getComposeColor(
+                                                        isDarkTheme
+                                                    ),
+                                                    modifier = Modifier
+                                                        .width(11.dp)
+                                                        .fillMaxHeight()
+                                                    ) {}
+                                                }
+                                            ) {
+                                                FlowRow(
+                                                    modifier = Modifier.fillMaxWidth(),
+                                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                                ) {
+                                                    Column {
+                                                        Text(
+                                                            text = subStat.substanceName,
+                                                            style = MaterialTheme.typography.titleMedium
+                                                        )
+                                                        val addOn =
+                                                            if (subStat.experienceCount == 1) " experience" else " experiences"
+                                                        Text(
+                                                            text = subStat.experienceCount.toString() + addOn,
+                                                        )
+                                                    }
+                                                    Column(horizontalAlignment = Alignment.End) {
+                                                        val cumulativeDose = subStat.totalDose
+                                                        if (cumulativeDose != null) {
+                                                            if (cumulativeDose.isEstimate) {
+                                                                if (cumulativeDose.estimatedDoseStandardDeviation != null) {
+                                                                    Text(text = "total ${cumulativeDose.dose.toReadableString()}±${cumulativeDose.estimatedDoseStandardDeviation.toReadableString()} ${cumulativeDose.units}")
+                                                                } else {
+                                                                    Text(text = "total ~${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
+                                                                }
+                                                            } else {
+                                                                Text(text = "total ${cumulativeDose.dose.toReadableString()} ${cumulativeDose.units}")
+
+                                                            }
+                                                        } else {
+                                                            Text(text = "total dose unknown")
+                                                        }
+                                                        subStat.routeCounts.forEach {
+                                                            Text(
+                                                                text = "${it.administrationRoute.displayText.lowercase()} ${it.count}x ",
+                                                            )
+                                                        }
+                                                    }
+                                                }
+
+                                            }
+                                            HorizontalDivider()
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            EmptyScreenDisclaimer(
+                                title = "No ingestions since ${statsModel.selectedOption.longDisplayText}",
+                                description = "Choose a longer duration range to see statistics."
+                            )
                         }
                     }
-                } else {
-                    EmptyScreenDisclaimer(
-                        title = "No ingestions since ${statsModel.selectedOption.longDisplayText}",
-                        description = "Choose a longer duration range to see statistics."
-                    )
                 }
             }
         }

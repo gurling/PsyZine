@@ -50,7 +50,7 @@ class ActiveExperienceRepository @Inject constructor(private val db: AppDatabase
         }
         val display = elements.map { element ->
             val iwc = element.ingestionWithCompanionAndCustomUnit
-            ActiveIngestion(iwc.ingestion.substanceName, iwc.doseDescription, iwc.ingestion.administrationRoute.displayText.lowercase(),
+            ActiveIngestion(iwc.displayName, iwc.doseDescription, iwc.ingestion.administrationRoute.displayText.lowercase(),
                 calculateCurrentPhase(iwc.ingestion.time, element.roaDuration, now), iwc.substanceCompanion?.color ?: AdaptiveColor.RED)
         }
         val lines = TimelineModelFactory.effectLines(elements, sourceSubstances)

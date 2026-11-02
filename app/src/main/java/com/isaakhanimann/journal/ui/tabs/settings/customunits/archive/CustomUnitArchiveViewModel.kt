@@ -33,5 +33,6 @@ class CustomUnitArchiveViewModel @Inject constructor(experienceRepository: Exper
     private val retries = MutableStateFlow(0)
     fun retry() { retries.value++ }
     val unitsState = retries.flatMapLatest { experienceRepository.getCustomUnitsFlow(true).unitListState() }
+        .map { it.copy(units = it.units.filter { unit -> unit.substanceName != null }) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CustomUnitListState())
 }

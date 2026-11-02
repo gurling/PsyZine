@@ -121,7 +121,7 @@ abstract class CustomUnitEditorViewModel(protected val guard: JournalSessionGuar
     protected fun populate(unit: CustomUnit) {
         if (savedState.get<Boolean>("unitDraft.initialized") == true) return
         name = unit.name; this.unit = unit.unit; unitPlural = unit.unitPlural ?: ""
-        originalUnit = unit.originalUnit
+        originalUnit = unit.originalUnit.orEmpty()
         doseText = unit.dose?.let { it.toPreservedString() } ?: ""
         estimatedDoseDeviationText = unit.estimatedDoseStandardDeviation?.let { it.toPreservedString() } ?: ""
         isEstimate = unit.isEstimate; isArchived = unit.isArchived; note = unit.note

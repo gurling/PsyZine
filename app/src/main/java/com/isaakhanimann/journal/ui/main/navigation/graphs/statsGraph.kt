@@ -26,6 +26,7 @@ import com.isaakhanimann.journal.ui.main.navigation.StatsTopLevelRoute
 import com.isaakhanimann.journal.ui.tabs.stats.StatsScreen
 import com.isaakhanimann.journal.ui.tabs.stats.substancecompanion.SubstanceCompanionScreen
 import kotlinx.serialization.Serializable
+import com.isaakhanimann.journal.ui.tabs.stats.tolerance.*
 
 fun NavGraphBuilder.statsGraph(navController: NavHostController) {
     navigation<StatsTopLevelRoute>(
@@ -41,10 +42,14 @@ fun NavGraphBuilder.statsGraph(navController: NavHostController) {
                         )
                     )
                 },
+                navigateToTolerance = { navController.navigate(ToleranceRoute()) },
             )
         }
         composableWithTransitions<SubstanceCompanionRoute> {
             SubstanceCompanionScreen()
+        }
+        composableWithTransitions<ToleranceRoute> {
+            ToleranceScreen(back = { navController.popBackStack() }, openSubject = { key, generation -> navController.navigate(ToleranceRoute(key, generation)) })
         }
     }
 }

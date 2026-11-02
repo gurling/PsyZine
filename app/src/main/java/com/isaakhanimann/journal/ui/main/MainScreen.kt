@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,6 +35,8 @@ import com.isaakhanimann.journal.ui.main.navigation.graphs.journalGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.saferGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.searchGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.settingsGraph
+import com.isaakhanimann.journal.ui.main.navigation.graphs.tagsGraph
+import com.isaakhanimann.journal.ui.main.navigation.graphs.definitionsGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.statsGraph
 import com.isaakhanimann.journal.ui.main.navigation.JournalTopLevelRoute
 import com.isaakhanimann.journal.ui.main.navigation.topLevelRoutes
@@ -62,18 +65,28 @@ fun MainScreen(
         }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
+        val sharedOriginDestination = currentDestination?.let {
+            it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagEditRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.SubjectTagsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagSubjectsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.definitions.DefinitionEditRoute>()
+        } == true
+        val screenOrigin = if (sharedOriginDestination) navBackStackEntry?.arguments?.getString("origin") else null
         val items = topLevelRoutes.map { topLevelRoute ->
-            val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
+            val selected = screenOrigin == topLevelRoute.name || currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
             PsyZineNavigationItem(
                 name = topLevelRoute.name,
                 icon = if (selected) topLevelRoute.filledIcon else topLevelRoute.outlinedIcon,
                 selected = selected,
                 onClick = {
                     if (selected) {
-                        val isAlreadyOnTopOfTab =
-                            topLevelRoutes.any { it.route == currentDestination?.route }
-                        if (!isAlreadyOnTopOfTab) {
-                            navController.popBackStack()
+                        val graph = currentDestination?.hierarchy?.filterIsInstance<NavGraph>()
+                            ?.firstOrNull { it.hasRoute(topLevelRoute.route::class) }
+                            ?: (navController.graph.findNode(topLevelRoute.route) as? NavGraph)
+                        val root = graph?.findStartDestination()
+                        if (root != null && currentDestination?.id != root.id) {
+                            navController.popBackStack(root.id, inclusive = false)
                         }
                     } else {
                         navController.navigate(topLevelRoute.route) {
@@ -106,6 +119,8 @@ fun MainScreen(
                 searchGraph(navController)
                 saferGraph(navController)
                 settingsGraph(navController)
+                tagsGraph(navController)
+                definitionsGraph(navController)
             }
         }
     } else {

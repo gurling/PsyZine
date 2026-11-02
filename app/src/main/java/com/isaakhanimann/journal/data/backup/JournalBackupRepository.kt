@@ -6,6 +6,7 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.exifinterface.media.ExifInterface
 import androidx.room.withTransaction
+import com.isaakhanimann.journal.data.definitions.toPortable
 import com.isaakhanimann.journal.data.attachments.*
 import com.isaakhanimann.journal.data.preferences.AppearanceRepository
 import com.isaakhanimann.journal.data.room.AppDatabase
@@ -32,7 +33,8 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
     private val storage: AttachmentStorage, private val appearance: AppearanceRepository,
     private val presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences, private val lock: JournalMutationLock,
     private val substances: com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository,
-    @ApplicationContext private val context: Context) {
+    @ApplicationContext private val context: Context,
+    private val userPreferences: com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences) {
     private val json = Json { ignoreUnknownKeys = true }
     private suspend fun readJournal(): JournalExport {
             val experiencesWithIngestionsAndRatings =
@@ -59,7 +61,8 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                             notes = ingestion.notes,
                             stomachFullness = ingestion.stomachFullness,
                             consumerName = ingestion.consumerName,
-                            customUnitId = ingestion.customUnitId
+                            customUnitId = ingestion.customUnitId,
+                            isHiddenInTimeline = ingestion.isHiddenInTimeline,
                         )
                     },
                     location = if (location != null) {
@@ -75,7 +78,8 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                         RatingSerializable(
                             option = rating.option,
                             time = rating.time,
-                            creationDate = rating.creationDate
+                            creationDate = rating.creationDate,
+                            isHiddenInTimeline = rating.isHiddenInTimeline,
                         )
                     },
                     timedNotes = it.timedNotes.map { timedNote ->
@@ -89,28 +93,18 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                     }
                 )
             }
+            val components = db.definitionDao().components().groupBy { it.parentCustomUnitId }
+            val roas = db.definitionDao().roaInfos().groupBy { it.customUnitId }
             val customUnitsSerializable = entries.getAllCustomUnitsSorted().map {
-                CustomUnitSerializable(
-                    id = it.id,
-                    substanceName = it.substanceName,
-                    name = it.name,
-                    creationDate = it.creationDate,
-                    administrationRoute = it.administrationRoute,
-                    dose = it.dose,
-                    estimatedDoseStandardDeviation = it.estimatedDoseStandardDeviation,
-                    isEstimate = it.isEstimate,
-                    isArchived = it.isArchived,
-                    unit = it.unit,
-                    unitPlural = it.unitPlural,
-                    originalUnit = it.originalUnit,
-                    note = it.note
-                )
+                it.toPortable(components[it.id].orEmpty(), roas[it.id].orEmpty())
             }
             return JournalExport(
                 experiences = experiencesSerializable,
                 substanceCompanions = entries.getAllSubstanceCompanions(),
                 customSubstances = entries.getAllCustomSubstances(),
-                customUnits = customUnitsSerializable
+                customUnits = customUnitsSerializable,
+                tags = db.definitionDao().tags(),
+                tagMemberships = db.definitionDao().memberships(),
             )
     }
     suspend fun export(uri: Uri, legacy: Boolean = false) = lock.mutex.withLock { withContext(Dispatchers.IO) {
@@ -119,8 +113,9 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
             Triple(readJournal(), entries.getAllExperiencesWithIngestionsTimedNotesAndRatingsSorted().map { it.experience.id }, db.photoAttachmentDao().all())
         }
         val journal = snapshot.first
+        val legacyJournal = if (legacy) BackupValidation.legacyJournal(journal) else null
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
-            if (legacy) output.write(json.encodeToString(journal).toByteArray())
+            if (legacy) output.write(json.encodeToString(checkNotNull(legacyJournal)).toByteArray())
             else {
                 val indices = snapshot.second.withIndex().associate { it.value to it.index }
                 val photos = snapshot.third.map { photo ->
@@ -131,8 +126,9 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                         photo.createdAt.epochSecond, photo.position, photo.sha256)
                 }
                 val settings = presentation.settings.first()
-                val manifest = BackupManifest(journal = journal, photos = photos, theme = appearance.theme.first().key,
-                    presentation = BackupPresentation(settings.enabled, settings.lockScreenDetails, settings.widgetDetails))
+                val manifest = BackupManifest(version = 2, journal = journal, photos = photos, theme = appearance.theme.first().key,
+                    presentation = BackupPresentation(settings.enabled, settings.lockScreenDetails, settings.widgetDetails),
+                    toleranceStatsPeriod = userPreferences.toleranceStatsPeriodFlow.first().name)
                 BackupValidation.manifest(manifest)
                 ZipOutputStream(BufferedOutputStream(output)).use { zip ->
                     zip.putNextEntry(ZipEntry("manifest.json")); zip.write(json.encodeToString(manifest).toByteArray()); zip.closeEntry()
@@ -215,8 +211,17 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                     } }
                     drafts.discard(draft)
                 } }
-                try { appearance.select(ThemeId.fromKey(manifest.theme)); manifest.presentation?.let { presentation.restore(it) }; importWarnings.distinct().joinToString("\n").takeIf { it.isNotEmpty() } }
-                catch (_: Exception) { "Journal restored. Appearance or presentation preferences could not be applied; choose them again in Settings." }
+                try {
+                    appearance.select(ThemeId.fromKey(manifest.theme))
+                    manifest.presentation?.let { presentation.restore(it) }
+                    manifest.toleranceStatsPeriod?.let { name ->
+                        val period = com.isaakhanimann.journal.data.definitions.TolerancePeriod.entries.firstOrNull { it.name == name }
+                        if (period != null) userPreferences.saveToleranceStatsPeriod(period)
+                        else importWarnings += "The saved tolerance period is not supported by this version. The current period was retained."
+                    }
+                    importWarnings.distinct().joinToString("\n").takeIf { it.isNotEmpty() }
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) { "Journal restored. Some display preferences could not be applied; choose them again in Settings." }
             }
         } catch (_: OutOfMemoryError) {
             if (committed) "Journal restored. Preferences could not be applied; choose them again in Settings."

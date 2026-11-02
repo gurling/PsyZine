@@ -20,6 +20,7 @@ package com.isaakhanimann.journal.data.room.experiences.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 import kotlinx.serialization.Serializable
 
 @Entity
@@ -28,4 +29,6 @@ data class SubstanceCompanion(
     @PrimaryKey(autoGenerate = false)
     val substanceName: String,
     var color: AdaptiveColor,
+    @ColumnInfo(defaultValue = "0") val isHiddenInTimeline: Boolean = false,
+    val referenceColor: String? = null,
 )

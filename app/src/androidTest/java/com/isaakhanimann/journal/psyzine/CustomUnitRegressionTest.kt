@@ -31,6 +31,7 @@ import org.junit.Assert.*
 import java.io.File
 import java.time.Instant
 import java.util.UUID
+import com.isaakhanimann.journal.data.definitions.definitionFingerprint
 
 class CustomUnitRegressionTest {
     @get:Rule val compose = createComposeRule()
@@ -104,7 +105,7 @@ class CustomUnitRegressionTest {
     }
     private fun useUnit() = runBlocking {
         db.experienceDao().insert(Experience(42, "fixture", "", sortDate = Instant.EPOCH, location = null))
-        db.experienceDao().insert(Ingestion(1, stored.substanceName, Instant.EPOCH, administrationRoute = stored.administrationRoute,
+        db.experienceDao().insert(Ingestion(1, stored.substanceName, Instant.EPOCH, administrationRoute = requireNotNull(stored.administrationRoute),
             dose = 1.0, isDoseAnEstimate = false, estimatedDoseStandardDeviation = null, units = stored.unit,
             experienceId = 42, notes = null, stomachFullness = null, consumerName = null, customUnitId = 6))
     }
@@ -295,6 +296,47 @@ class CustomUnitRegressionTest {
             val stale = finish()
             assertTrue(stale.saveError!!.contains("restored"))
             assertTrue(repo.getSortedExperiencesWithIngestionsFlow().first().isEmpty())
+        } finally { preferenceScope.cancel() }
+    }
+
+    @Test fun nativeFinishKeepsDefinitionIdentityIgnoresOldTimePresetsAndPreventsDuplicates() = runBlocking<Unit> {
+        val preferenceScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val store = androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(scope = preferenceScope) { File(directory, "native-preferences.preferences_pb") }
+        val preferences = com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store)
+        try {
+            val oldPreset = Instant.ofEpochSecond(3600)
+            preferences.saveClonedIngestionTime(oldPreset)
+            val generation = guard.readSession(null) { it }
+            val definitions = com.isaakhanimann.journal.data.definitions.DefinitionRepository(db, guard)
+            val id = definitions.save(generation, stored.copy(id = 0, substanceName = null, administrationRoute = null,
+                dose = null, originalUnit = null, name = "Synthetic native definition"),
+                listOf(com.isaakhanimann.journal.data.definitions.DoseComponent(parentCustomUnitId = 0,
+                    substanceName = "Caffeine", substanceUnit = "mg", dose = 0.0001)), emptyList(), null)
+            val fingerprint = repo.definitionContents().definitionFingerprint(id)
+            lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.FinishIngestionScreenViewModel
+            compose.runOnIdle {
+                model = com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.FinishIngestionScreenViewModel(repo, preferences, guard,
+                    SavedStateHandle(mapOf("administrationRoute" to AdministrationRoute.ORAL, "isEstimate" to false,
+                        "units" to "capsule", "dose" to 2.0, "estimatedDoseStandardDeviation" to null,
+                        "substanceName" to "Synthetic native definition", "customUnitId" to id,
+                        "journalGeneration" to generation, "definitionFingerprint" to fingerprint, "startAtNow" to true)))
+                models.put("native-finish", model)
+            }
+            compose.waitUntil(30000) { !model.isLoadingColor || model.saveError != null }
+            assertNull(model.saveError)
+            var saved = 0
+            compose.runOnIdle {
+                model.createSaveAndDismissAfter { saved++ }
+                model.createSaveAndDismissAfter { saved++ }
+            }
+            compose.waitUntil(30000) { saved > 0 || model.saveError != null }
+            assertNull(model.saveError); assertEquals(1, saved)
+            val ingestion = db.experienceDao().getSortedIngestionsFlow().first().single()
+            assertNull(ingestion.substanceName); assertEquals(id, ingestion.customUnitId)
+            assertEquals(2.0, ingestion.dose!!, 0.0)
+            assertTrue(java.time.Duration.between(ingestion.time, Instant.now()).abs().seconds < 120)
+            assertEquals(oldPreset, preferences.clonedIngestionTimeFlow.first())
+            assertTrue(db.experienceDao().getAllSubstanceCompanions().isEmpty())
         } finally { preferenceScope.cancel() }
     }
 

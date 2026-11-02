@@ -33,6 +33,7 @@ import com.isaakhanimann.journal.data.room.experiences.relations.ExperienceWithI
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanion
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithExperienceAndCustomUnit
 import com.isaakhanimann.journal.ui.tabs.settings.JournalExport
+import com.isaakhanimann.journal.data.definitions.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
@@ -77,13 +78,20 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         check(experienceDao.update(note) == 1) { "This note was deleted." }
     }
 
-    suspend fun update(ingestion: Ingestion, previousParent: Int, generation: String?) = sessionGuard.withSession(generation, previousParent) {
+    suspend fun update(ingestion: Ingestion, previousParent: Int, generation: String?, definitionFingerprint: String? = null) = sessionGuard.withSession(generation, previousParent) {
         requireParent(ingestion.experienceId)
         check(experienceDao.getIngestion(ingestion.id)?.experienceId == previousParent) { "This ingestion was deleted or moved. Reopen it." }
         ingestion.customUnitId?.let { id ->
             val unit = experienceDao.getCustomUnit(id)
-            check(unit != null && unit.substanceName == ingestion.substanceName && unit.administrationRoute == ingestion.administrationRoute) { "This custom unit was deleted or changed. Choose a unit again." }
-            com.isaakhanimann.journal.data.room.validateCustomUnitDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation, ingestion.isDoseAnEstimate, unit)
+            check(unit != null && unit.substanceName == ingestion.substanceName) { "This custom unit was deleted or changed. Choose a unit again." }
+            if (unit.substanceName == null) {
+                val content = experienceDao.definitionContents()
+                check(definitionFingerprint != null && content.definitionFingerprint(id) == definitionFingerprint) { "This definition changed. Reopen the entry before saving." }
+                content.toGraph().resolve(id, DoseQuantity(ingestion.dose, ingestion.isDoseAnEstimate, ingestion.estimatedDoseStandardDeviation))
+            } else {
+                check(unit.administrationRoute == ingestion.administrationRoute) { "This custom unit's route changed. Choose a unit again." }
+                com.isaakhanimann.journal.data.room.validateCustomUnitDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation, ingestion.isDoseAnEstimate, unit)
+            }
         }
         com.isaakhanimann.journal.data.room.validateDose(ingestion.dose, ingestion.estimatedDoseStandardDeviation)
         require(ingestion.endTime == null || ingestion.endTime!! >= ingestion.time) { "End time must not be before start time." }
@@ -118,15 +126,16 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         photos.forEach { runCatching { storage.file(it.relativePath).setLastModified(System.currentTimeMillis()) } }
     }
 
-    suspend fun insert(customUnit: CustomUnit) = experienceDao.insert(customUnit).toInt()
-    suspend fun update(customUnit: CustomUnit) { check(experienceDao.update(customUnit) == 1) { "This record was deleted. Close this screen." } }
+    suspend fun insert(customUnit: CustomUnit) = experienceDao.insertLegacyUnit(customUnit)
+    suspend fun update(customUnit: CustomUnit) { check(experienceDao.updateLegacyUnit(customUnit) == 1) { "This record was deleted. Close this screen." } }
+    fun observeConsumerNames() = experienceDao.observeConsumerNames()
 
     suspend fun migrateBenzydamine() = experienceDao.migrateBenzydamine()
     suspend fun migrateCannabisAndMushroomUnits() = experienceDao.migrateCannabisAndMushroomUnits()
     suspend fun insertIngestionExperienceAndCompanion(
         ingestion: Ingestion,
         experience: Experience,
-        substanceCompanion: SubstanceCompanion
+        substanceCompanion: SubstanceCompanion?
     ) = experienceDao.insertIngestionExperienceAndCompanion(
         ingestion,
         experience,
@@ -139,7 +148,7 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
 
     suspend fun insertIngestionAndCompanion(
         ingestion: Ingestion,
-        substanceCompanion: SubstanceCompanion
+        substanceCompanion: SubstanceCompanion?
     ) = experienceDao.insertIngestionAndCompanion(
         ingestion,
         substanceCompanion
@@ -158,6 +167,10 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         val current = getCustomUnitWithIngestions(customUnit.id)
             ?: throw com.isaakhanimann.journal.data.room.CustomUnitProblem("This custom unit was deleted. Close this screen and choose another unit.")
         if (current.ingestions.isNotEmpty()) throw com.isaakhanimann.journal.data.room.UsedCustomUnit(current.ingestions.size)
+        check(experienceDao.definitionParents(customUnit.id) == 0) { "Another blend uses this definition. Archive it to keep that blend intact." }
+        experienceDao.removeUnitComponents(customUnit.id)
+        experienceDao.removeUnitRoas(customUnit.id)
+        experienceDao.removeSubjectTags("custom:${customUnit.id}")
         check(experienceDao.delete(customUnit) == 1) { "This record was deleted. Close this screen." }
     }
 
@@ -196,7 +209,7 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
             .flowOn(Dispatchers.IO)
             .conflate()
 
-    suspend fun getCustomSubstance(name: String): CustomSubstance? =
+    suspend fun getCustomSubstance(name: String?): CustomSubstance? =
         experienceDao.getCustomSubstance(name)
 
     suspend fun getCustomSubstance(id: Int): CustomSubstance? = experienceDao.getCustomSubstance(id)
@@ -328,6 +341,8 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
             .conflate()
 
     fun getAllCustomUnitsFlow() = experienceDao.getAllCustomUnitsFlow()
+    suspend fun definitionContents() = experienceDao.definitionContents()
+    fun observeDefinitionContents() = experienceDao.observeDefinitionContents()
         .flowOn(Dispatchers.IO)
         .conflate()
 

@@ -21,6 +21,7 @@ package com.isaakhanimann.journal.data.room.experiences.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 import java.time.Instant
 
 
@@ -31,5 +32,6 @@ data class ShulginRating(
     var time: Instant?,
     var creationDate: Instant? = Instant.now(),
     var option: ShulginRatingOption,
-    var experienceId: Int
+    var experienceId: Int,
+    @ColumnInfo(defaultValue = "0") val isHiddenInTimeline: Boolean = false,
 )

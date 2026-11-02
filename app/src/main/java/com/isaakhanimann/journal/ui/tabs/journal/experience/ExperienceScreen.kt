@@ -128,6 +128,10 @@ fun ExperienceScreen(
     navigateBack: () -> Unit,
 ) {
     com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!viewModel.session.ready) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack)
+        return
+    }
     val ingestionsWithCompanions = viewModel.ingestionsWithCompanionsFlow.collectAsStateWithLifecycle().value
     val experience = viewModel.experienceFlow.collectAsStateWithLifecycle().value
     val photos = viewModel.photos.collectAsStateWithLifecycle().value

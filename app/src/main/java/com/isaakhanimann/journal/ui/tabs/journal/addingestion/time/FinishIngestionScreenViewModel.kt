@@ -25,6 +25,8 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.navigation.toRoute
+import com.isaakhanimann.journal.data.definitions.definitionFingerprint
+import com.isaakhanimann.journal.data.definitions.toGraph
 import com.isaakhanimann.journal.data.room.JournalSessionGuard
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
@@ -70,6 +72,8 @@ class FinishIngestionScreenViewModel @Inject constructor(
     private val sessionGuard: JournalSessionGuard,
     state: SavedStateHandle
 ) : ViewModel() {
+    private var expectedDefinitionFingerprint: String? = null
+    private var nativeDefinition = false
     private var generation: String? = null
     private var expectedUnitFingerprint: String? = null
     var isSaving by mutableStateOf(false)
@@ -102,9 +106,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
     private val sortedExperiencesFlow = experienceRepo.getSortedExperiencesWithIngestionsFlow()
 
     val sortedConsumerNamesFlow =
-        experienceRepo.getSortedIngestions(limit = 200).map { ingestions ->
-            return@map ingestions.mapNotNull { it.consumerName }.distinct()
-        }.stateIn(
+        experienceRepo.observeConsumerNames().stateIn(
             initialValue = emptyList(),
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)
@@ -172,6 +174,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         estimatedDoseStandardDeviation = finishIngestionRoute.estimatedDoseStandardDeviation
         customUnitId = finishIngestionRoute.customUnitId
         expectedUnitFingerprint = finishIngestionRoute.customUnitFingerprint
+        expectedDefinitionFingerprint = finishIngestionRoute.definitionFingerprint
         units = finishIngestionRoute.units?.let {
             if (it == "null") {
                 null
@@ -184,8 +187,8 @@ class FinishIngestionScreenViewModel @Inject constructor(
             try {
                 generation = sessionGuard.readSession(state.get<String>("journalGeneration") ?: finishIngestionRoute.journalGeneration) { token -> token }.also { state["journalGeneration"] = it }
                 val lastIngestionTimeOfExperience =
-                    userPreferences.lastIngestionTimeOfExperienceFlow.first()
-                val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first()
+                    userPreferences.lastIngestionTimeOfExperienceFlow.first().takeUnless { finishIngestionRoute.startAtNow }
+                val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first().takeUnless { finishIngestionRoute.startAtNow }
                 if (clonedIngestionTime != null) {
                     presetStart = clonedIngestionTime
                     presetEnd = clonedIngestionTime.plus(30, ChronoUnit.MINUTES)
@@ -207,9 +210,12 @@ class FinishIngestionScreenViewModel @Inject constructor(
                 loadedEndLocal = localDateTimeEndFlow.value
                 updateExperiencesBasedOnSelectedTime()
                 val allCompanions = experienceRepo.getAllSubstanceCompanionsFlow().first()
+                nativeDefinition = customUnitId?.let { experienceRepo.getCustomUnit(it)?.substanceName == null } == true
                 val thisCompanion = allCompanions.firstOrNull { it.substanceName == substanceName }
                 substanceCompanion = thisCompanion
-                if (thisCompanion == null) {
+                if (nativeDefinition) {
+                    isShowingColorPicker = false
+                } else if (thisCompanion == null) {
                     isShowingColorPicker = true
                     val alreadyUsedColors = allCompanions.map { it.color }
                     val otherColors = AdaptiveColor.entries.filter { !alreadyUsedColors.contains(it) }
@@ -306,11 +312,16 @@ class FinishIngestionScreenViewModel @Inject constructor(
         customUnitId?.let { id ->
             val unit = experienceRepo.getCustomUnit(id) ?: throw CustomUnitProblem("This custom unit was deleted. Go back and choose a dose again.")
             if (expectedUnitFingerprint != null && expectedUnitFingerprint != unit.definitionFingerprint()) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
-            if (unit.substanceName != substanceName || unit.administrationRoute != administrationRoute) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
-            try { validateCustomUnitDose(dose, estimatedDoseStandardDeviation, isEstimate, unit) }
+            nativeDefinition = unit.substanceName == null
+            if (nativeDefinition) {
+                val graph = experienceRepo.definitionContents()
+                if (expectedDefinitionFingerprint == null || graph.definitionFingerprint(id) != expectedDefinitionFingerprint) throw CustomUnitProblem("This definition changed. Go back and choose an amount again.")
+                graph.toGraph().resolve(id, com.isaakhanimann.journal.data.definitions.DoseQuantity(dose, isEstimate, estimatedDoseStandardDeviation))
+            } else if (unit.substanceName != substanceName || unit.administrationRoute != administrationRoute) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
+            try { if (!nativeDefinition) validateCustomUnitDose(dose, estimatedDoseStandardDeviation, isEstimate, unit) }
             catch (_: IllegalArgumentException) { throw CustomUnitProblem("This dose cannot be calculated with the custom unit. Go back and correct the amount or the unit in Settings.") }
         }
-        val substanceCompanion = SubstanceCompanion(
+        val substanceCompanion = if (nativeDefinition) null else SubstanceCompanion(
             substanceName,
             color = selectedColor
         )
@@ -351,7 +362,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         }
         require(endTime == null || endTime >= time) { "End time must not be before start time." }
         return Ingestion(
-            substanceName = substanceName,
+            substanceName = if (nativeDefinition) null else substanceName,
             time = time,
             endTime = endTime,
             administrationRoute = administrationRoute,

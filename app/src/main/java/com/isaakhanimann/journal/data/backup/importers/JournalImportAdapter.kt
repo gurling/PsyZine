@@ -20,6 +20,7 @@ object JournalImportAdapter {
             val normalized = when (root["exportSource"]?.jsonPrimitive?.contentOrNull) {
                 null, "" -> root
                 "Android Journal" -> convertAndroidJournal(root, warnings, referenceSubstanceNames)
+                "Android Journal 17.1" -> ReferenceJournal17Adapter.convert(root, warnings)
                 else -> throw JournalImportException("unsupported_source", "This export source is not supported. Use legacy JSON or a PsyZine backup.")
             }
             val journal = json.decodeFromJsonElement<JournalExport>(normalized)

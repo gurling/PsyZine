@@ -46,6 +46,14 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_HIDE_DOSAGE_DOTS = booleanPreferencesKey("key_hide_dosage_dots")
         val KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT = booleanPreferencesKey("KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT")
         val KEY_IS_TIMELINE_HIDDEN = booleanPreferencesKey("KEY_IS_TIMELINE_HIDDEN")
+        val KEY_TOLERANCE_STATS_PERIOD = stringPreferencesKey("tolerance_stats_period")
+    }
+
+    val toleranceStatsPeriodFlow = dataStore.data.map {
+        com.isaakhanimann.journal.data.definitions.TolerancePeriod.fromName(it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD])
+    }
+    suspend fun saveToleranceStatsPeriod(value: com.isaakhanimann.journal.data.definitions.TolerancePeriod) {
+        dataStore.edit { it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD] = value.name }
     }
 
     suspend fun saveTimeDisplayOption(value: SavedTimeDisplayOption) {

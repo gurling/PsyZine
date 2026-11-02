@@ -440,12 +440,6 @@ fun SettingsScreen(
                                 onClick = {
                                     isShowingDeleteDialog = false
                                     deleteEverything()
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Deleted everything",
-                                            duration = SnackbarDuration.Short
-                                        )
-                                    }
                                 }
                             ) {
                                 Text("Delete")

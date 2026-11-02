@@ -21,6 +21,7 @@ package com.isaakhanimann.journal.data.room.experiences.entities
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import java.time.Instant
 
@@ -28,7 +29,7 @@ import java.time.Instant
 data class Ingestion(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val substanceName: String,
+    val substanceName: String?,
     var time: Instant,
     var endTime: Instant? = null,
     var creationDate: Instant? = Instant.now(),
@@ -41,5 +42,6 @@ data class Ingestion(
     var notes: String?,
     var stomachFullness: StomachFullness?,
     var consumerName: String?,
-    var customUnitId: Int?
+    var customUnitId: Int?,
+    @ColumnInfo(defaultValue = "0") val isHiddenInTimeline: Boolean = false,
 )

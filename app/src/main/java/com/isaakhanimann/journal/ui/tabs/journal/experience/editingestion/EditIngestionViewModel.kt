@@ -25,7 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
+import com.isaakhanimann.journal.data.definitions.definitionFingerprint
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 import com.isaakhanimann.journal.data.room.experiences.entities.Ingestion
@@ -75,10 +76,11 @@ class EditIngestionViewModel @Inject constructor(
     var localDateTimeEndFlow = MutableStateFlow(LocalDateTime.now())
     var consumerName by mutableStateOf("")
     private var selectedCustomUnitId: Int? = null
+    private var selectedDefinitionFingerprint: String? = null
     var customUnit: CustomUnit? by mutableStateOf(null)
     val otherCustomUnits = experienceRepo.getAllCustomUnitsFlow().combine(ingestionFlow) { customUnits, ing ->
         customUnits.filter {customUnit ->
-            customUnit.administrationRoute == ing?.administrationRoute && customUnit.substanceName == ing.substanceName && customUnit.id != ing.customUnitId
+            ing != null && customUnit.administrationRoute == ing.administrationRoute && customUnit.substanceName == ing.substanceName && customUnit.id != ing.customUnitId
         }
     }.stateIn(
         initialValue = emptyList(),
@@ -95,7 +97,7 @@ class EditIngestionViewModel @Inject constructor(
     }
 
     init {
-        val editIngestionRoute = state.toRoute<EditIngestionRoute>()
+        val editIngestionRoute = EditIngestionRoute(state.journalRecordId("ingestionId"))
         session.load {
             val ingestionAndCustomUnit =
                 experienceRepo.getIngestionFlow(id = editIngestionRoute.ingestionId).first() ?: error("This entry was deleted. Close this screen.")
@@ -122,15 +124,21 @@ class EditIngestionViewModel @Inject constructor(
             }
             selectedCustomUnitId = ing.customUnitId
             customUnit = ingestionAndCustomUnit.customUnit
+            val definitionId = ing.customUnitId
+            val definition = ingestionAndCustomUnit.customUnit
+            if (definitionId != null && definition != null && definition.substanceName == null) {
+                val fingerprint = experienceRepo.definitionContents().definitionFingerprint(definitionId)
+                check(state.get<String>("editDefinitionFingerprint")?.let { it == fingerprint } != false) { "This definition changed. Close this entry and reopen it." }
+                state["editDefinitionFingerprint"] = fingerprint
+                selectedDefinitionFingerprint = fingerprint
+            }
             loadedEnd = localDateTimeEndFlow.value
             initialEndInstant = ing.endTime ?: ing.time.plus(30, ChronoUnit.MINUTES)
         }
     }
 
     val sortedConsumerNamesFlow =
-        experienceRepo.getSortedIngestions(limit = 200).map { ingestions ->
-            return@map ingestions.mapNotNull { it.consumerName }.distinct()
-        }.stateIn(
+        experienceRepo.observeConsumerNames().stateIn(
             initialValue = emptyList(),
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000)
@@ -222,7 +230,7 @@ class EditIngestionViewModel @Inject constructor(
             endTime = if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
                 com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeEndFlow.value, loadedEnd, initialEndInstant) else null,
             consumerName = if (consumerName == current.consumerName.orEmpty()) current.consumerName else consumerName.ifBlank { null })
-        experienceRepo.update(updated, current.experienceId, session.generation)
+        experienceRepo.update(updated, current.experienceId, session.generation, selectedDefinitionFingerprint)
     }
 
     fun deleteIngestion(onSuccess: () -> Unit) = session.run(onSuccess) {

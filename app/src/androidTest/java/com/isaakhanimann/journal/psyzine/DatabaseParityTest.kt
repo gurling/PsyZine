@@ -11,6 +11,7 @@ import com.isaakhanimann.journal.data.room.attachments.PhotoAttachment
 import com.isaakhanimann.journal.data.room.experiences.entities.*
 import com.isaakhanimann.journal.data.room.migrations.Migration8To9
 import com.isaakhanimann.journal.data.room.migrations.Migration7To8
+import com.isaakhanimann.journal.data.room.migrations.Migration9To10
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.flow.first
@@ -27,7 +28,7 @@ class DatabaseParityTest {
     @get:Rule val helper = MigrationTestHelper(instrumentation, AppDatabase::class.java)
 
     @Test fun everyOriginalSchemaMigratesAndRetainsAllOriginalColumnsAndIds() {
-        for (version in 1..8) {
+        for (version in 1..9) {
             val name = "migration-$version-${UUID.randomUUID()}"
             val schema = JSONObject(instrumentation.context.assets.open("com.isaakhanimann.journal.data.room.AppDatabase/$version.json").bufferedReader().use { it.readText() })
             val entities = schema.getJSONObject("database").getJSONArray("entities")
@@ -49,7 +50,7 @@ class DatabaseParityTest {
                     records[table] = values
                 }
             }
-            helper.runMigrationsAndValidate(name, 9, true, Migration7To8, Migration8To9).use { database ->
+            helper.runMigrationsAndValidate(name, 10, true, Migration7To8, Migration8To9, Migration9To10).use { database ->
                 records.forEach { (table, values) ->
                     database.query("SELECT * FROM `$table`").use { cursor ->
                         assertTrue("$table has its original row", cursor.moveToFirst())
@@ -76,6 +77,39 @@ class DatabaseParityTest {
             }
             instrumentation.targetContext.deleteDatabase(name)
         }
+    }
+
+    @Test fun nativeMigrationPreservesDeletedIdHighWaterAndRollsBackLowSpace() {
+        val name = "native-migration-${UUID.randomUUID()}"
+        helper.createDatabase(name, 9).use { db ->
+            db.execSQL("INSERT INTO CustomUnit (id,substanceName,name,creationDate,administrationRoute,dose,isEstimate,isArchived,unit,originalUnit,note) VALUES (900,'Synthetic','kept',0,'ORAL',0.0001,0,0,'capsule','mg','kept')")
+            db.execSQL("DELETE FROM CustomUnit WHERE id=900")
+            db.execSQL("INSERT INTO CustomUnit (id,substanceName,name,creationDate,administrationRoute,dose,isEstimate,isArchived,unit,originalUnit,note) VALUES (7,'Synthetic','old',0,'ORAL',0.0001,0,0,'capsule','mg','kept')")
+            val failing = object : androidx.sqlite.db.SupportSQLiteDatabase by db {
+                override fun execSQL(sql: String) {
+                    if (sql.contains("CREATE TABLE IF NOT EXISTS CustomRoaInfo")) throw android.database.sqlite.SQLiteFullException("injected low space")
+                    db.execSQL(sql)
+                }
+            }
+            db.beginTransaction()
+            try { Migration9To10.migrate(failing); fail("Low space must fail migration") }
+            catch (_: android.database.sqlite.SQLiteFullException) { }
+            finally { db.endTransaction() }
+            assertEquals(9, db.version)
+            db.query("SELECT dose,note FROM CustomUnit WHERE id=7").use { c ->
+                assertTrue(c.moveToFirst()); assertEquals(0.0001, c.getDouble(0), 0.0); assertEquals("kept", c.getString(1))
+            }
+            db.query("SELECT COUNT(*) FROM sqlite_master WHERE name='DoseComponent'").use { c -> c.moveToFirst(); assertEquals(0, c.getInt(0)) }
+        }
+        helper.runMigrationsAndValidate(name, 10, true, Migration9To10).use { db ->
+            db.query("SELECT substanceName,substanceUnit,dose,parentCustomUnitId FROM DoseComponent").use { c ->
+                assertTrue(c.moveToFirst()); assertEquals("Synthetic", c.getString(0)); assertEquals("mg", c.getString(1))
+                assertEquals(0.0001, c.getDouble(2), 0.0); assertEquals(7, c.getInt(3)); assertFalse(c.moveToNext())
+            }
+            db.execSQL("INSERT INTO CustomUnit (substanceName,name,creationDate,administrationRoute,isEstimate,isArchived,unit,note) VALUES (NULL,'native',0,NULL,0,0,'capsule','')")
+            db.query("SELECT id FROM CustomUnit WHERE name='native'").use { c -> assertTrue(c.moveToFirst()); assertTrue(c.getInt(0) > 900) }
+        }
+        instrumentation.targetContext.deleteDatabase(name)
     }
 
     private fun database() = Room.inMemoryDatabaseBuilder(instrumentation.targetContext, AppDatabase::class.java).build()

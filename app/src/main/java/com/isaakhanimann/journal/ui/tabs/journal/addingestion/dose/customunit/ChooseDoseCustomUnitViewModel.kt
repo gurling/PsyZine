@@ -30,6 +30,7 @@ class ChooseDoseCustomUnitViewModel @Inject constructor(
                 ?: throw CustomUnitProblem("This custom unit was deleted. Go back and choose another unit.")
             val expected = savedState.get<String>("selectedUnitDefinition")
             if (expected != null && expected != record.definitionFingerprint()) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
+            if (record.substanceName == null || record.administrationRoute == null) throw CustomUnitProblem("Choose this blend from the custom definition library.")
             customUnit = record.copy()
             savedState["selectedUnitDefinition"] = record.definitionFingerprint()
             val substance = substanceRepo.getSubstance(record.substanceName)
@@ -66,7 +67,7 @@ class ChooseDoseCustomUnitViewModel @Inject constructor(
                 ?: throw CustomUnitProblem("This custom unit was deleted. Go back and choose another unit.")
             if (current.definitionFingerprint() != selected.definitionFingerprint()) throw CustomUnitProblem("This custom unit changed. Go back and choose a dose again.")
             if (current.isArchived) throw CustomUnitProblem("This unit is archived. Go back and choose an available unit, or unarchive it in Settings.")
-            if (customUnitInputErrors(current.name, current.unit, current.originalUnit,
+            if (customUnitInputErrors(current.name, current.unit, current.originalUnit.orEmpty(),
                     current.dose?.toString() ?: "", current.estimatedDoseStandardDeviation?.toString() ?: "", true).isNotEmpty())
                 throw CustomUnitProblem("This custom unit has invalid saved values. Correct it in Settings → Custom units before using it.")
             try { validateDose(amount, uncertainty); validateCustomUnitDose(amount, uncertainty, estimate, current) }

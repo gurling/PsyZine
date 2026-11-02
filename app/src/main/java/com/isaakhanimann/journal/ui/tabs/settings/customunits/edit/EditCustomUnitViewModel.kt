@@ -29,7 +29,8 @@ class EditCustomUnitViewModel @Inject constructor(
             if (expected != null && expected != record.editorFingerprint()) throw CustomUnitProblem("This unit changed while you were editing. Close this screen and reopen it before saving.")
             original = record.copy()
             savedState["unitDraft.original"] = record.editorFingerprint()
-            substanceName = record.substanceName; administrationRoute = record.administrationRoute
+            substanceName = record.substanceName ?: throw CustomUnitProblem("Open this blend in the definition editor.")
+            administrationRoute = record.administrationRoute ?: throw CustomUnitProblem("Open this definition in the definition editor.")
             roaDose = substanceRepository.getSubstance(substanceName)?.getRoa(administrationRoute)?.roaDose
             val customSubstance = experienceRepo.getCustomSubstance(substanceName)
             numberOfIngestionsWithThisCustomUnit = snapshot.ingestions.size

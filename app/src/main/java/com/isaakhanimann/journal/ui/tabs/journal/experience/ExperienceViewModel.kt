@@ -21,7 +21,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
@@ -124,7 +124,7 @@ class ExperienceViewModel @Inject constructor(
     )
 
     init {
-        val experienceRoute = state.toRoute<ExperienceRoute>()
+        val experienceRoute = ExperienceRoute(state.journalRecordId("experienceId"))
         val expId = experienceRoute.experienceId
         experienceId = expId
         session.load {
@@ -339,7 +339,7 @@ class ExperienceViewModel @Inject constructor(
     val interactionsFlow =
         sortedIngestionsWithCompanionsFlow.combine(combinationSettingsStorage.enabledInteractionsFlow) { ingestions, enabledInteractions ->
             val interactionsToCheck =
-                ingestions.filter { it.ingestion.consumerName == null }.map { it.ingestion.substanceName }.plus(enabledInteractions).distinct()
+                ingestions.filter { it.ingestion.consumerName == null }.mapNotNull { it.ingestion.substanceName }.plus(enabledInteractions).distinct()
             return@combine interactionsToCheck.flatMapIndexed { index: Int, interaction: String ->
                 return@flatMapIndexed interactionsToCheck.drop(index + 1).mapNotNull { other ->
                     interactionChecker.getInteractionBetween(
@@ -437,7 +437,7 @@ class ExperienceViewModel @Inject constructor(
     companion object {
 
         fun getCumulativeDoses(ingestions: List<IngestionWithAssociatedData>): List<CumulativeDose> {
-            return ingestions.groupBy { it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName }
+            return ingestions.groupBy { it.ingestionWithCompanionAndCustomUnit.displayName }
                 .map { groupedBySubstanceName ->
                     val ingestionsOfSameSubstance = groupedBySubstanceName.value
                     val cumulativeRouteDose =
