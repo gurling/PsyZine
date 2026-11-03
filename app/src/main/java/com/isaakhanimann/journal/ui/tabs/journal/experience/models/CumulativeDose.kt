@@ -23,8 +23,11 @@ import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 
 data class CumulativeDose(
     val substanceName: String,
-    val cumulativeRouteAndDose: List<CumulativeRouteAndDose>
+    val cumulativeRouteAndDose: List<CumulativeRouteAndDose>,
+    val subjectKey: String? = null,
 )
+
+data class CumulativeProjection(val totals: List<CumulativeDose> = emptyList(), val notices: List<String> = emptyList())
 
 data class CumulativeRouteAndDose(
     val cumulativeDose: Double,

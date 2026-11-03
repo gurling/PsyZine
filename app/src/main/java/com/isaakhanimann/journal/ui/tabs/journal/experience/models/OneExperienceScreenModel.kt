@@ -39,4 +39,5 @@ data class OneExperienceScreenModel(
     val timedNotesSorted: List<TimedNote>,
     val consumersWithIngestions: List<ConsumerWithIngestions>,
     val dataForEffectLines: List<DataForOneEffectLine>,
+    val calculationNotices: List<String> = emptyList(),
 )

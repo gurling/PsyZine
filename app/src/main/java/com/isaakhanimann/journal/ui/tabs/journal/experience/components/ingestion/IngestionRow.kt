@@ -69,7 +69,7 @@ fun IngestionRow(
     ContentWithSideStripe(
         stripeWidth = 5.dp,
         modifier = modifier,
-        stripe = { VerticalLine(color = ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
+        stripe = { VerticalLine(color = ingestionElement.displayColor ?: ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
     ) {
         time()
         val title = if (customUnit != null && ingestion.substanceName != null) {
@@ -89,7 +89,7 @@ fun IngestionRow(
             val text = buildAnnotatedString {
                 append(ingestionWithCompanionAndCustomUnit.doseDescription)
                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                    if (customUnit == null) {
+                    if (customUnit == null || customUnit.substanceName == null) {
                         append(" " + ingestion.administrationRoute.displayText.lowercase())
                     } else {
                         ingestionWithCompanionAndCustomUnit.customUnitDose?.calculatedDoseDescription?.let {
@@ -106,6 +106,8 @@ fun IngestionRow(
                 DotRows(numDots = numDots)
             }
         }
+        ingestionElement.calculationError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        CalculatedComponents(ingestion.id, ingestionElement.components, areDosageDotsHidden)
         val note = ingestion.notes
         if (!note.isNullOrBlank()) {
             Text(text = note, style = MaterialTheme.typography.bodySmall)

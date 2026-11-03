@@ -132,10 +132,22 @@ fun ExperienceScreen(
         com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack)
         return
     }
-    val ingestionsWithCompanions = viewModel.ingestionsWithCompanionsFlow.collectAsStateWithLifecycle().value
-    val experience = viewModel.experienceFlow.collectAsStateWithLifecycle().value
-    val photos = viewModel.photos.collectAsStateWithLifecycle().value
-    val isFavorite = viewModel.isFavoriteFlow.collectAsStateWithLifecycle().value
+    val record by viewModel.recordState.collectAsStateWithLifecycle()
+    if (record.loading) {
+        Column(Modifier.padding(24.dp)) {
+            androidx.compose.material3.CircularProgressIndicator()
+            Text("Loading entry")
+        }
+        return
+    }
+    if (record.error != null) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack, record.error!!)
+        return
+    }
+    val ingestionsWithCompanions = record.value?.ingestions.orEmpty()
+    val experience = record.value?.experience
+    val photos = record.value?.photos.orEmpty()
+    val isFavorite = experience?.isFavorite ?: false
     val oneExperienceScreenModel = OneExperienceScreenModel(
         isFavorite = isFavorite,
         title = experience?.title ?: "",
@@ -151,7 +163,8 @@ fun ExperienceScreen(
         ratings = viewModel.ratingsFlow.collectAsStateWithLifecycle().value,
         timedNotesSorted = viewModel.timedNotesSortedFlow.collectAsStateWithLifecycle().value,
         consumersWithIngestions = viewModel.consumersWithIngestionsFlow.collectAsStateWithLifecycle().value,
-        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsStateWithLifecycle().value
+        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsStateWithLifecycle().value,
+        calculationNotices = viewModel.cumulativeProjectionFlow.collectAsStateWithLifecycle().value.notices,
     )
     ExperienceScreen(
         lazyPhotos = {
@@ -296,6 +309,15 @@ fun ExperienceScreen(
                 }
             }
             val cumulativeDoses = oneExperienceScreenModel.cumulativeDoses
+            if (oneExperienceScreenModel.calculationNotices.isNotEmpty()) {
+                item(key = "calculation-notices") {
+                    Column(Modifier.padding(horizontal = horizontalPadding, vertical = 8.dp)) {
+                        oneExperienceScreenModel.calculationNotices.forEach {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
             if (cumulativeDoses.isNotEmpty()) {
                 item(key = "cumulative") {
                 CumulativeDosesSection(

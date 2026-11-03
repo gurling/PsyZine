@@ -76,7 +76,7 @@ fun ExplainTimelineScreen() {
                         "Taking e.g. x amount now will give the same effect as taking x amount later. There is no immediate tolerance.",
                         "Taking twice the dose will give twice the effect.",
                         "Duration ranges from PsychonautWiki can be applied for all kinds of dosages.",
-                        "Oral ingestions are always on an empty stomach and therefore not delayed (by up to 4 hours).",
+                        "The saved stomach-fullness setting delays oral curves by its estimated onset delay. Other administration routes are not delayed. Recorded ingestion times stay unchanged.",
                     )
                 )
             }
@@ -84,7 +84,7 @@ fun ExplainTimelineScreen() {
                 BulletPoints(
                     points = listOf(
                         "The timeline is drawn based on the onset, comeup, peak and offset (and sometimes total) from PsychonautWiki.",
-                        "Touch and hold, drag horizontally, or hover over the graph to inspect each ingestion. Percentage of peak is its estimated curve height relative to its own peak. The mg equivalent is the recorded dose converted to milligrams and scaled by that percentage; it is a timeline estimate, not a measurement of drug remaining in the body. Unknown dose conversions and unknown dotted trajectories are shown as unavailable.",
+                        "Touch and hold, drag horizontally, or hover over the graph to inspect each ingestion or component curve. Percentage of peak is its estimated curve height relative to its own peak. The equivalent quantity scales the recorded or calculated quantity by that percentage. Mass doses are shown in milligrams; definitions with their own timeline can use their own units. This is a timeline estimate, not a measurement of drug remaining in the body. Unknown quantities and unknown dotted trajectories are shown as unavailable.",
                         "In the ideal case all 4 durations (onset, comeup, peak and offset) are defined and the full timeline is drawn as averageOnset -> averageComeup -> weightedPeak -> weightedOffset, where \"weighted\" means that the given range has been linearly interpolated with the dose, so if a threshold dose was taken it takes the minimum of the range, if a heavy dose was taken it takes the max and for everything in between it linearly interpolates.",
                         "The timelines from ingestions with the same substance and administration route where substances have onset, comeup, peak and offset defined are combined into a cumulative timeline by simply putting the individual lines on top of each other. This is not done for ingestions where either the onset, comeup, peak or offset duration is missing.",
                         "Different administration routes are always drawn as separate timelines even if they are of the same substance. They also take the full height of the canvas, not the height that is proportional to the dose or effect.",

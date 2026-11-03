@@ -48,12 +48,12 @@ class AllTimelinesModel(
 
     init {
         val ratingTimes = dataForRatings.map { it.time }
-        val ingestionTimes = dataForLines.map { it.startTime }
+        val ingestionTimes = dataForLines.map { it.recordedTime }
         val noteTimes = timedNotes.map { it.time }
         val allStartTimeCandidates = ratingTimes + ingestionTimes + noteTimes
         startTime =
             allStartTimeCandidates.reduce { acc, date -> if (acc.isBefore(date)) acc else date }
-        val roaGroups = dataForLines.groupBy { it.substanceName }
+        val roaGroups = dataForLines.groupBy { it.groupingKey }
             .flatMap { substanceGroup ->
                 val linesPerSubstance = substanceGroup.value
                 return@flatMap linesPerSubstance.groupBy { it.route }.map { routeGroup ->

@@ -8,6 +8,7 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.drawables.t
 import java.time.Duration
 import java.time.Instant
 import java.util.Locale
+import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 
 fun doseToMilligrams(dose: Double?, unit: String?): Double? {
     if (dose == null || !dose.isFinite() || dose < 0) return null
@@ -23,14 +24,25 @@ fun doseToMilligrams(dose: Double?, unit: String?): Double? {
 data class TimelineCursorReadout(
     val ingestion: DataForOneEffectLine,
     val peakFraction: Float?,
-    val milligramEquivalent: Double?
+    val milligramEquivalent: Double?,
+    val quantityEquivalent: Double? = null,
 )
+
+fun TimelineCursorReadout.equivalentText(): String {
+    val unit = ingestion.quantityUnit?.takeIf { it.isNotBlank() }
+    if (unit != null) {
+        val amount = quantityEquivalent ?: return "$unit equivalent unavailable"
+        val label = if (amount == 1.0) unit else ingestion.quantityUnitPlural?.takeIf { it.isNotBlank() } ?: unit
+        return "${amount.toReadableString()} $label equivalent"
+    }
+    return milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" } ?: "mg equivalent unavailable"
+}
 
 /** Per-ingestion estimates, independent of the graph's display-height normalization. */
 class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
     private data class Curve(val ingestion: DataForOneEffectLine, val full: FullTimelines?)
 
-    private val curves = lines.groupBy { it.substanceName to it.route }.values.flatMap { group ->
+    private val curves = lines.groupBy { it.groupingKey to it.route }.values.flatMap { group ->
         // The renderer uses the first route duration for every ingestion in the group.
         group.map { original ->
             val line = original.copy(roaDuration = group.first().roaDuration)
@@ -56,7 +68,9 @@ class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
         }
         val equivalent = if (fraction != null) line.doseInMilligrams?.let { it * fraction }
             ?.takeIf { it.isFinite() && it >= 0 } else null
-        TimelineCursorReadout(line, fraction, equivalent)
+        val quantityEquivalent = if (fraction != null) line.quantity?.let { it * fraction }
+            ?.takeIf { it.isFinite() && it >= 0 } else null
+        TimelineCursorReadout(line, fraction, equivalent, quantityEquivalent)
     }
 
     private fun knownPartialFraction(line: DataForOneEffectLine, seconds: Float): Float? {

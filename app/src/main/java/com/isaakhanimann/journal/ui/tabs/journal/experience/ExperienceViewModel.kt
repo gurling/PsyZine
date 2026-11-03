@@ -23,9 +23,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
-import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
-import com.isaakhanimann.journal.data.substances.classes.Substance
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDuration
 import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
@@ -35,7 +33,6 @@ import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.hourLimitToSe
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.DataForOneEffectLine
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.SavedTimeDisplayOption
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.TimeDisplayOption
-import com.isaakhanimann.journal.ui.tabs.journal.experience.components.getStrengthRelativeToCommonDose
 import com.isaakhanimann.journal.ui.tabs.journal.experience.models.ConsumerWithIngestions
 import com.isaakhanimann.journal.ui.tabs.journal.experience.models.CumulativeDose
 import com.isaakhanimann.journal.ui.tabs.journal.experience.models.CumulativeRouteAndDose
@@ -47,13 +44,18 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.DataForOneT
 import com.isaakhanimann.journal.ui.tabs.settings.combinations.CombinationSettingsStorage
 import com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
+import com.isaakhanimann.journal.ui.tabs.journal.experience.models.CumulativeProjection
+import com.isaakhanimann.journal.ui.tabs.journal.experience.models.projectedCumulativeDoses
+import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.PresentedIngestion
+import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
@@ -63,6 +65,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class ExperienceViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
@@ -72,6 +75,7 @@ class ExperienceViewModel @Inject constructor(
     private val userPreferences: UserPreferences,
     combinationSettingsStorage: CombinationSettingsStorage,
     private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
+    records: com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository,
     state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
@@ -115,63 +119,34 @@ class ExperienceViewModel @Inject constructor(
 
     private val experienceId: Int
 
-    private val localIsFavoriteFlow = MutableStateFlow(false)
-
-    val isFavoriteFlow = localIsFavoriteFlow.stateIn(
-        initialValue = false,
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
-
     init {
         val experienceRoute = ExperienceRoute(state.journalRecordId("experienceId"))
         val expId = experienceRoute.experienceId
         experienceId = expId
         session.load {
-            val experience = experienceRepo.getExperience(expId) ?: error("This experience was deleted. Close this screen.")
-            val isFavorite = experience?.isFavorite ?: false
-            localIsFavoriteFlow.emit(isFavorite)
+            checkNotNull(experienceRepo.getExperience(expId)) { "This experience was deleted. Close this screen." }
         }
     }
 
     fun saveIsFavorite(isFavorite: Boolean) {
         session.run {
             experienceRepo.updateFavorite(experienceId, isFavorite, session.generation)
-            localIsFavoriteFlow.emit(isFavorite)
         }
     }
 
-    val photos = attachments.observe(experienceId).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
-
-    val ingestionsWithCompanionsFlow =
-        experienceRepo.getIngestionsWithCompanionsFlow(experienceId)
-            .stateIn(
-                initialValue = emptyList(),
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(0)
-            )
-
-    val ratingsFlow =
-        experienceRepo.getRatingsFlow(experienceId)
-            .stateIn(
-                initialValue = emptyList(),
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(0)
-            )
-
-    val timedNotesSortedFlow =
-        experienceRepo.getTimedNotesFlowSorted(experienceId)
-            .stateIn(
-                initialValue = emptyList(),
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(0)
-            )
-
-    val experienceFlow = experienceRepo.getExperienceFlow(experienceId).stateIn(
-        initialValue = null,
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
+    val recordState = com.isaakhanimann.journal.ui.utils.journalReadSession(viewModelScope, state) { generation ->
+        records.observeTimeline(experienceId, generation)
+    }
+    val photos = recordState.map { it.value?.photos.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val ingestionsWithCompanionsFlow = recordState.map { it.value?.ingestions.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val ratingsFlow = recordState.map { it.value?.ratings.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val timedNotesSortedFlow = recordState.map { it.value?.timedNotes.orEmpty() }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val experienceFlow = recordState.map { it.value?.experience }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), null)
 
     private val currentTimeFlow: Flow<Instant> = flow {
         while (true) {
@@ -214,132 +189,51 @@ class ExperienceViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(0)
         )
 
-    private val sortedIngestionsWithCompanionsFlow =
-        ingestionsWithCompanionsFlow.map { ingestionsWithCompanions ->
-            ingestionsWithCompanions.sortedBy { it.ingestion.time }
-        }
+    private data class EffectsSnapshot(
+        val byConsumer: Map<String?, List<PresentedIngestion>> = emptyMap(),
+        val cumulative: CumulativeProjection = CumulativeProjection(),
+    )
 
-    private val ingestionsWithAssociatedDataFlow: Flow<List<IngestionWithAssociatedData>> =
-        sortedIngestionsWithCompanionsFlow.map { ingestionsWithComps ->
-            ingestionsWithComps.map { oneIngestionWithComp ->
-                val ingestion = oneIngestionWithComp.ingestion
-                val roa = substanceRepo.getSubstance(oneIngestionWithComp.ingestion.substanceName)
-                    ?.getRoa(ingestion.administrationRoute)
-                val roaDuration = roa?.roaDuration
-                IngestionWithAssociatedData(
-                    ingestionWithCompanionAndCustomUnit = oneIngestionWithComp,
-                    roaDuration = roaDuration,
-                    roaDose = roa?.roaDose
-                )
+    private val effectsSnapshot = recordState.mapLatest { state ->
+        val record = state.value ?: return@mapLatest EffectsSnapshot()
+        val context = currentCoroutineContext()
+        val catalog = substanceRepo.getAllSubstances()
+        val presented = record.ingestions.sortedWith(compareBy<IngestionWithCompanionAndCustomUnit> { it.ingestion.time }
+            .thenBy { it.ingestion.id }).groupBy { it.ingestion.consumerName }.mapValues { (_, rows) ->
+            TimelineModelFactory.projectRecords(rows, catalog, record.definitionGraph, record.companionMap) { context.ensureActive() }
+        }
+        val totals = projectedCumulativeDoses(presented[null].orEmpty(), record.definitionGraph, catalog.associateBy { it.name }) { context.ensureActive() }
+        EffectsSnapshot(presented, totals)
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), EffectsSnapshot())
+
+    private val myPresentedRecordsFlow = effectsSnapshot.map { it.byConsumer[null].orEmpty() }
+    val ingestionElementsFlow = myPresentedRecordsFlow.map { records -> records.map { it.element } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val dataForEffectTimelinesFlow = myPresentedRecordsFlow.map { records -> records.flatMap { it.curves } }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val cumulativeProjectionFlow = effectsSnapshot.map { it.cumulative }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), CumulativeProjection())
+    val cumulativeDosesFlow = cumulativeProjectionFlow.map { it.totals }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+
+    val consumersWithIngestionsFlow = combine(effectsSnapshot, isTimelineHiddenFlow, areSubstanceHeightsIndependentFlow) {
+            snapshot, isHidden, independent ->
+        snapshot.byConsumer.mapNotNull { (consumer, records) ->
+            if (consumer == null) return@mapNotNull null
+            val lines = records.flatMap { it.curves }
+            val display = when {
+                isHidden -> TimelineDisplayOption.Hidden
+                lines.none { it.roaDuration != null } -> TimelineDisplayOption.NotWorthDrawing
+                else -> TimelineDisplayOption.Shown(AllTimelinesModel(lines, emptyList(), emptyList(), independent))
             }
+            ConsumerWithIngestions(consumer, records.map { it.element }, lines, display)
         }
-
-    private val myIngestionsWithAssociatedDataFlow =
-        ingestionsWithAssociatedDataFlow.map { ingestions ->
-            ingestions.filter { it.ingestionWithCompanionAndCustomUnit.ingestion.consumerName == null }
-        }
-
-    val consumersWithIngestionsFlow = combine(
-        ingestionsWithAssociatedDataFlow,
-        isTimelineHiddenFlow,
-        areSubstanceHeightsIndependentFlow
-    ) { ingestions, isTimelineHidden, areSubstanceHeightsIndependent ->
-        val otherIngestions =
-            ingestions.filter { it.ingestionWithCompanionAndCustomUnit.ingestion.consumerName != null }
-        val groupedByConsumer =
-            otherIngestions.groupBy { it.ingestionWithCompanionAndCustomUnit.ingestion.consumerName }
-        return@combine groupedByConsumer.mapNotNull { entry ->
-            val consumerName = entry.key ?: return@mapNotNull null
-            val sortedIngestionsWith =
-                entry.value.sortedBy { it.ingestionWithCompanionAndCustomUnit.ingestion.time }
-            val ingestionElements =
-                getIngestionElements(sortedIngestionsWith = sortedIngestionsWith)
-            val substances =
-                ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-            val dataForEffectLines = com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(ingestionElements, substances)
-            val timelineDisplayOption = if (isTimelineHidden) {
-                TimelineDisplayOption.Hidden
-            } else {
-                val isWorthDrawing =
-                    ingestionElements.isNotEmpty() && !(ingestionElements.all { it.roaDuration == null })
-                if (isWorthDrawing) {
-                    val model = AllTimelinesModel(
-                        dataForLines = dataForEffectLines,
-                        dataForRatings = emptyList(),
-                        timedNotes = emptyList(),
-                        areSubstanceHeightsIndependent = areSubstanceHeightsIndependent
-                    )
-                    TimelineDisplayOption.Shown(model)
-                } else {
-                    TimelineDisplayOption.NotWorthDrawing
-                }
-            }
-            return@mapNotNull ConsumerWithIngestions(
-                consumerName = consumerName,
-                ingestionElements = ingestionElements,
-                dataForEffectLines = dataForEffectLines,
-                timelineDisplayOption = timelineDisplayOption
-            )
-        }
-    }.flowOn(Dispatchers.Default)
-        .stateIn(
-        initialValue = emptyList(),
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
-
-    val ingestionElementsFlow = myIngestionsWithAssociatedDataFlow.map {
-        getIngestionElements(it)
-    }.stateIn(
-        initialValue = emptyList(),
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
-
-    val dataForEffectTimelinesFlow = ingestionElementsFlow.map { ingestionElements ->
-        val substances =
-            ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(ingestionElements = ingestionElements, substances = substances)
-    }.stateIn(
-        initialValue = emptyList(),
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
-
-    val cumulativeDosesFlow = myIngestionsWithAssociatedDataFlow.map {
-        getCumulativeDoses(it)
-    }.stateIn(
-        initialValue = emptyList(),
-        scope = viewModelScope,
-        started = SharingStarted.WhileSubscribed(0)
-    )
-
-    private fun getIngestionElements(sortedIngestionsWith: List<IngestionWithAssociatedData>): List<IngestionElement> {
-        return sortedIngestionsWith.map { ingestionWith ->
-            val numDots =
-                if (ingestionWith.ingestionWithCompanionAndCustomUnit.customUnit != null) {
-                    ingestionWith.roaDose?.getNumDots(
-                        ingestionDose = ingestionWith.ingestionWithCompanionAndCustomUnit.customUnitDose?.calculatedDose,
-                        ingestionUnits = ingestionWith.ingestionWithCompanionAndCustomUnit.customUnit?.originalUnit
-                    )
-                } else {
-                    ingestionWith.roaDose?.getNumDots(
-                        ingestionWith.ingestionWithCompanionAndCustomUnit.ingestion.dose,
-                        ingestionUnits = ingestionWith.ingestionWithCompanionAndCustomUnit.ingestion.units
-                    )
-                }
-            IngestionElement(
-                ingestionWithCompanionAndCustomUnit = ingestionWith.ingestionWithCompanionAndCustomUnit,
-                roaDuration = ingestionWith.roaDuration,
-                numDots = numDots
-            )
-        }
-    }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
 
     val interactionsFlow =
-        sortedIngestionsWithCompanionsFlow.combine(combinationSettingsStorage.enabledInteractionsFlow) { ingestions, enabledInteractions ->
+        myPresentedRecordsFlow.combine(combinationSettingsStorage.enabledInteractionsFlow) { records, enabledInteractions ->
             val interactionsToCheck =
-                ingestions.filter { it.ingestion.consumerName == null }.mapNotNull { it.ingestion.substanceName }.plus(enabledInteractions).distinct()
+                records.flatMap { it.contributions }.mapNotNull { (it.subject as? com.isaakhanimann.journal.data.definitions.SubjectId.Catalog)?.name }.plus(enabledInteractions).distinct()
             return@combine interactionsToCheck.flatMapIndexed { index: Int, interaction: String ->
                 return@flatMapIndexed interactionsToCheck.drop(index + 1).mapNotNull { other ->
                     interactionChecker.getInteractionBetween(
@@ -397,7 +291,7 @@ class ExperienceViewModel @Inject constructor(
         } else if (dataForEffectLines.isEmpty()) {
             return@combine TimelineDisplayOption.NotWorthDrawing
         } else {
-            val dataForRatings = ratings.mapNotNull {
+            val dataForRatings = ratings.filterNot { it.isHiddenInTimeline }.mapNotNull {
                 val ratingTime = it.time
                 return@mapNotNull if (ratingTime == null) {
                     null
@@ -414,7 +308,7 @@ class ExperienceViewModel @Inject constructor(
                         DataForOneTimedNote(time = it.time, color = it.color)
                     }
             val isWorthDrawing =
-                ingestionElements.isNotEmpty() && !(ingestionElements.all { it.roaDuration == null } && dataForRatings.isEmpty() && dataForTimedNotes.isEmpty())
+                dataForEffectLines.any { it.roaDuration != null } || dataForRatings.isNotEmpty() || dataForTimedNotes.isNotEmpty()
             if (isWorthDrawing) {
                 val model = AllTimelinesModel(
                     dataForLines = dataForEffectLines,

@@ -39,8 +39,9 @@ class CustomDefinitionGraph(
     val roaInfos: List<CustomRoaInfo>,
 ) {
     val definitions = definitions.associateBy { it.id }
-    private val children = components.groupBy { it.parentCustomUnitId }
+    internal val children = components.groupBy { it.parentCustomUnitId }
         .mapValues { (_, rows) -> rows.sortedWith(compareBy<DoseComponent> { it.creationDate }.thenBy { it.id }) }
+    internal val ownRoutes = roaInfos.associateBy { it.customUnitId to it.administrationRoute }
     init { require(this.definitions.size == definitions.size) { "Duplicate custom definition IDs." } }
 
     fun validateFrom(id: Int) {
@@ -98,10 +99,11 @@ class CustomDefinitionGraph(
         definitions.keys.forEach(::depth)
     }
 
-    fun resolve(id: Int, quantity: DoseQuantity): List<ResolvedDose> {
+    fun resolve(id: Int, quantity: DoseQuantity, checkCancelled: () -> Unit = {}): List<ResolvedDose> {
         val result = mutableListOf<ResolvedDose>()
         val visiting = mutableSetOf<Int>()
         fun visit(unitId: Int, amount: DoseQuantity, path: List<Int>, hidden: Boolean) {
+            checkCancelled()
             require(visiting.add(unitId) && visiting.size <= 64) { "This definition contains a cycle or is nested too deeply. Edit its components." }
             val unit = definitions[unitId] ?: error("This definition is missing. Reopen the entry and choose another definition.")
             val hide = hidden || unit.isHiddenInTimeline
@@ -112,6 +114,8 @@ class CustomDefinitionGraph(
                     amount.times(DoseQuantity(unit.dose, unit.isEstimate, unit.estimatedDoseStandardDeviation)), path, hide)
                 else ResolvedDose(SubjectId.Definition(unitId), unit.name, unit.unit, amount, path, hide)
             } else parts.forEach { part ->
+                checkCancelled()
+                require((part.substanceName != null) xor (part.childCustomUnitId != null)) { "A component must have exactly one target." }
                 val combined = amount.times(DoseQuantity(part.dose, part.isEstimate, part.estimatedDoseStandardDeviation))
                 val nextPath = path + part.id
                 val child = part.childCustomUnitId

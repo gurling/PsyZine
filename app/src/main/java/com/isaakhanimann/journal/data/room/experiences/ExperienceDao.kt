@@ -53,11 +53,13 @@ interface ExperienceDao {
 
     @RawQuery(observedEntities = [Experience::class, Ingestion::class, SubstanceCompanion::class,
         CustomUnit::class, ShulginRating::class, TimedNote::class,
+        DoseComponent::class, CustomRoaInfo::class,
         com.isaakhanimann.journal.data.room.attachments.PhotoAttachment::class,
         com.isaakhanimann.journal.data.room.attachments.JournalState::class])
     fun observeRecordChanges(query: SupportSQLiteQuery): Flow<Int>
 
     @RawQuery(observedEntities = [Experience::class, Ingestion::class, SubstanceCompanion::class, CustomUnit::class,
+        DoseComponent::class, CustomRoaInfo::class,
         com.isaakhanimann.journal.data.room.attachments.JournalState::class])
     fun observeActiveChanges(query: SupportSQLiteQuery): Flow<Int>
 

@@ -29,7 +29,7 @@ data class RoaDose(
     val heavyMin: Double?,
 ) {
     fun getDoseClass(ingestionDose: Double?, ingestionUnits: String? = units): DoseClass? {
-        if (ingestionUnits != units || ingestionDose == null) return null
+        if (ingestionUnits != units || ingestionDose == null || !ingestionDose.isFinite() || ingestionDose < 0) return null
         return if (lightMin != null && ingestionDose < lightMin) {
             DoseClass.THRESHOLD
         } else if (lightMin != null && commonMin != null && lightMin <= ingestionDose && ingestionDose < commonMin) {
@@ -46,7 +46,7 @@ data class RoaDose(
     }
 
     fun getNumDots(ingestionDose: Double?, ingestionUnits: String? = units): Int? {
-        if (ingestionUnits != units || ingestionDose == null) return null
+        if (ingestionUnits != units || ingestionDose == null || !ingestionDose.isFinite() || ingestionDose < 0) return null
         if (lightMin != null && ingestionDose < lightMin) {
             return 0
         } else if (lightMin != null && commonMin != null && lightMin <= ingestionDose && ingestionDose < commonMin) {
@@ -56,8 +56,11 @@ data class RoaDose(
         } else if (strongMin != null && heavyMin != null && strongMin <= ingestionDose && ingestionDose < heavyMin) {
             return 3
         } else if (heavyMin != null) {
+            if (!heavyMin.isFinite() || heavyMin <= 0.0) return null
             return if (heavyMin <= ingestionDose) {
-                val timesHeavy = floor(ingestionDose.div(heavyMin)).roundToInt()
+                val groups = floor(ingestionDose.div(heavyMin))
+                if (!groups.isFinite() || groups > (Int.MAX_VALUE - 4) / 4) return null
+                val timesHeavy = groups.roundToInt()
                 val rest = ingestionDose.rem(heavyMin)
                 return (timesHeavy * 4) + getNumDotsUpTo4(dose = rest)
             } else {

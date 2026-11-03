@@ -190,13 +190,13 @@ fun AllTimelines(
         cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + ". " + model.cursorModel.at(time).joinToString { value ->
             "${value.ingestion.substanceName}, ${value.ingestion.route.displayText}, " +
                 (value.peakFraction?.let { "${(it * 100).roundToInt()} percent of peak" } ?: "peak percentage unavailable") + ", " +
-                (value.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" } ?: "mg equivalent unavailable")
+                value.equivalentText()
         }
     } ?: "Cursor hidden"
 
     Box(modifier = modifier.semantics {
         contentDescription = "Estimated effect timeline from ${model.startTime.getShortTimeText()}. " +
-            model.cursorModel.at(model.startTime).joinToString { "${it.ingestion.substanceName}, ${it.ingestion.route.displayText}, ${it.ingestion.startTime.getShortTimeText()}" }
+            model.cursorModel.at(model.startTime).joinToString { "${it.ingestion.substanceName}, ${it.ingestion.route.displayText}, ${it.ingestion.recordedTime.getShortTimeText()}" }
         stateDescription = cursorSummary
         customActions = listOf(
             CustomAccessibilityAction("Move cursor earlier by 15 minutes") { moveCursor(-1) },
@@ -334,12 +334,11 @@ fun AllTimelines(
                         style = MaterialTheme.typography.labelLarge)
                     Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
                         readouts.forEach { readout ->
-                            Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.startTime.getShortTimeText()}",
+                            Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.recordedTime.getShortTimeText()}",
                                 style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
                             val percentage = readout.peakFraction?.let { "${(it * 100).roundToInt()}% of peak" }
                                 ?: "Peak percentage unavailable"
-                            val equivalent = readout.milligramEquivalent?.let { "${it.toReadableString()} mg equivalent" }
-                                ?: "mg equivalent unavailable"
+                            val equivalent = readout.equivalentText()
                             Text("$percentage · $equivalent", style = MaterialTheme.typography.bodySmall)
                         }
                     }
