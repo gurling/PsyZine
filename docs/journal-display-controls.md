@@ -27,6 +27,15 @@ The choices persist and travel in optional backup fields; absent fields in older
 backups retain the current values. Preference failures use the existing readable
 Settings error and retain previous choices.
 
+Timeline quantity panels also offer an optional “Group by subject” view. Groups
+use persistent subject identity and administration route. Peak percentages come
+from the combined raw curve, independently of the chart's height normalization.
+The equivalent amount is the sum of existing per-ingestion estimates, labeled
+separately from the combined-peak percentage. Unknown contributions keep totals
+unknown; incompatible quantity units are not added. Compatible mass equivalents
+may still be shown in mg. The original per-ingestion view remains the default.
+Group curves are cached on demand, and hiding quantities skips grouped readouts.
+
 ## Focused development checks — 9 November 2026
 
 - Direct debug APK build passed; Direct and Play JVM suites passed 150 tests each.
@@ -44,3 +53,8 @@ The section-visibility follow-up passed 11 focused tests (nine preference and
 two backup metadata cases), the Direct debug APK build and diff checks. These
 cover persistence, partial restore, absent fields, round trips and failed writes.
 Device interaction, lint and full-regression checks were not run for this batch.
+
+The grouped quantity follow-up passed ten focused cursor tests, the Direct debug
+APK build and diff checks. Cases cover combined peaks, separated ingestions,
+typed identities/routes, unknown quantities and the existing individual cursor
+behavior. New panel interaction and large-font device checks were not run.

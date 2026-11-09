@@ -11,6 +11,31 @@ import org.junit.Test
 import java.time.Instant
 
 class TimelineCursorTest {
+    @Test fun groupedPeaksUseTheCombinedCurveAndKeepIndividualEstimates() {
+        val lines = listOf(line().copy(quantity = 2.0, quantityUnit = "capsule"),
+            line().copy(quantity = 3.0, quantityUnit = "capsule"))
+        val model = TimelineCursorModel(lines)
+        val group = model.groupedAt(start.plusSeconds(40)).single()
+        assertEquals(2, group.contributionCount)
+        assertEquals(1f, group.value.peakFraction!!, .0001f)
+        assertEquals(5.0, group.value.quantityEquivalent!!, .0001)
+        assertEquals(2, model.at(start.plusSeconds(40)).size)
+    }
+    @Test fun groupedReadoutsSeparateTypedSubjectsAndRoutesAndKeepUnknownAmounts() {
+        val model = TimelineCursorModel(listOf(line().copy(subjectKey = "custom:1"),
+            line(null).copy(subjectKey = "custom:1"), line().copy(subjectKey = "custom:2"),
+            line().copy(subjectKey = "custom:1", route = AdministrationRoute.SMOKED)))
+        val groups = model.groupedAt(start.plusSeconds(40))
+        assertEquals(3, groups.size)
+        assertNull(groups.first().value.milligramEquivalent)
+        assertEquals(1f, groups.first().value.peakFraction!!, .0001f)
+    }
+    @Test fun separatedIngestionsUseTheirActualCombinedPeakRatherThanSumOfIndividualPeaks() {
+        val model = TimelineCursorModel(listOf(line(), line().copy(startTime = start.plusSeconds(200))))
+        assertEquals(1f, model.groupedAt(start.plusSeconds(40)).single().value.peakFraction!!, .0001f)
+        val partial = TimelineCursorModel(listOf(line(), line().copy(roaDuration = null, subjectKey = "other")))
+        assertNull(partial.groupedAt(start).last().value.peakFraction)
+    }
     private val start = Instant.parse("2026-01-01T12:00:00Z")
     private fun range(seconds: Float) = DurationRange(seconds, seconds, DurationUnits.SECONDS)
     private val duration = RoaDuration(range(10f), range(20f), range(30f), range(40f), null, null)

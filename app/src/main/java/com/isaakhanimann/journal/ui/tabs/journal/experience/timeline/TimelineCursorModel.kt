@@ -27,6 +27,7 @@ data class TimelineCursorReadout(
     val milligramEquivalent: Double?,
     val quantityEquivalent: Double? = null,
 )
+data class GroupedTimelineReadout(val value: TimelineCursorReadout, val contributionCount: Int)
 
 fun TimelineCursorReadout.equivalentText(): String {
     val unit = ingestion.quantityUnit?.takeIf { it.isNotBlank() }
@@ -60,6 +61,33 @@ class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
     }
 
     val ingestions: List<DataForOneEffectLine> = curves.map { it.ingestion }
+    private data class Group(val indices: List<Int>, val start: Instant, val full: FullTimelines?)
+    private val groups by lazy { curves.indices.groupBy { curves[it].ingestion.groupingKey to curves[it].ingestion.route }.values.map { indices ->
+        val lines = indices.map { curves[it].ingestion }
+        val start = lines.minOf { it.startTime }
+        val full = if (indices.all { curves[it].full != null } && lines.all { it.height.isFinite() && it.height >= 0 }) {
+            lines.first().roaDuration?.toFullTimelines(lines.map { WeightedLine(it.startTime, it.endTime, it.horizontalWeight, it.height) }, start)
+                ?.takeIf { it.nonNormalisedHeight.isFinite() && it.nonNormalisedHeight > 0 }
+        } else null
+        Group(indices, start, full)
+    } }
+
+    /** Subject/route peaks use the combined raw curve, independent of the drawing scale. */
+    fun groupedAt(time: Instant): List<GroupedTimelineReadout> {
+        val values = at(time)
+        return groups.map { group ->
+            val parts = group.indices.map { values[it] }
+            val units = parts.map { it.ingestion.quantityUnit }.distinct()
+            fun sumKnown(numbers: List<Double?>): Double? = if (numbers.any { it == null || !it.isFinite() || it < 0 }) null
+                else numbers.sumOf { it!! }.takeIf(Double::isFinite)
+            val quantity = if (units.size == 1 && !units.single().isNullOrBlank()) sumKnown(parts.map { it.quantityEquivalent }) else null
+            val mg = sumKnown(parts.map { it.milligramEquivalent })
+            val line = if (units.size == 1) parts.first().ingestion else parts.first().ingestion.copy(quantityUnit = null, quantityUnitPlural = null)
+            val seconds = Duration.between(group.start, time).toMillis() / 1000f
+            val fraction = group.full?.let { (it.heightAt(seconds) / it.nonNormalisedHeight).takeIf(Float::isFinite)?.coerceIn(0f, 1f) }
+            GroupedTimelineReadout(TimelineCursorReadout(line, fraction, mg, quantity), parts.size)
+        }
+    }
 
     fun at(time: Instant): List<TimelineCursorReadout> = curves.map { (line, full) ->
         val seconds = Duration.between(line.startTime, time).toMillis() / 1000f

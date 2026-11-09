@@ -197,11 +197,16 @@ fun AllTimelines(
     } else null
     val panelPoint = cursorPoint ?: nowX?.takeIf { !hideQuantities }?.let { Offset(it, 0f) }
     val panelTime = accessibleTime ?: currentTime.takeIf { panelPoint != null }
+    var groupQuantities by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    val groupedReadouts = remember(model, panelTime, hideQuantities, groupQuantities) {
+        if (panelTime != null && !hideQuantities && groupQuantities) model.cursorModel.groupedAt(panelTime) else emptyList()
+    }
     val readouts = remember(model, panelTime, hideQuantities) {
         if (panelTime != null && !hideQuantities) model.cursorModel.at(panelTime) else emptyList()
     }
     val cursorSummary = accessibleTime?.let { time ->
-        cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + if (hideQuantities) "" else ". " + readouts.joinToString { value ->
+        cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + if (hideQuantities) "" else ". " +
+        (if (groupQuantities) groupedReadouts.map { it.value } else readouts).joinToString { value ->
             "${value.ingestion.substanceName}, ${value.ingestion.route.displayText}, " +
                 (value.peakFraction?.let { "${(it * 100).roundToInt()} percent of peak" } ?: "peak percentage unavailable") + ", " +
                 value.equivalentText()
@@ -349,7 +354,19 @@ fun AllTimelines(
                     Text(if (cursorPoint == null) "Now · ${time.getShortTimeText()}" else cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
                         style = MaterialTheme.typography.labelLarge)
                     if (!hideQuantities) {
+                    androidx.compose.material3.TextButton(onClick = { groupQuantities = !groupQuantities }) {
+                        Text(if (groupQuantities) "Show per ingestion" else "Group by subject")
+                    }
                     LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth().testTag("timeline-quantity-list")) {
+                        if (groupQuantities) {
+                            itemsIndexed(groupedReadouts, key = { _, value -> "group:${value.value.ingestion.groupingKey}:${value.value.ingestion.route}" }) { _, group ->
+                                val value = group.value
+                                Text("${value.ingestion.substanceName} · ${value.ingestion.route.displayText} · ${group.contributionCount} contributions",
+                                    style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
+                                val percentage = value.peakFraction?.let { "${(it * 100).roundToInt()}% of combined peak" } ?: "Combined peak unavailable"
+                                Text("$percentage · ${value.equivalentText()}", style = MaterialTheme.typography.bodySmall)
+                            }
+                        } else {
                         itemsIndexed(readouts, key = { index, value -> "${value.ingestion.sourceIngestionId}:${value.ingestion.componentPath}:$index" }) { _, readout ->
                             Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.recordedTime.getShortTimeText()}",
                                 style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
@@ -358,8 +375,9 @@ fun AllTimelines(
                             val equivalent = readout.equivalentText()
                             Text("$percentage · $equivalent", style = MaterialTheme.typography.bodySmall)
                         }
+                        }
                     }
-                    Text("Per-ingestion timeline estimate", style = MaterialTheme.typography.labelSmall,
+                    Text(if (groupQuantities) "Combined peak; summed per-ingestion equivalents" else "Per-ingestion timeline estimate", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
                     }
                 }
