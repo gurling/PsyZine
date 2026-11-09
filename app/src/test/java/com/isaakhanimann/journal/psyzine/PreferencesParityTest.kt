@@ -47,6 +47,19 @@ class PreferencesParityTest {
         try { user.restoreJournalDisplaySettings(true, false); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
         assertEquals(JournalDisplaySettings(false, true), user.journalDisplaySettingsFlow.first())
     }
+    @Test fun statisticsCustomPeriodRetainsItsDatesAcrossReentryAndFailedWrites() = runTest {
+        val store = Store(); val user = UserPreferences(store)
+        val start = java.time.LocalDate.of(2026, 10, 10); val end = java.time.LocalDate.of(2026, 11, 14)
+        val metric = com.isaakhanimann.journal.data.definitions.StatisticsMetric.DOSAGE
+        val period = com.isaakhanimann.journal.data.definitions.StatisticsPeriod.CUSTOM
+        assertEquals(com.isaakhanimann.journal.data.definitions.StatisticsSelection(), user.advancedStatisticsSelectionFlow.first())
+        user.saveAdvancedStatisticsSelection(metric, period, start, end)
+        val expected = com.isaakhanimann.journal.data.definitions.StatisticsSelection(metric, period, start, end)
+        assertEquals(expected, UserPreferences(store).advancedStatisticsSelectionFlow.first())
+        store.fail = true
+        try { user.saveAdvancedStatisticsSelection(customStart = start.plusDays(1), customEnd = end); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(expected, user.advancedStatisticsSelectionFlow.first())
+    }
     @Test fun everyThemePersistsAndUnknownSelectionRecovers() = runTest {
         val store = Store(); val appearance = AppearanceRepository(store)
         ThemeId.entries.forEach { theme ->

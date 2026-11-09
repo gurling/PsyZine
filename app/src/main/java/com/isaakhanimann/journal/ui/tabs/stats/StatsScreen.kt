@@ -86,6 +86,7 @@ fun StatsScreen(
     viewModel: StatsViewModel = hiltViewModel(),
     navigateToSubstanceCompanion: (substanceName: String, consumerName: String?) -> Unit,
     navigateToTolerance: () -> Unit = {},
+    navigateToAdvancedStatistics: () -> Unit = {},
 ) {
     StatsScreen(
         navigateToSubstanceCompanion = navigateToSubstanceCompanion,
@@ -94,6 +95,7 @@ fun StatsScreen(
         onChangeConsumerName = viewModel::onChangeConsumer,
         consumerNamesSorted = viewModel.sortedConsumerNamesFlow.collectAsStateWithLifecycle().value,
         navigateToTolerance = navigateToTolerance,
+        navigateToAdvancedStatistics = navigateToAdvancedStatistics,
     )
 }
 
@@ -124,6 +126,7 @@ fun StatsScreen(
     onChangeConsumerName: (String?) -> Unit,
     consumerNamesSorted: List<String>,
     navigateToTolerance: () -> Unit = {},
+    navigateToAdvancedStatistics: () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -181,6 +184,7 @@ fun StatsScreen(
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
             TextButton(onClick = navigateToTolerance, modifier = Modifier.padding(horizontal = horizontalPadding)) { Text("Tolerance") }
+            TextButton(onClick = navigateToAdvancedStatistics, modifier = Modifier.padding(horizontal = horizontalPadding)) { Text("Advanced statistics") }
             Box(Modifier.weight(1f)) {
                 if (!statsModel.areThereAnyIngestions) {
                     EmptyScreenDisclaimer(

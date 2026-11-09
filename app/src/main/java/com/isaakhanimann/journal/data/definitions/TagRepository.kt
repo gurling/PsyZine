@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.combine
 @Serializable
 data class TagAssignmentSnapshot(val tags: List<SubstanceTag>, val memberships: List<SubstanceTagMembership>, val subjectVersion: String?, val subjectName: String)
 
-data class TagFilterSnapshot(val generation: String, val tags: List<SubstanceTag>, val memberships: Map<String, Set<String>>)
+data class TagFilterSnapshot(val generation: String, val tags: List<SubstanceTag>, val memberships: Map<String, Set<String>>,
+    val primaryTags: Map<String, String> = emptyMap())
 
 fun primaryTagId(tags: List<SubstanceTag>, selected: Set<String>, preferred: String?): String? =
     preferred?.takeIf { it in selected } ?: tags.filter { it.id in selected }

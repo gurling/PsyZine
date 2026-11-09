@@ -49,6 +49,10 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_TOLERANCE_STATS_PERIOD = stringPreferencesKey("tolerance_stats_period")
         val KEY_SHOW_COMPONENTS = booleanPreferencesKey("KEY_ARE_SUB_COMPONENTS_SHOWN")
         val KEY_HIDE_TIMELINE_QUANTITIES = booleanPreferencesKey("key_hide_timeline_quantity_info")
+        val KEY_ADVANCED_STATS_METRIC = stringPreferencesKey("advanced_stats_metric")
+        val KEY_ADVANCED_STATS_PERIOD = stringPreferencesKey("advanced_stats_period")
+        val KEY_ADVANCED_STATS_START = stringPreferencesKey("advanced_stats_start")
+        val KEY_ADVANCED_STATS_END = stringPreferencesKey("advanced_stats_end")
     }
 
     val journalDisplaySettingsFlow = dataStore.data.map {
@@ -70,6 +74,35 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
 
     val toleranceStatsPeriodFlow = dataStore.data.map {
         com.isaakhanimann.journal.data.definitions.TolerancePeriod.fromName(it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD])
+    }
+
+    val advancedStatisticsSelectionFlow = dataStore.data.map { values ->
+        com.isaakhanimann.journal.data.definitions.StatisticsSelection(
+            com.isaakhanimann.journal.data.definitions.StatisticsMetric.entries.firstOrNull {
+                it.name == values[PreferencesKeys.KEY_ADVANCED_STATS_METRIC]
+            } ?: com.isaakhanimann.journal.data.definitions.StatisticsMetric.EXPERIENCES,
+            com.isaakhanimann.journal.data.definitions.StatisticsPeriod.entries.firstOrNull {
+                it.name == values[PreferencesKeys.KEY_ADVANCED_STATS_PERIOD]
+            } ?: com.isaakhanimann.journal.data.definitions.StatisticsPeriod.WEEKS_12,
+            values[PreferencesKeys.KEY_ADVANCED_STATS_START]?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
+            values[PreferencesKeys.KEY_ADVANCED_STATS_END]?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() })
+    }
+
+    suspend fun saveAdvancedStatisticsSelection(metric: com.isaakhanimann.journal.data.definitions.StatisticsMetric? = null,
+        period: com.isaakhanimann.journal.data.definitions.StatisticsPeriod? = null,
+        customStart: java.time.LocalDate? = null, customEnd: java.time.LocalDate? = null) {
+        if (customStart != null || customEnd != null) {
+            require(customStart != null && customEnd != null && customStart <= customEnd) { "Enter a valid start and end date." }
+            require(customStart.year in 1..9999 && customEnd.year in 1..9999 && customEnd.year - customStart.year < 31) {
+                "Choose a range with at most 31 yearly buckets."
+            }
+        }
+        dataStore.edit { values ->
+            metric?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_METRIC] = it.name }
+            period?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_PERIOD] = it.name }
+            customStart?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_START] = it.toString() }
+            customEnd?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_END] = it.toString() }
+        }
     }
     suspend fun saveToleranceStatsPeriod(value: com.isaakhanimann.journal.data.definitions.TolerancePeriod) {
         dataStore.edit { it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD] = value.name }

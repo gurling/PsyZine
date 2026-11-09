@@ -1,5 +1,8 @@
 # PsyZine verification and acceptance
 
+The [advanced journal statistics](advanced-statistics.md) increment adds a separate
+calendar-based view while preserving the existing overview.
+
 The 9 November 2026 [journal display controls](journal-display-controls.md) record
 the focused development checks for persistent card and timeline options.
 

@@ -27,9 +27,11 @@ class SubjectBrowserRepository @Inject constructor(private val db: AppDatabase, 
             val snapshot = guard.readSession(null) { generation ->
                 val dao = db.definitionDao()
                 val definitions = dao.definitions()
-                val memberships = dao.memberships().groupBy { it.subjectId }
+                val assignmentRows = dao.memberships()
+                val memberships = assignmentRows.groupBy { it.subjectId }
                     .mapValues { (_, rows) -> rows.map { it.tagId }.toSet() }
-                val tags = TagFilterSnapshot(generation, dao.tags(), memberships)
+                val tags = TagFilterSnapshot(generation, dao.tags(), memberships,
+                    assignmentRows.filter { it.isPrimary }.associate { it.subjectId to it.tagId })
                 BrowserRead(tags, definitions, db.experienceDao().getAllCustomSubstances(), dao.recentBrowserIngestions(),
                     if (includeJournal) db.experienceDao().getAllExperiencesWithIngestionsTimedNotesAndRatingsSorted() else emptyList())
             }
