@@ -52,7 +52,10 @@ class ActiveNotificationRenderer(private val context: Context) {
         val stop = PendingIntent.getService(context, 0,
             android.content.Intent(context, ActiveExperienceService::class.java).setAction(ActiveExperienceService.ACTION_STOP),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val log = PendingIntent.getActivity(context, 0, logIngestionIntent(context, data.id, data.generation),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return base().setStyle(NotificationCompat.DecoratedCustomViewStyle()).setCustomContentView(collapsed).setCustomBigContentView(expanded)
+            .addAction(0, "Log ingestion", log)
             .addAction(0, "Stop automatic notification", stop)
             .setContentTitle(context.getString(R.string.live_activity_channel_name)).setContentText(summary)
             .setContentIntent(tap).setCategory(NotificationCompat.CATEGORY_STOPWATCH).setUsesChronometer(true)

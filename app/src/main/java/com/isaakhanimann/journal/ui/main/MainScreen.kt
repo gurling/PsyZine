@@ -51,6 +51,11 @@ fun MainScreen(
     if (accepted == null) return
     val displaySettings by viewModel.journalDisplaySettings.collectAsStateWithLifecycle()
     if (accepted) {
+        viewModel.navigationError?.let { message -> androidx.compose.material3.AlertDialog(
+            onDismissRequest = viewModel::clearNavigationError, title = { androidx.compose.material3.Text("Could not open ingestion form") },
+            text = { androidx.compose.material3.Text(message) }, confirmButton = {
+                androidx.compose.material3.TextButton(onClick = viewModel::clearNavigationError) { androidx.compose.material3.Text("OK") }
+            }) }
         val navController = rememberNavController()
         androidx.compose.runtime.LaunchedEffect(experienceRequest?.token) {
             experienceRequest?.let {
@@ -58,7 +63,14 @@ fun MainScreen(
                 val editingSameEntry = entry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>() == true &&
                     entry.toRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>().experienceId == it.experienceId
                 // Keep an editor for this entry in focus; otherwise push without discarding drafts.
-                if (!editingSameEntry && viewModel.canOpen(it)) {
+                if (it.action == ExperienceNavigationAction.LOG_INGESTION) {
+                    val adding = entry?.destination?.hierarchy?.any { destination ->
+                        destination.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.AddIngestionRoute>()
+                    } == true
+                    if (!adding && viewModel.prepareNotificationIngestion(it)) {
+                        navController.navigate(com.isaakhanimann.journal.ui.main.navigation.graphs.AddIngestionRoute) { launchSingleTop = true }
+                    }
+                } else if (!editingSameEntry && viewModel.canOpen(it)) {
                     navController.navigate(com.isaakhanimann.journal.ui.main.navigation.graphs.ExperienceRoute(it.experienceId)) { launchSingleTop = true }
                 }
                 consumeExperienceRequest()

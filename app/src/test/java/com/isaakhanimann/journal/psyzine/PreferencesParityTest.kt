@@ -14,6 +14,18 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun notificationTimeResetIsAtomicAndDoesNotChangePresentationPreferences() = runTest {
+        val store = Store(); val prefs = UserPreferences(store)
+        val time = java.time.Instant.ofEpochSecond(123)
+        prefs.saveIngestionTimes(time, time)
+        store.fail = true
+        try { prefs.saveIngestionTimes(null, null); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(time, prefs.lastIngestionTimeOfExperienceFlow.first())
+        store.fail = false
+        prefs.saveIngestionTimes(null, null)
+        assertNull(prefs.lastIngestionTimeOfExperienceFlow.first())
+        assertTrue(PresentationPreferences(store).settings.first().enabled)
+    }
     @Test fun stoppingAutomaticNotificationPersistsWithoutChangingWidgetPrivacyAndFailuresRetainTheChoice() = runTest {
         val store = Store(); val prefs = PresentationPreferences(store)
         prefs.widgetDetails(false)

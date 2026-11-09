@@ -44,7 +44,7 @@ val ARE_CONDITIONS_ACCEPTED = booleanPreferencesKey("are_conditions_accepted")
 class MainScreenViewModel @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val database: AppDatabase,
-    userPreferences: com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences,
+    private val userPreferences: com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences,
 ) : ViewModel() {
 
     val journalDisplaySettings = userPreferences.journalDisplaySettingsFlow
@@ -75,6 +75,19 @@ class MainScreenViewModel @Inject constructor(
     var acceptError by mutableStateOf<String?>(null)
         private set
     fun clearAcceptError() { acceptError = null }
+    var navigationError by mutableStateOf<String?>(null); private set
+    fun clearNavigationError() { navigationError = null }
+    suspend fun prepareNotificationIngestion(request: ExperienceNavigationRequest): Boolean {
+        if (!canOpen(request)) return false
+        return try {
+            userPreferences.saveIngestionTimes(null, null)
+            canOpen(request)
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) {
+            navigationError = "Could not prepare a new ingestion. Your journal is unchanged. Try the notification again."
+            false
+        }
+    }
 
     fun accept() {
         viewModelScope.launch {

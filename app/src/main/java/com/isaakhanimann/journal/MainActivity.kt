@@ -182,7 +182,9 @@ class MainActivity : ComponentActivity() {
                 val exists = database.withTransaction {
                     database.photoAttachmentDao().generation() == generation && database.experienceDao().getExperience(id) != null
                 }
-                if (exists) experienceRequest = ExperienceNavigationRequest(id, generation)
+                if (exists) experienceRequest = ExperienceNavigationRequest(id, generation,
+                    action = if (intent.getBooleanExtra(com.isaakhanimann.journal.service.EXTRA_LOG_INGESTION, false))
+                        com.isaakhanimann.journal.ui.main.ExperienceNavigationAction.LOG_INGESTION else com.isaakhanimann.journal.ui.main.ExperienceNavigationAction.VIEW)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
                 android.util.Log.w("ActiveExperience", "Navigation unavailable: ${e.javaClass.simpleName}")
