@@ -29,8 +29,15 @@ SavedStateHandle; restored journals invalidate subject and bucket references.
 Preference failures retain previous choices and offer a readable error. No Room
 schema, journal records, photos or existing overview behavior are changed.
 
-This increment does not include co-occurrence statistics, between-experience
-breaks, experience-level dose distributions or inline experience tolerance.
+Expanded matching-record details also list co-occurring subjects, counted once
+per matching experience for the selected consumer. This context includes records
+outside the chosen dates without adding them to chart counts or dose totals.
+Select a subject in that list to open its matching experiences. Empty results
+have an explicit message. These relationships do not establish simultaneous use
+or an interaction.
+
+This increment does not include between-experience breaks, experience-level
+dose distributions or inline experience tolerance.
 The new choices remain local preferences; portable backup metadata is unchanged.
 
 ## Focused development checks — 9 November 2026
@@ -42,3 +49,8 @@ metric anchors, repeated/hidden ingredients, unknown values, tag grouping,
 cancellation, numeric extremes, and custom-date persistence/write failure.
 `git diff --check` passed. New-screen device interaction, full regression, lint
 and release qualification were not run for this increment.
+
+The co-occurrence follow-up passed 14 focused aggregation tests and the Direct
+debug APK build. Added cases cover consumer isolation, duplicate records,
+whole-experience context outside selected dates, selected buckets and empty
+results. Device interaction checks were not run for this follow-up.

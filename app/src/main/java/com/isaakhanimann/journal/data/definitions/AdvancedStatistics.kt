@@ -85,8 +85,10 @@ data class StatisticsDistribution(val sampleCount: Int, val excludedRecords: Int
 data class StatisticsDose(val subject: StatisticsSubject, val route: AdministrationRoute, val units: String?,
     val knownTotal: Double?, val knownRecords: Int, val unknownRecords: Int, val isEstimate: Boolean,
     val distribution: StatisticsDistribution? = null)
+data class StatisticsCoOccurrence(val subject: StatisticsSubject, val experienceIds: List<Int>)
 data class StatisticsGroup(val key: String, val name: String, val experienceCount: Int, val ingestionCount: Int,
-    val doses: List<StatisticsDose>, val records: List<StatisticsRecord>)
+    val doses: List<StatisticsDose>, val records: List<StatisticsRecord>,
+    val coOccurrences: List<StatisticsCoOccurrence> = emptyList())
 data class AdvancedStatisticsReport(val generation: String, val request: StatisticsRequest, val window: StatisticsWindow,
     val buckets: List<Double?>, val groups: List<StatisticsGroup>, val subjects: List<StatisticsSubject>,
     val consumers: List<String>, val invalidDefinitions: Int, val selectedBucket: Int?, val quantityUnits: String? = null,
@@ -137,7 +139,9 @@ fun projectAdvancedStatistics(data: SubjectBrowserSnapshot, request: StatisticsR
     val window = advancedStatisticsWindow(request, now.date, earliest, locale)
     val start = window.start.atStartOfDay(now.zone).toInstant()
     val end = window.endInclusive.plusDays(1).atStartOfDay(now.zone).toInstant()
-    val candidates = all.filter { it.ingestion.consumerName.orEmpty() == request.consumer.orEmpty() }
+    val consumerRecords = all.filter { it.ingestion.consumerName.orEmpty() == request.consumer.orEmpty() }
+    val contextByExperience = consumerRecords.groupBy { it.experience.id }
+    val candidates = consumerRecords
         .map { source -> source.copy(contributions = source.contributions.filter { request.subjectKey == null || it.subject.key == request.subjectKey }) }
         .filter { it.contributions.isNotEmpty() && it.anchor >= start && it.anchor < end }
     val selected = selectedBucket?.takeIf { it in window.buckets.indices }
@@ -158,10 +162,24 @@ fun projectAdvancedStatistics(data: SubjectBrowserSnapshot, request: StatisticsR
         checkCancelled()
         val doses = doseTotals(values)
         val rows = values.distinctBy { it.ingestion.id }.sortedWith(compareBy<StatisticsSource> { it.ingestion.time }.thenBy { it.ingestion.id })
+        val ownSubjects = values.flatMap { it.contributions }.mapTo(hashSetOf()) { it.subject.key }
+        val context = linkedMapOf<String, Pair<StatisticsSubject, MutableSet<Int>>>()
+        rows.map { it.experience.id }.distinct().forEach { experienceId ->
+            checkCancelled()
+            contextByExperience[experienceId].orEmpty().forEach { source ->
+                source.contributions.forEach { contribution ->
+                    if (contribution.subject.key !in ownSubjects) {
+                        context.getOrPut(contribution.subject.key) { contribution.subject to linkedSetOf() }.second.add(experienceId)
+                    }
+                }
+            }
+        }
+        val coOccurrences = context.values.map { (subject, ids) -> StatisticsCoOccurrence(subject, ids.sorted()) }
+            .sortedWith(compareByDescending<StatisticsCoOccurrence> { it.experienceIds.size }.thenBy { it.subject.name }.thenBy { it.subject.key })
         StatisticsGroup(key, if (request.groupByPrimaryTag) tags[key]?.name ?: "Untagged" else values.first().contributions.first().subject.name,
             rows.map { it.experience.id }.distinct().size, rows.size, doses,
             rows.map { StatisticsRecord(it.ingestion.id, it.experience.id, it.experience.title,
-                it.ingestion.time.atZone(now.zone).toLocalDate(), it.ingestion.time) })
+                it.ingestion.time.atZone(now.zone).toLocalDate(), it.ingestion.time) }, coOccurrences)
     }.sortedWith(compareByDescending<StatisticsGroup> { it.ingestionCount }.thenBy { it.name }.thenBy { it.key })
     val quantityUnits = doseTotals(candidates).map { it.units }.distinct()
     val needsSubject = request.selection.metric == StatisticsMetric.DOSAGE && request.subjectKey == null

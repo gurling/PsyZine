@@ -13,6 +13,27 @@ import java.time.*
 import java.util.Locale
 
 class AdvancedStatisticsTest {
+    @Test fun coOccurrencesUseWholeExperiencesButKeepTheConsumerAndDeduplicateRecords() {
+        val a = raw(1)
+        val b = raw(2, "2025-01-01T12:00:00Z", name = "B")
+        val other = raw(3, name = "Other").copy(consumerName = "Someone else")
+        val snapshot = data(entry(1, listOf(a, b, b, other)))
+        val result = report(snapshot, request().copy(subjectKey = "pw:A"))
+        val companions = result.groups.single().coOccurrences
+        assertEquals(listOf("pw:B"), companions.map { it.subject.key })
+        assertEquals(listOf(1), companions.single().experienceIds)
+        assertEquals(1.0, result.buckets.sumOf { it ?: 0.0 }, 0.0)
+        assertEquals(1, result.groups.single().ingestionCount)
+    }
+
+    @Test fun coOccurrencesFollowSelectedBucketsAndHaveAnEmptyState() {
+        val snapshot = data(entry(1, listOf(raw(1, "2026-10-24T12:00:00Z"), raw(2, name = "B"))),
+            entry(2, listOf(raw(3))))
+        val selected = report(snapshot, request().copy(subjectKey = "pw:A"), 6)
+        assertTrue(selected.groups.single().coOccurrences.isEmpty())
+        val all = report(snapshot, request().copy(subjectKey = "pw:A"))
+        assertEquals(listOf(1), all.groups.single().coOccurrences.single().experienceIds)
+    }
     private val zone = ZoneId.of("Europe/Prague")
     private val now = CalendarNow(Instant.parse("2026-10-25T11:00:00Z"), zone)
     private val locale = Locale.forLanguageTag("cs-CZ")

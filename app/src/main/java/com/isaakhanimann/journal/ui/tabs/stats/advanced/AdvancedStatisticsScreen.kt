@@ -46,6 +46,7 @@ fun AdvancedStatisticsContent(state: AdvancedStatisticsState, saving: Boolean, m
     val report = state.report
     var showCustom by rememberSaveable { mutableStateOf(false) }
     var expandedGroup by rememberSaveable(report?.generation, report?.selectedBucket) { mutableStateOf<String?>(null) }
+    var expandedCompanion by rememberSaveable(report?.generation, report?.selectedBucket, expandedGroup) { mutableStateOf<String?>(null) }
     Scaffold(topBar = { TopAppBar(title = { Text("Advanced statistics") }, navigationIcon = {
         IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
     }) }) { padding ->
@@ -127,6 +128,24 @@ fun AdvancedStatisticsContent(state: AdvancedStatisticsState, saving: Boolean, m
                         }
                     }
                     report.groups.firstOrNull { it.key == expandedGroup }?.let { group ->
+                        item {
+                            Text("${group.name}: co-occurring subjects", style = MaterialTheme.typography.titleMedium)
+                            Text("Other subjects recorded for the same consumer in matching experiences. Includes records outside the selected dates; each experience counts once. This does not establish simultaneous use or an interaction.", style = MaterialTheme.typography.bodySmall)
+                            if (group.coOccurrences.isEmpty()) Text("No other subjects recorded in these experiences.")
+                        }
+                        items(group.coOccurrences, key = { "companion:${it.subject.key}" }) { companion ->
+                            ListItem(headlineContent = { Text(companion.subject.name) },
+                                supportingContent = { Text("${companion.experienceIds.size} matching experiences · ${subjectKind(companion.subject.key)}") },
+                                modifier = Modifier.clickable { expandedCompanion = if (expandedCompanion == companion.subject.key) null else companion.subject.key })
+                        }
+                        group.coOccurrences.firstOrNull { it.subject.key == expandedCompanion }?.let { companion ->
+                            val links = group.records.distinctBy { it.experienceId }.filter { it.experienceId in companion.experienceIds }
+                            items(links, key = { "companion-experience:${it.experienceId}" }) { record ->
+                                TextButton(onClick = { openExperience(record.experienceId, report.generation) }) {
+                                    Text("Open ${record.title.ifBlank { "untitled experience" }} (${record.date})")
+                                }
+                            }
+                        }
                         item { Text("${group.name}: matching records", style = MaterialTheme.typography.titleMedium)
                             Text("Ordered by ingestion time. An experience link opens the preserved journal record.", style = MaterialTheme.typography.bodySmall) }
                         items(group.records, key = { "record:${it.ingestionId}" }) { record ->
