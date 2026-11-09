@@ -19,6 +19,14 @@ are readable; a pending experience action rejects duplicate taps and supports
 retry. Cancellation does not produce a false failure message. No database schema
 or application identity change is included.
 
+Settings also provides independent switches to hide interactions and tolerance
+on experience screens. Both default to visible. Hiding the experience summaries
+does not alter records, statistics, or the interaction checks during ingestion
+entry. Hiding tolerance removes its inline composition and active collection.
+The choices persist and travel in optional backup fields; absent fields in older
+backups retain the current values. Preference failures use the existing readable
+Settings error and retain previous choices.
+
 ## Focused development checks — 9 November 2026
 
 - Direct debug APK build passed; Direct and Play JVM suites passed 150 tests each.
@@ -31,3 +39,8 @@ or application identity change is included.
 
 These are focused development results. Full regression, lint, five-variant builds
 and release qualification are reserved for a later milestone.
+
+The section-visibility follow-up passed 11 focused tests (nine preference and
+two backup metadata cases), the Direct debug APK build and diff checks. These
+cover persistence, partial restore, absent fields, round trips and failed writes.
+Device interaction, lint and full-regression checks were not run for this batch.

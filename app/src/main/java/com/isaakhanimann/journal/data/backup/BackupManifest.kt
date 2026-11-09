@@ -17,4 +17,5 @@ data class BackupPhoto(val id: String, val experienceIndex: Int, val path: Strin
 data class BackupPresentation(val enabled: Boolean = true, val lockScreenDetails: Boolean = false, val widgetDetails: Boolean = true)
 
 @Serializable
-data class BackupJournalDisplay(val showComponents: Boolean? = null, val hideTimelineQuantities: Boolean? = null)
+data class BackupJournalDisplay(val showComponents: Boolean? = null, val hideTimelineQuantities: Boolean? = null,
+    val hideInteractions: Boolean? = null, val hideTolerance: Boolean? = null)

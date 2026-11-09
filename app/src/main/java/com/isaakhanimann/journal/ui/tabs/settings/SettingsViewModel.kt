@@ -48,6 +48,8 @@ class SettingsViewModel @Inject constructor(
         SharingStarted.WhileSubscribed(0), com.isaakhanimann.journal.data.preferences.JournalDisplaySettings())
     fun saveShowComponents(value: Boolean) = savePresentation { userPreferences.saveShowComponents(value) }
     fun saveHideTimelineQuantities(value: Boolean) = savePresentation { userPreferences.saveHideTimelineQuantities(value) }
+    fun saveHideInteractions(value: Boolean) = savePresentation { userPreferences.saveHideInteractions(value) }
+    fun saveHideTolerance(value: Boolean) = savePresentation { userPreferences.saveHideTolerance(value) }
 
     fun saveDosageDotsAreHidden(value: Boolean) = savePresentation {
         userPreferences.saveDosageDotsAreHidden(value)

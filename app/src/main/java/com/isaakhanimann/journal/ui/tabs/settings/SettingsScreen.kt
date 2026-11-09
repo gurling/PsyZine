@@ -154,6 +154,8 @@ fun SettingsScreen(
         journalDisplaySettings = viewModel.journalDisplaySettings.collectAsStateWithLifecycle().value,
         saveShowComponents = viewModel::saveShowComponents,
         saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
+        saveHideInteractions = viewModel::saveHideInteractions,
+        saveHideTolerance = viewModel::saveHideTolerance,
     )
 }
 
@@ -188,6 +190,8 @@ fun SettingsScreen(
     journalDisplaySettings: com.isaakhanimann.journal.data.preferences.JournalDisplaySettings = com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(),
     saveShowComponents: (Boolean) -> Unit = {},
     saveHideTimelineQuantities: (Boolean) -> Unit = {},
+    saveHideInteractions: (Boolean) -> Unit = {},
+    saveHideTolerance: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -263,6 +267,12 @@ fun SettingsScreen(
                 HorizontalDivider()
                 JournalDisplaySwitch("Hide timeline quantity details", journalDisplaySettings.hideTimelineQuantities,
                     "Keep the graph and time cursor visible.", saveHideTimelineQuantities)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide interactions in experiences", journalDisplaySettings.hideInteractions,
+                    "Hide the experience summary. Interaction checks when adding ingestions remain available.", saveHideInteractions)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide tolerance in experiences", journalDisplaySettings.hideTolerance,
+                    "Hide the inline panel. Tolerance remains available from Statistics.", saveHideTolerance)
                 HorizontalDivider()
                 Row(
                     modifier = Modifier

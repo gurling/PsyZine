@@ -311,7 +311,9 @@ fun ExperienceScreen(
             )
             }
             if (oneExperienceScreenModel.ingestionElements.isNotEmpty()) {
-                item(key = "tolerance") { toleranceContent() }
+                item(key = "tolerance") {
+                    if (!com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTolerance) toleranceContent()
+                }
                 item(key = "ingestions") {
                 MyIngestionList(
                     verticalCardPadding = verticalCardPadding,
@@ -388,7 +390,8 @@ fun ExperienceScreen(
             }
             }
             val interactions = oneExperienceScreenModel.interactions
-            item(key = "interactions") { AnimatedVisibility(visible = interactions.isNotEmpty()) {
+            item(key = "interactions") { AnimatedVisibility(visible = interactions.isNotEmpty() &&
+                !com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideInteractions) {
                 ExperienceInteractionsSection(
                     verticalCardPadding = verticalCardPadding,
                     interactions = interactions,

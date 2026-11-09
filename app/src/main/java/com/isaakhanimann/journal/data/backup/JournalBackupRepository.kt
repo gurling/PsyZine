@@ -130,7 +130,8 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                 val manifest = BackupManifest(version = 2, journal = journal, photos = photos, theme = appearance.theme.first().key,
                     presentation = BackupPresentation(settings.enabled, settings.lockScreenDetails, settings.widgetDetails),
                     toleranceStatsPeriod = userPreferences.toleranceStatsPeriodFlow.first().name,
-                    journalDisplay = BackupJournalDisplay(journalDisplay.showComponents, journalDisplay.hideTimelineQuantities))
+                    journalDisplay = BackupJournalDisplay(journalDisplay.showComponents, journalDisplay.hideTimelineQuantities,
+                        journalDisplay.hideInteractions, journalDisplay.hideTolerance))
                 BackupValidation.manifest(manifest)
                 ZipOutputStream(BufferedOutputStream(output)).use { zip ->
                     zip.putNextEntry(ZipEntry("manifest.json")); zip.write(json.encodeToString(manifest).toByteArray()); zip.closeEntry()
@@ -216,7 +217,8 @@ class JournalBackupRepository @Inject constructor(private val db: AppDatabase, p
                 try {
                     appearance.select(ThemeId.fromKey(manifest.theme))
                     manifest.presentation?.let { presentation.restore(it) }
-                    manifest.journalDisplay?.let { userPreferences.restoreJournalDisplaySettings(it.showComponents, it.hideTimelineQuantities) }
+                    manifest.journalDisplay?.let { userPreferences.restoreJournalDisplaySettings(it.showComponents, it.hideTimelineQuantities,
+                        it.hideInteractions, it.hideTolerance) }
                     manifest.toleranceStatsPeriod?.let { name ->
                         val period = com.isaakhanimann.journal.data.definitions.TolerancePeriod.entries.firstOrNull { it.name == name }
                         if (period != null) userPreferences.saveToleranceStatsPeriod(period)

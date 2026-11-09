@@ -14,6 +14,22 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun sectionVisibilityChoicesPersistAndPartialRestoreKeepsAbsentFields() = runTest {
+        val store = Store(); val user = UserPreferences(store)
+        assertFalse(user.journalDisplaySettingsFlow.first().hideInteractions)
+        assertFalse(user.journalDisplaySettingsFlow.first().hideTolerance)
+        user.saveHideInteractions(true); user.saveHideTolerance(true)
+        val restored = UserPreferences(store)
+        assertTrue(restored.journalDisplaySettingsFlow.first().hideInteractions)
+        assertTrue(restored.journalDisplaySettingsFlow.first().hideTolerance)
+        restored.restoreJournalDisplaySettings(false, null)
+        assertEquals(JournalDisplaySettings(false, false, true, true), restored.journalDisplaySettingsFlow.first())
+        restored.restoreJournalDisplaySettings(null, null, hideInteractions = false)
+        assertEquals(JournalDisplaySettings(false, false, false, true), restored.journalDisplaySettingsFlow.first())
+        store.fail = true
+        try { restored.restoreJournalDisplaySettings(null, null, true, false); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(JournalDisplaySettings(false, false, false, true), restored.journalDisplaySettingsFlow.first())
+    }
     @Test fun inlineTolerancePeriodIsIndependentAndRetainedOnFailure() = runTest {
         val store = Store(); val user = UserPreferences(store)
         val month = com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_1M
