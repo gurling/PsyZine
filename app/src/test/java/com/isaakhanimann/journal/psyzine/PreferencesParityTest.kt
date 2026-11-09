@@ -14,6 +14,17 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun stoppingAutomaticNotificationPersistsWithoutChangingWidgetPrivacyAndFailuresRetainTheChoice() = runTest {
+        val store = Store(); val prefs = PresentationPreferences(store)
+        prefs.widgetDetails(false)
+        prefs.notificationEnabled(false)
+        val stopped = PresentationPreferences(store).settings.first()
+        assertFalse(stopped.enabled)
+        assertFalse(stopped.widgetDetails)
+        store.fail = true
+        try { prefs.notificationEnabled(true); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertFalse(prefs.settings.first().enabled)
+    }
     @Test fun sectionVisibilityChoicesPersistAndPartialRestoreKeepsAbsentFields() = runTest {
         val store = Store(); val user = UserPreferences(store)
         assertFalse(user.journalDisplaySettingsFlow.first().hideInteractions)

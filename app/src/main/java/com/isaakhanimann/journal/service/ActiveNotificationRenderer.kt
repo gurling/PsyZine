@@ -49,10 +49,24 @@ class ActiveNotificationRenderer(private val context: Context) {
         expanded.setTextViewText(R.id.more_ingestions, if (data.ingestions.size > 4) "+${data.ingestions.size - 4} more · Open journal" else "Estimated phases")
         expanded.setTextColor(R.id.more_ingestions, palette.scheme.onSurfaceVariant.toArgb())
         val public = base().setContentTitle(context.getString(R.string.live_activity_channel_name)).setContentText("Open PsyZine to view details").setContentIntent(tap).build()
+        val stop = PendingIntent.getService(context, 0,
+            android.content.Intent(context, ActiveExperienceService::class.java).setAction(ActiveExperienceService.ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return base().setStyle(NotificationCompat.DecoratedCustomViewStyle()).setCustomContentView(collapsed).setCustomBigContentView(expanded)
+            .addAction(0, "Stop automatic notification", stop)
             .setContentTitle(context.getString(R.string.live_activity_channel_name)).setContentText(summary)
             .setContentIntent(tap).setCategory(NotificationCompat.CATEGORY_STOPWATCH).setUsesChronometer(true)
             .setWhen(data.firstIngestionTime.toEpochMilli()).setPublicVersion(public)
             .setVisibility(if (publicDetails) NotificationCompat.VISIBILITY_PUBLIC else NotificationCompat.VISIBILITY_PRIVATE).build()
+    }
+    fun stopFailure(): Notification {
+        val retry = PendingIntent.getService(context, 0,
+            android.content.Intent(context, ActiveExperienceService::class.java).setAction(ActiveExperienceService.ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val open = PendingIntent.getActivity(context, 1, android.content.Intent(context, com.isaakhanimann.journal.MainActivity::class.java),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        return base().setContentTitle("Could not stop automatic notification")
+            .setContentText("The setting could not be saved. Retry or open PsyZine Settings.")
+            .setContentIntent(open).addAction(0, "Retry stop", retry).build()
     }
 }

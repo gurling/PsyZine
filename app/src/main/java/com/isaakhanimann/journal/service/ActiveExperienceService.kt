@@ -36,6 +36,8 @@ class ActiveExperienceService : Service() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var updateJob: Job? = null
     @Volatile private var latestStartId = 0
+    private var stopJob: Job? = null
+    @Volatile private var stopFailed = false
     private val renderer by lazy { ActiveNotificationRenderer(this) }
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onCreate() {
@@ -49,6 +51,24 @@ class ActiveExperienceService : Service() {
     @SuppressLint("MissingPermission") // activeNotificationsAllowed checks permission/channel; revocation can still race and is caught below.
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         latestStartId = startId
+        if (intent?.action == ACTION_STOP) {
+            if (stopJob?.isActive != true) stopJob = scope.launch {
+                try {
+                    preferences.notificationEnabled(false)
+                    stopFailed = false
+                    val observedStartId = latestStartId
+                    if (!preferences.settings.first().enabled && stopSelfResult(observedStartId)) {
+                        updateJob?.cancel()
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
+                } catch (e: CancellationException) { throw e }
+                catch (_: Exception) {
+                    stopFailed = true
+                    runCatching { getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, renderer.stopFailure()) }
+                }
+            }
+            return START_NOT_STICKY
+        }
         if (updateJob?.isActive == true) return START_STICKY
         val loading = renderer.base().setContentTitle(getString(R.string.live_activity_loading)).build()
         try {
@@ -78,7 +98,8 @@ class ActiveExperienceService : Service() {
                         }
                         val systemDark = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
                         val palette = ThemePalettes.get(appearance.theme.first(), systemDark)
-                        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, renderer.notification(data, settings.lockScreenDetails, palette))
+                        getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID,
+                            if (stopFailed) renderer.stopFailure() else renderer.notification(data, settings.lockScreenDetails, palette))
                         updateWidgets()
                     } catch (e: CancellationException) { throw e }
                     catch (e: Exception) {
@@ -100,5 +121,8 @@ class ActiveExperienceService : Service() {
         catch (e: CancellationException) { throw e }
         catch (e: Exception) { android.util.Log.w("TimelineWidget", "Update unavailable: ${e.javaClass.simpleName}") }
     }
-    companion object { const val CHANNEL_ID = "active_experience"; const val NOTIFICATION_ID = 101; const val UPDATE_INTERVAL_MS = 30_000L }
+    companion object {
+        const val ACTION_STOP = "app.psyzine.STOP_AUTOMATIC_NOTIFICATION"
+        const val CHANNEL_ID = "active_experience"; const val NOTIFICATION_ID = 101; const val UPDATE_INTERVAL_MS = 30_000L
+    }
 }
