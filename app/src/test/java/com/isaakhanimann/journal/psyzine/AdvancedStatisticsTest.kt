@@ -13,6 +13,30 @@ import java.time.*
 import java.util.Locale
 
 class AdvancedStatisticsTest {
+    @Test fun experienceDistributionsSumMatchingRecordsAndExcludeTheWholeIncompleteExperience() {
+        val snapshot = data(entry(1, listOf(raw(1, dose = 2.0), raw(2, dose = 4.0))),
+            entry(2, listOf(raw(3, dose = 8.0), raw(4, dose = null))), entry(3, listOf(raw(5, dose = 10.0))))
+        val dose = report(snapshot, request()).groups.single().doses.single()
+        assertEquals(4, dose.distribution!!.sampleCount)
+        val summary = dose.experienceDistribution!!
+        assertEquals(2, summary.sampleCount)
+        assertEquals(1, summary.excludedExperiences)
+        assertEquals(8.0, summary.mean, 0.0)
+        assertEquals(8.0, summary.median, 0.0)
+        assertEquals(listOf(1), summary.minimum.experienceIds)
+        assertEquals(listOf(3), summary.maximum.experienceIds)
+    }
+
+    @Test fun experienceDistributionsNormalizeMassButRejectIncompatibleUnitsAndOverflow() {
+        val snapshot = data(entry(1, listOf(raw(1, dose = 0.002).copy(units = "g"), raw(2, dose = 4.0))),
+            entry(2, listOf(raw(3), raw(4).copy(units = "ml"))),
+            entry(3, listOf(raw(5, dose = Double.MAX_VALUE), raw(6, dose = Double.MAX_VALUE))))
+        val doses = report(snapshot, request()).groups.single().doses
+        val mg = doses.first { it.units == "mg" }
+        assertEquals(6.0, mg.experienceDistribution!!.mean, 0.0)
+        assertEquals(2, mg.excludedExperiences)
+        assertNull(doses.first { it.units == "ml" }.experienceDistribution)
+    }
     @Test fun intervalIntegrationKeepsSubjectConsumerAndBucketFilters() {
         val first = raw(1, "2026-10-24T09:00:00Z")
         val other = raw(2, "2026-10-24T10:00:00Z").copy(consumerName = "Someone else", endTime = Instant.parse("2026-11-01T00:00:00Z"))

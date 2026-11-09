@@ -82,9 +82,13 @@ data class StatisticsRecord(val ingestionId: Int, val experienceId: Int, val tit
 data class StatisticsExtreme(val amount: Double, val ingestionIds: List<Int>)
 data class StatisticsDistribution(val sampleCount: Int, val excludedRecords: Int, val mean: Double, val median: Double,
     val minimum: StatisticsExtreme, val maximum: StatisticsExtreme)
+data class StatisticsExperienceExtreme(val amount: Double, val experienceIds: List<Int>)
+data class StatisticsExperienceDistribution(val sampleCount: Int, val excludedExperiences: Int, val mean: Double, val median: Double,
+    val minimum: StatisticsExperienceExtreme, val maximum: StatisticsExperienceExtreme)
 data class StatisticsDose(val subject: StatisticsSubject, val route: AdministrationRoute, val units: String?,
     val knownTotal: Double?, val knownRecords: Int, val unknownRecords: Int, val isEstimate: Boolean,
-    val distribution: StatisticsDistribution? = null)
+    val distribution: StatisticsDistribution? = null,
+    val experienceDistribution: StatisticsExperienceDistribution? = null, val excludedExperiences: Int = 0)
 data class StatisticsCoOccurrence(val subject: StatisticsSubject, val experienceIds: List<Int>)
 data class StatisticsGroup(val key: String, val name: String, val experienceCount: Int, val ingestionCount: Int,
     val doses: List<StatisticsDose>, val records: List<StatisticsRecord>,
@@ -211,14 +215,18 @@ private fun fallback(raw: Ingestion, id: Int?): List<StatisticsContribution> = l
 
 private fun doseTotals(sources: List<StatisticsSource>): List<StatisticsDose> {
     data class Key(val subject: StatisticsSubject, val route: AdministrationRoute, val units: String?)
-    data class Value(val rawId: Int, val quantity: DoseQuantity)
+    data class Value(val rawId: Int, val experienceId: Int, val quantity: DoseQuantity)
     val grouped = linkedMapOf<Key, MutableList<Value>>()
     sources.forEach { source -> source.contributions.forEach { contribution ->
         val units = contribution.units?.trim()?.takeIf(String::isNotEmpty)
         val mass = units in setOf("g", "mg", "µg", "μg", "ug", "mcg")
         val quantity = if (mass) contribution.quantity.copy(amount = convertDoseUnits(contribution.quantity.amount, units, "mg")) else contribution.quantity
         val key = Key(contribution.subject, source.ingestion.administrationRoute, if (mass) "mg" else units)
-        grouped.getOrPut(key) { mutableListOf() }.add(Value(source.ingestion.id, quantity))
+        grouped.getOrPut(key) { mutableListOf() }.add(Value(source.ingestion.id, source.experience.id, quantity))
+    } }
+    val experienceUnits = mutableMapOf<Triple<String, AdministrationRoute, Int>, MutableSet<String?>>()
+    grouped.forEach { (key, values) -> values.forEach { value ->
+        experienceUnits.getOrPut(Triple(key.subject.key, key.route, value.experienceId)) { linkedSetOf() }.add(key.units)
     } }
     return grouped.map { (key, values) ->
         val byRecord = values.groupBy { it.rawId }
@@ -227,8 +235,20 @@ private fun doseTotals(sources: List<StatisticsSource>): List<StatisticsDose> {
             else rows.sumOf { it.quantity.amount!! }.takeIf(Double::isFinite)?.let { id to it }
         }
         val known = values.mapNotNull { it.quantity.amount?.takeIf { amount -> key.units != null && amount.isFinite() && amount >= 0 } }
+        val experiences = values.groupBy { it.experienceId }
+        val experienceSamples = experiences.mapNotNull { (id, rows) ->
+            val units = experienceUnits[Triple(key.subject.key, key.route, id)].orEmpty()
+            if (key.units == null || units.size != 1 || rows.any { it.quantity.amount == null }) null
+            else rows.sumOf { it.quantity.amount!! }.takeIf(Double::isFinite)?.let { id to it }
+        }
+        val experienceSummary = statisticsDistribution(experienceSamples, experiences.size)?.let { summary ->
+            StatisticsExperienceDistribution(summary.sampleCount, summary.excludedRecords, summary.mean, summary.median,
+                StatisticsExperienceExtreme(summary.minimum.amount, summary.minimum.ingestionIds),
+                StatisticsExperienceExtreme(summary.maximum.amount, summary.maximum.ingestionIds))
+        }
         StatisticsDose(key.subject, key.route, key.units, known.takeIf { it.isNotEmpty() }?.sum()?.takeIf(Double::isFinite), samples.size,
-            byRecord.size - samples.size, values.any { it.quantity.isEstimate }, statisticsDistribution(samples, byRecord.size))
+            byRecord.size - samples.size, values.any { it.quantity.isEstimate }, statisticsDistribution(samples, byRecord.size),
+            experienceSummary, experiences.size - experienceSamples.size)
     }.sortedWith(compareBy({ it.subject.name }, { it.subject.key }, { it.route.name }, { it.units.orEmpty() }))
 }
 

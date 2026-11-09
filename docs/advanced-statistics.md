@@ -44,8 +44,16 @@ use the recorded start; invalid reversed ends cannot create a negative duration.
 Rows link back to the contributing experiences. These elapsed durations do not
 estimate effect duration or tolerance recovery.
 
-Experience-level dose distributions, current-break/tolerance percentages and
-inline experience tolerance remain outside this increment.
+Each subject/route/unit summary also has a separate experience-level distribution.
+It sums matching records per experience before computing the mean, median and
+linked extrema. An unknown quantity excludes that whole experience from this
+population. Incompatible or missing units for the same subject and route also
+exclude it; supported mass conversions remain compatible. Overflowing experience
+sums are excluded. Counts of included and excluded experiences are explicit.
+Per-ingestion samples and known totals retain their existing populations.
+
+Current-break/tolerance percentages and inline experience tolerance remain
+outside this increment.
 The new choices remain local preferences; portable backup metadata is unchanged.
 
 ## Focused development checks — 9 November 2026
@@ -66,3 +74,8 @@ results. Device interaction checks were not run for this follow-up.
 The recorded-interval follow-up passed 19 focused tests (15 aggregation and four
 interval cases) and the Direct debug APK build. Diff checks passed. No device,
 lint, full regression or release checks were run for this follow-up.
+
+The experience-distribution follow-up passed 17 focused aggregation tests and
+the Direct debug APK build. Added cases cover sums across records, whole-sample
+exclusion for unknown quantities, mass conversion, incompatible units and
+overflow. Diff checks passed; device, lint and full-regression checks were not run.

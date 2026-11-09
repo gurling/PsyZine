@@ -120,6 +120,19 @@ fun AdvancedStatisticsContent(state: AdvancedStatisticsState, saving: Boolean, m
                                             }
                                         }
                                     }
+                                    val experienceSummary = dose.experienceDistribution
+                                    if (experienceSummary == null) {
+                                        Text("Per experience: no complete known samples; ${dose.excludedExperiences} experiences excluded.")
+                                    } else {
+                                        Text("Per experience: mean ${statisticsQuantityText(experienceSummary.mean)}; median ${statisticsQuantityText(experienceSummary.median)} ${dose.units.orEmpty()}")
+                                        Text("${experienceSummary.sampleCount} complete known experiences; ${experienceSummary.excludedExperiences} excluded. Uses matching records in this view, separately for each route. Unknown or incompatible units exclude an experience.", style = MaterialTheme.typography.bodySmall)
+                                        listOf("Minimum" to experienceSummary.minimum, "Maximum" to experienceSummary.maximum).forEach { (label, extreme) ->
+                                            Text("Experience $label: ${statisticsQuantityText(extreme.amount)} ${dose.units.orEmpty()} (${extreme.experienceIds.size} matching experiences)")
+                                            TextButton(onClick = { openExperience(extreme.experienceIds.first(), report.generation) }) {
+                                                Text("Open a ${label.lowercase()} experience")
+                                            }
+                                        }
+                                    }
                                 }
                                 TextButton(onClick = { expandedGroup = if (expandedGroup == group.key) null else group.key }) {
                                     Text(if (expandedGroup == group.key) "Hide matching records" else "Show matching records")
