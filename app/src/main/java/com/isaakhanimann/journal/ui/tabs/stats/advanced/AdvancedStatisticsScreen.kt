@@ -129,6 +129,18 @@ fun AdvancedStatisticsContent(state: AdvancedStatisticsState, saving: Boolean, m
                     }
                     report.groups.firstOrNull { it.key == expandedGroup }?.let { group ->
                         item {
+                            Text("${group.name}: recorded intervals", style = MaterialTheme.typography.titleMedium)
+                            Text("Uses only matching records in this view. Within experiences: start-to-start. Between experiences: recorded end to next start, with overlapping spans counted as zero. These are elapsed times, not tolerance or effect estimates.", style = MaterialTheme.typography.bodySmall)
+                            if (group.intervals.withinExperiences.isEmpty()) Text("No within-experience intervals.")
+                            if (group.intervals.betweenExperiences.isEmpty()) Text("No between-experience breaks.")
+                        }
+                        items(group.intervals.withinExperiences, key = { "within:${it.fromIngestionId}:${it.toIngestionId}" }) { interval ->
+                            StatisticsIntervalRow("Within experience", interval, report.generation, openExperience)
+                        }
+                        items(group.intervals.betweenExperiences, key = { "break:${it.fromIngestionId}:${it.toIngestionId}" }) { interval ->
+                            StatisticsIntervalRow("Between experiences", interval, report.generation, openExperience)
+                        }
+                        item {
                             Text("${group.name}: co-occurring subjects", style = MaterialTheme.typography.titleMedium)
                             Text("Other subjects recorded for the same consumer in matching experiences. Includes records outside the selected dates; each experience counts once. This does not establish simultaneous use or an interaction.", style = MaterialTheme.typography.bodySmall)
                             if (group.coOccurrences.isEmpty()) Text("No other subjects recorded in these experiences.")
@@ -167,6 +179,19 @@ private fun subjectKind(key: String) = when {
     key.startsWith("custom:") -> "definition"
     key.startsWith("local:") -> "local"
     else -> "catalog"
+}
+
+@Composable
+private fun StatisticsIntervalRow(label: String, interval: StatisticsInterval, generation: String,
+    openExperience: (Int, String) -> Unit) {
+    Column {
+        val duration = interval.elapsed
+        Text("$label: ${duration.toDays()}d ${duration.toHours() % 24}h ${duration.toMinutes() % 60}m ${duration.seconds % 60}s")
+        TextButton(onClick = { openExperience(interval.fromExperienceId, generation) }) { Text("Open starting record #${interval.fromIngestionId}") }
+        if (interval.toExperienceId != interval.fromExperienceId) {
+            TextButton(onClick = { openExperience(interval.toExperienceId, generation) }) { Text("Open following record #${interval.toIngestionId}") }
+        }
+    }
 }
 
 @Composable

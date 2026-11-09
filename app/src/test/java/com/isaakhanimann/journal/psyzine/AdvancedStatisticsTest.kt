@@ -13,6 +13,15 @@ import java.time.*
 import java.util.Locale
 
 class AdvancedStatisticsTest {
+    @Test fun intervalIntegrationKeepsSubjectConsumerAndBucketFilters() {
+        val first = raw(1, "2026-10-24T09:00:00Z")
+        val other = raw(2, "2026-10-24T10:00:00Z").copy(consumerName = "Someone else", endTime = Instant.parse("2026-11-01T00:00:00Z"))
+        val next = raw(3, "2026-10-25T09:00:00Z")
+        val snapshot = data(entry(1, listOf(first, other)), entry(2, listOf(next)))
+        val selected = request().copy(subjectKey = "pw:A")
+        assertEquals(Duration.ofHours(24), report(snapshot, selected).groups.single().intervals.betweenExperiences.single().elapsed)
+        assertTrue(report(snapshot, selected, 6).groups.single().intervals.betweenExperiences.isEmpty())
+    }
     @Test fun coOccurrencesUseWholeExperiencesButKeepTheConsumerAndDeduplicateRecords() {
         val a = raw(1)
         val b = raw(2, "2025-01-01T12:00:00Z", name = "B")

@@ -36,8 +36,16 @@ Select a subject in that list to open its matching experiences. Empty results
 have an explicit message. These relationships do not establish simultaneous use
 or an interaction.
 
-This increment does not include between-experience breaks, experience-level
-dose distributions or inline experience tolerance.
+Matching-record details include start-to-start intervals within experiences and
+recorded-end-to-start breaks between experiences. Overlapping recorded spans
+produce zero breaks; nested overlaps retain the latest preceding end. Only
+matching subjects, consumers and bucket records participate. Missing end times
+use the recorded start; invalid reversed ends cannot create a negative duration.
+Rows link back to the contributing experiences. These elapsed durations do not
+estimate effect duration or tolerance recovery.
+
+Experience-level dose distributions, current-break/tolerance percentages and
+inline experience tolerance remain outside this increment.
 The new choices remain local preferences; portable backup metadata is unchanged.
 
 ## Focused development checks — 9 November 2026
@@ -54,3 +62,7 @@ The co-occurrence follow-up passed 14 focused aggregation tests and the Direct
 debug APK build. Added cases cover consumer isolation, duplicate records,
 whole-experience context outside selected dates, selected buckets and empty
 results. Device interaction checks were not run for this follow-up.
+
+The recorded-interval follow-up passed 19 focused tests (15 aggregation and four
+interval cases) and the Direct debug APK build. Diff checks passed. No device,
+lint, full regression or release checks were run for this follow-up.

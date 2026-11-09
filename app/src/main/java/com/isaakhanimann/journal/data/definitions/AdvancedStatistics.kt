@@ -88,7 +88,8 @@ data class StatisticsDose(val subject: StatisticsSubject, val route: Administrat
 data class StatisticsCoOccurrence(val subject: StatisticsSubject, val experienceIds: List<Int>)
 data class StatisticsGroup(val key: String, val name: String, val experienceCount: Int, val ingestionCount: Int,
     val doses: List<StatisticsDose>, val records: List<StatisticsRecord>,
-    val coOccurrences: List<StatisticsCoOccurrence> = emptyList())
+    val coOccurrences: List<StatisticsCoOccurrence> = emptyList(),
+    val intervals: StatisticsIntervals = StatisticsIntervals())
 data class AdvancedStatisticsReport(val generation: String, val request: StatisticsRequest, val window: StatisticsWindow,
     val buckets: List<Double?>, val groups: List<StatisticsGroup>, val subjects: List<StatisticsSubject>,
     val consumers: List<String>, val invalidDefinitions: Int, val selectedBucket: Int?, val quantityUnits: String? = null,
@@ -179,7 +180,8 @@ fun projectAdvancedStatistics(data: SubjectBrowserSnapshot, request: StatisticsR
         StatisticsGroup(key, if (request.groupByPrimaryTag) tags[key]?.name ?: "Untagged" else values.first().contributions.first().subject.name,
             rows.map { it.experience.id }.distinct().size, rows.size, doses,
             rows.map { StatisticsRecord(it.ingestion.id, it.experience.id, it.experience.title,
-                it.ingestion.time.atZone(now.zone).toLocalDate(), it.ingestion.time) }, coOccurrences)
+                it.ingestion.time.atZone(now.zone).toLocalDate(), it.ingestion.time) }, coOccurrences,
+            statisticsIntervals(rows.map { StatisticsIntervalRecord(it.ingestion.id, it.experience.id, it.ingestion.time, it.ingestion.endTime) }, checkCancelled))
     }.sortedWith(compareByDescending<StatisticsGroup> { it.ingestionCount }.thenBy { it.name }.thenBy { it.key })
     val quantityUnits = doseTotals(candidates).map { it.units }.distinct()
     val needsSubject = request.selection.metric == StatisticsMetric.DOSAGE && request.subjectKey == null
