@@ -52,8 +52,15 @@ exclude it; supported mass conversions remain compatible. Overflowing experience
 sums are excluded. Counts of included and excluded experiences are explicit.
 Per-ingestion samples and known totals retain their existing populations.
 
-Current-break/tolerance percentages and inline experience tolerance remain
-outside this increment.
+Experience screens offer an expandable current-tolerance panel. It reuses the
+Statistics interval model and subject details, with an independent saved period
+defaulting to Past 1M (30 elapsed days). It loads while expanded and collects
+state with the screen lifecycle. The panel labels its journal-wide, current-time
+scope explicitly; it does not reconstruct tolerance at a historical experience
+date. Missing metadata remains unknown, and preference failures retain the
+previous choice. This local period preference does not change portable backups.
+
+Current-break/tolerance percentages remain outside this increment.
 The new choices remain local preferences; portable backup metadata is unchanged.
 
 ## Focused development checks — 9 November 2026
@@ -79,3 +86,9 @@ The experience-distribution follow-up passed 17 focused aggregation tests and
 the Direct debug APK build. Added cases cover sums across records, whole-sample
 exclusion for unknown quantities, mass conversion, incompatible units and
 overflow. Diff checks passed; device, lint and full-regression checks were not run.
+
+The inline current-tolerance follow-up passed 19 focused tests (seven interval,
+four definition-source and eight preference cases) and the Direct debug APK
+build. The new preference case verifies the independent period, persistence and
+failed-write retention. Diff checks passed. Device interaction, lint and full
+regression were not run for this follow-up.

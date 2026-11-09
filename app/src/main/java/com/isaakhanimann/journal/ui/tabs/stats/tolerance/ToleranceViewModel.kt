@@ -23,7 +23,9 @@ data class ToleranceUiState(val loading: Boolean = true, val report: ToleranceRe
 @HiltViewModel
 class ToleranceViewModel @Inject constructor(repo: ToleranceRepository, calendar: LocalCalendar,
     private val preferences: UserPreferences, savedState: SavedStateHandle) : ViewModel() {
-    private val route = savedState.toRoute<ToleranceRoute>()
+    private val experienceId = savedState.get<Int>("experienceId")
+    private val route = ToleranceRoute(savedState.get<String>("subjectKey"),
+        savedState.get<String>("generation") ?: savedState.get<String>("journalGeneration"))
     private val retry = MutableStateFlow(0)
     var saving by mutableStateOf(false); private set
     var saveError by mutableStateOf<String?>(null); private set
@@ -33,16 +35,19 @@ class ToleranceViewModel @Inject constructor(repo: ToleranceRepository, calendar
         if (saving) return
         saving = true
         viewModelScope.launch {
-            try { preferences.saveToleranceStatsPeriod(value) }
+            try {
+                if (experienceId == null) preferences.saveToleranceStatsPeriod(value)
+                else preferences.saveToleranceExperiencePeriod(value)
+            }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { saveError = "Could not save this period. The previous period is retained. Try again." }
             finally { saving = false }
         }
     }
     val state = retry.flatMapLatest {
-        combine(calendar.changes, preferences.toleranceStatsPeriodFlow) { _, period -> calendar.now() to period }
+        combine(calendar.changes, if (experienceId == null) preferences.toleranceStatsPeriodFlow else preferences.toleranceExperiencePeriodFlow) { _, period -> calendar.now() to period }
             .flatMapLatest { (now, period) ->
-                repo.observe(calendar::now, period).map { report ->
+                repo.observe(calendar::now, period, experienceId).map { report ->
                     if (route.generation != null && route.generation != report.generation)
                         ToleranceUiState(false, period = period, zone = report.zone, error = "The journal was restored or deleted. Reopen this chart from Statistics.")
                     else ToleranceUiState(false, report, period, report.zone, subjectKey = route.subjectKey)

@@ -41,12 +41,12 @@ fun ToleranceScreen(back: () -> Unit, openSubject: (String, String) -> Unit, mod
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ToleranceScreenContent(state: ToleranceUiState, saving: Boolean, period: (TolerancePeriod) -> Unit,
-    retry: () -> Unit, back: () -> Unit, openSubject: (String, String) -> Unit) {
+    retry: () -> Unit, back: () -> Unit, openSubject: (String, String) -> Unit, embedded: Boolean = false) {
     var choosingPeriod by remember { mutableStateOf(false) }
     val report = state.report
     val rows = report?.projection?.rows.orEmpty().filter { state.subjectKey == null || it.subject.key == state.subjectKey }
     val end = report?.let { value -> maxOf(value.cutoff, rows.flatMap { it.bands.values.flatten() }.maxOfOrNull { it.end } ?: value.cutoff) }
-    Scaffold(topBar = { TopAppBar(title = { Text("Tolerance") }, navigationIcon = {
+    Scaffold(topBar = { if (!embedded) TopAppBar(title = { Text("Tolerance") }, navigationIcon = {
         IconButton(onClick = back) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back") }
     }) }) { padding ->
         LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("tolerance-list"), contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -96,6 +96,28 @@ fun ToleranceScreenContent(state: ToleranceUiState, saving: Boolean, period: (To
                     if (report.unresolvedDefinitions.isNotEmpty()) item { Text("Some custom definitions could not be resolved. Their journal records remain available; reopen the definition to correct missing components.") }
                 }
             }
+        }
+    }
+}
+
+/** Load only while expanded; lifecycle-aware collection stops when the experience leaves the foreground. */
+@Composable
+fun ExperienceTolerance() {
+    var expanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
+    Column {
+        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide current tolerance" else "Show current tolerance") }
+        if (expanded) {
+            val model: ToleranceViewModel = hiltViewModel()
+            val state by model.state.collectAsStateWithLifecycle()
+            var subject by remember(state.report?.generation) { mutableStateOf<String?>(null) }
+            Text("Current tolerance across your journal, as of now. This is not a reconstruction at this experience's date.", style = MaterialTheme.typography.bodySmall)
+            if (subject != null) TextButton(onClick = { subject = null }) { Text("All subjects") }
+            Box(Modifier.fillMaxWidth().height(480.dp)) {
+                ToleranceScreenContent(state.copy(subjectKey = subject), model.saving, model::period, model::retry,
+                    back = {}, openSubject = { key, _ -> subject = key }, embedded = true)
+            }
+            model.saveError?.let { Text(it, Modifier.semantics { liveRegion = LiveRegionMode.Polite })
+                TextButton(onClick = model::dismissError) { Text("Dismiss error") } }
         }
     }
 }

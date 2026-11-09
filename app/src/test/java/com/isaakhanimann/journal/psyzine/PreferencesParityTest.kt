@@ -14,6 +14,19 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun inlineTolerancePeriodIsIndependentAndRetainedOnFailure() = runTest {
+        val store = Store(); val user = UserPreferences(store)
+        val month = com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_1M
+        val week = com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_1W
+        assertEquals(month, user.toleranceExperiencePeriodFlow.first())
+        assertEquals(com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_2M, user.toleranceStatsPeriodFlow.first())
+        user.saveToleranceExperiencePeriod(week)
+        assertEquals(week, UserPreferences(store).toleranceExperiencePeriodFlow.first())
+        assertEquals(com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_2M, user.toleranceStatsPeriodFlow.first())
+        store.fail = true
+        try { user.saveToleranceExperiencePeriod(month); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(week, user.toleranceExperiencePeriodFlow.first())
+    }
     private class Store(initial: Preferences = emptyPreferences()) : DataStore<Preferences> {
         private val state = MutableStateFlow(initial)
         override val data: Flow<Preferences> = state

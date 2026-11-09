@@ -28,7 +28,7 @@ data class ToleranceReport(val projection: ToleranceProjection, val start: Insta
 class ToleranceRepository @Inject constructor(private val db: AppDatabase, private val guard: JournalSessionGuard,
     private val substances: SubstanceRepository) {
     fun observe(now: CalendarNow, period: TolerancePeriod): Flow<ToleranceReport> = observe({ now }, period)
-    fun observe(now: () -> CalendarNow, period: TolerancePeriod): Flow<ToleranceReport> = flow {
+    fun observe(now: () -> CalendarNow, period: TolerancePeriod, experienceId: Int? = null): Flow<ToleranceReport> = flow {
         substances.initialize()
         val catalog = substances.getAllSubstances().associateBy { it.name }
         emitAll(db.definitionDao().observeToleranceChanges(SimpleSQLiteQuery("SELECT 1")).mapLatest {
@@ -36,6 +36,7 @@ class ToleranceRepository @Inject constructor(private val db: AppDatabase, priva
             val start = current.instant.minus(Duration.ofDays(period.days))
             val snapshot = guard.readSession(null) { generation ->
                 val dao = db.experienceDao()
+                if (experienceId != null) check(dao.getExperience(experienceId) != null) { "This experience was deleted. Reopen the journal." }
                 val events = db.definitionDao().toleranceIngestions(start.minus(Duration.ofDays(90)), current.instant)
                 val graph = db.definitionDao().definitions().toGraph()
                 val colors = dao.getAllSubstanceCompanions().associate { it.substanceName to it.color.name }

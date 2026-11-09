@@ -47,6 +47,7 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT = booleanPreferencesKey("KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT")
         val KEY_IS_TIMELINE_HIDDEN = booleanPreferencesKey("KEY_IS_TIMELINE_HIDDEN")
         val KEY_TOLERANCE_STATS_PERIOD = stringPreferencesKey("tolerance_stats_period")
+        val KEY_TOLERANCE_EXPERIENCE_PERIOD = stringPreferencesKey("tolerance_experience_period")
         val KEY_SHOW_COMPONENTS = booleanPreferencesKey("KEY_ARE_SUB_COMPONENTS_SHOWN")
         val KEY_HIDE_TIMELINE_QUANTITIES = booleanPreferencesKey("key_hide_timeline_quantity_info")
         val KEY_ADVANCED_STATS_METRIC = stringPreferencesKey("advanced_stats_metric")
@@ -74,6 +75,14 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
 
     val toleranceStatsPeriodFlow = dataStore.data.map {
         com.isaakhanimann.journal.data.definitions.TolerancePeriod.fromName(it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD])
+    }
+    val toleranceExperiencePeriodFlow = dataStore.data.map { values ->
+        com.isaakhanimann.journal.data.definitions.TolerancePeriod.entries.firstOrNull {
+            it.name == values[PreferencesKeys.KEY_TOLERANCE_EXPERIENCE_PERIOD]
+        } ?: com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_1M
+    }
+    suspend fun saveToleranceExperiencePeriod(value: com.isaakhanimann.journal.data.definitions.TolerancePeriod) {
+        dataStore.edit { it[PreferencesKeys.KEY_TOLERANCE_EXPERIENCE_PERIOD] = value.name }
     }
 
     val advancedStatisticsSelectionFlow = dataStore.data.map { values ->

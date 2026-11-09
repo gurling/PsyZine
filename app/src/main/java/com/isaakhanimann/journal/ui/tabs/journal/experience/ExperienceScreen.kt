@@ -172,6 +172,7 @@ fun ExperienceScreen(
         calculationNotices = viewModel.cumulativeProjectionFlow.collectAsStateWithLifecycle().value.notices,
     )
     ExperienceScreen(
+        toleranceContent = { com.isaakhanimann.journal.ui.tabs.stats.tolerance.ExperienceTolerance() },
         lazyPhotos = {
             item(key = "photo-title") {
                 Text("Photos", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
@@ -269,6 +270,7 @@ fun ExperienceScreen(
     lazyPhotos: LazyListScope.() -> Unit = {},
     saveHideTimelineQuantities: (Boolean) -> Unit = {},
     savingDisplayPreference: Boolean = false,
+    toleranceContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -309,6 +311,7 @@ fun ExperienceScreen(
             )
             }
             if (oneExperienceScreenModel.ingestionElements.isNotEmpty()) {
+                item(key = "tolerance") { toleranceContent() }
                 item(key = "ingestions") {
                 MyIngestionList(
                     verticalCardPadding = verticalCardPadding,
