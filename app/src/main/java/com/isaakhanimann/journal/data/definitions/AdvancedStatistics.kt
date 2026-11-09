@@ -93,7 +93,7 @@ data class StatisticsCoOccurrence(val subject: StatisticsSubject, val experience
 data class StatisticsGroup(val key: String, val name: String, val experienceCount: Int, val ingestionCount: Int,
     val doses: List<StatisticsDose>, val records: List<StatisticsRecord>,
     val coOccurrences: List<StatisticsCoOccurrence> = emptyList(),
-    val intervals: StatisticsIntervals = StatisticsIntervals())
+    val intervals: StatisticsIntervals = StatisticsIntervals(), val currentBreak: StatisticsCurrentBreak? = null)
 data class AdvancedStatisticsReport(val generation: String, val request: StatisticsRequest, val window: StatisticsWindow,
     val buckets: List<Double?>, val groups: List<StatisticsGroup>, val subjects: List<StatisticsSubject>,
     val consumers: List<String>, val invalidDefinitions: Int, val selectedBucket: Int?, val quantityUnits: String? = null,
@@ -163,6 +163,12 @@ fun projectAdvancedStatistics(data: SubjectBrowserSnapshot, request: StatisticsR
             grouped.getOrPut(key) { mutableListOf() }.add(source.copy(contributions = values))
         }
     }
+    val currentContext = linkedMapOf<String, MutableList<StatisticsIntervalRecord>>()
+    consumerRecords.forEach { source ->
+        checkCancelled()
+        val row = StatisticsIntervalRecord(source.ingestion.id, source.experience.id, source.ingestion.time, source.ingestion.endTime)
+        source.contributions.map { groupKey(it.subject) }.distinct().forEach { key -> currentContext.getOrPut(key) { mutableListOf() }.add(row) }
+    }
     val groups = grouped.map { (key, values) ->
         checkCancelled()
         val doses = doseTotals(values)
@@ -185,7 +191,8 @@ fun projectAdvancedStatistics(data: SubjectBrowserSnapshot, request: StatisticsR
             rows.map { it.experience.id }.distinct().size, rows.size, doses,
             rows.map { StatisticsRecord(it.ingestion.id, it.experience.id, it.experience.title,
                 it.ingestion.time.atZone(now.zone).toLocalDate(), it.ingestion.time) }, coOccurrences,
-            statisticsIntervals(rows.map { StatisticsIntervalRecord(it.ingestion.id, it.experience.id, it.ingestion.time, it.ingestion.endTime) }, checkCancelled))
+            statisticsIntervals(rows.map { StatisticsIntervalRecord(it.ingestion.id, it.experience.id, it.ingestion.time, it.ingestion.endTime) }, checkCancelled),
+            statisticsCurrentBreak(currentContext[key].orEmpty(), now.instant))
     }.sortedWith(compareByDescending<StatisticsGroup> { it.ingestionCount }.thenBy { it.name }.thenBy { it.key })
     val quantityUnits = doseTotals(candidates).map { it.units }.distinct()
     val needsSubject = request.selection.metric == StatisticsMetric.DOSAGE && request.subjectKey == null

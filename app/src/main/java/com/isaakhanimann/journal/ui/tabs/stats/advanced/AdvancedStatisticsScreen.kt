@@ -143,6 +143,15 @@ fun AdvancedStatisticsContent(state: AdvancedStatisticsState, saving: Boolean, m
                     report.groups.firstOrNull { it.key == expandedGroup }?.let { group ->
                         item {
                             Text("${group.name}: recorded intervals", style = MaterialTheme.typography.titleMedium)
+                            val current = group.currentBreak
+                            Text("Current context uses all matching subjects for this consumer across the journal, including outside the selected dates.", style = MaterialTheme.typography.bodySmall)
+                            if (current == null) Text("No matching ingestion has started yet.")
+                            else {
+                                Text("As of ${current.asOf.atZone(java.time.ZoneId.systemDefault())}", style = MaterialTheme.typography.bodySmall)
+                                if (current.ongoing) Text("A recorded ingestion is still ongoing; no current break yet.")
+                                else Text("Current recorded break: ${current.elapsed.toDays()}d ${current.elapsed.toHours() % 24}h ${current.elapsed.toMinutes() % 60}m")
+                                TextButton(onClick = { openExperience(current.experienceId, report.generation) }) { Text("Open latest contributing record #${current.ingestionId}") }
+                            }
                             Text("Uses only matching records in this view. Within experiences: start-to-start. Between experiences: recorded end to next start, with overlapping spans counted as zero. These are elapsed times, not tolerance or effect estimates.", style = MaterialTheme.typography.bodySmall)
                             if (group.intervals.withinExperiences.isEmpty()) Text("No within-experience intervals.")
                             if (group.intervals.betweenExperiences.isEmpty()) Text("No between-experience breaks.")

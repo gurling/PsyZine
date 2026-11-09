@@ -9,6 +9,16 @@ import java.time.Duration
 import java.time.Instant
 
 class StatisticsIntervalsTest {
+    @Test fun currentBreakUsesLongestRecordedEndAndIgnoresFutureStarts() {
+        val rows = listOf(row(1, 1, 0, 100), row(2, 2, 10, 20), row(3, 3, 300))
+        val result = statisticsCurrentBreak(rows, Instant.ofEpochSecond(150))!!
+        assertEquals(1, result.ingestionId)
+        assertEquals(Duration.ofSeconds(50), result.elapsed)
+        assertFalse(result.ongoing)
+        assertTrue(statisticsCurrentBreak(rows, Instant.ofEpochSecond(50))!!.ongoing)
+        assertNull(statisticsCurrentBreak(listOf(row(1, 1, 300)), Instant.ofEpochSecond(100)))
+        assertNull(statisticsCurrentBreak(emptyList(), Instant.EPOCH))
+    }
     private fun row(id: Int, experience: Int, start: Long, end: Long? = null) =
         StatisticsIntervalRecord(id, experience, Instant.ofEpochSecond(start), end?.let(Instant::ofEpochSecond))
 

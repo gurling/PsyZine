@@ -13,6 +13,15 @@ import java.time.*
 import java.util.Locale
 
 class AdvancedStatisticsTest {
+    @Test fun currentBreakIncludesLaterRecordsOutsideTheSelectedDatesButNotOtherConsumers() {
+        val snapshot = data(entry(1, listOf(raw(1, "2026-10-20T09:00:00Z"))),
+            entry(2, listOf(raw(2, "2026-10-25T09:00:00Z"), raw(3, "2026-10-25T10:00:00Z").copy(consumerName = "Someone else"))))
+        val selected = request(StatisticsPeriod.CUSTOM).copy(customStart = LocalDate.of(2026, 10, 20), customEnd = LocalDate.of(2026, 10, 20))
+        val group = report(snapshot, selected).groups.single()
+        assertEquals(listOf(1), group.records.map { it.ingestionId })
+        assertEquals(2, group.currentBreak!!.ingestionId)
+        assertEquals(Duration.ofHours(2), group.currentBreak.elapsed)
+    }
     @Test fun experienceDistributionsSumMatchingRecordsAndExcludeTheWholeIncompleteExperience() {
         val snapshot = data(entry(1, listOf(raw(1, dose = 2.0), raw(2, dose = 4.0))),
             entry(2, listOf(raw(3, dose = 8.0), raw(4, dose = null))), entry(3, listOf(raw(5, dose = 10.0))))

@@ -9,6 +9,18 @@ data class StatisticsInterval(val fromExperienceId: Int, val toExperienceId: Int
     val fromIngestionId: Int, val toIngestionId: Int, val elapsed: Duration)
 data class StatisticsIntervals(val withinExperiences: List<StatisticsInterval> = emptyList(),
     val betweenExperiences: List<StatisticsInterval> = emptyList())
+data class StatisticsCurrentBreak(val ingestionId: Int, val experienceId: Int, val recordedEnd: Instant,
+    val asOf: Instant, val elapsed: Duration, val ongoing: Boolean)
+
+/** Current context spans the journal; planned future starts do not interrupt an existing break. */
+fun statisticsCurrentBreak(records: List<StatisticsIntervalRecord>, now: Instant): StatisticsCurrentBreak? {
+    val latest = records.filter { it.start <= now }.distinctBy { it.ingestionId }
+        .maxWithOrNull(compareBy<StatisticsIntervalRecord> { maxOf(it.start, it.end ?: it.start) }
+            .thenBy { it.ingestionId }) ?: return null
+    val end = maxOf(latest.start, latest.end ?: latest.start)
+    return StatisticsCurrentBreak(latest.ingestionId, latest.experienceId, end, now,
+        if (end >= now) Duration.ZERO else Duration.between(end, now), end > now)
+}
 
 /** Within-entry intervals are start-to-start. Breaks use recorded ends, never estimated effect durations. */
 fun statisticsIntervals(records: List<StatisticsIntervalRecord>, checkCancelled: () -> Unit = {}): StatisticsIntervals {

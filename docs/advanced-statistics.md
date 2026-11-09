@@ -60,7 +60,14 @@ scope explicitly; it does not reconstruct tolerance at a historical experience
 date. Missing metadata remains unknown, and preference failures retain the
 previous choice. This local period preference does not change portable backups.
 
-Current-break/tolerance percentages remain outside this increment.
+Interval details also show a current recorded break, using all matching subjects
+for the selected consumer across the journal, independently of the historical
+date/bucket filter. Future starts do not interrupt the current break. Ongoing
+recorded ranges show an explicit ongoing state; nested overlapping records use
+the longest preceding end. The captured “as of” time is displayed and the
+contributing experience is linked. This is elapsed recorded time, not an effect
+duration or a tolerance recovery percentage. Tolerance percentages remain
+outside this increment.
 The new choices remain local preferences; portable backup metadata is unchanged.
 
 ## Focused development checks — 9 November 2026
@@ -92,3 +99,9 @@ four definition-source and eight preference cases) and the Direct debug APK
 build. The new preference case verifies the independent period, persistence and
 failed-write retention. Diff checks passed. Device interaction, lint and full
 regression were not run for this follow-up.
+
+The current-break follow-up passed 23 focused tests (18 aggregation and five
+interval cases), the Direct debug APK build and diff checks. Added cases cover
+future starts, ongoing and overlapping ranges, empty histories, consumer
+isolation and current context outside the historical filter. Device, lint and
+full-regression checks were not run for this follow-up.
