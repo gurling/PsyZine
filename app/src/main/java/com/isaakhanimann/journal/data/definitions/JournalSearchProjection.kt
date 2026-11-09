@@ -22,7 +22,8 @@ data class IngestionSearchHit(val ingestion: Ingestion, val experience: Experien
 data class JournalSearchProjection(val generation: String? = null, val request: JournalSearchRequest = JournalSearchRequest(),
     val catalogNames: List<String> = emptyList(), val locals: List<CustomSubstance> = emptyList(),
     val definitions: List<DefinitionWithContent> = emptyList(), val experiences: List<Experience> = emptyList(),
-    val ingestions: List<IngestionSearchHit> = emptyList()) {
+    val ingestions: List<IngestionSearchHit> = emptyList(),
+    val experienceNames: Map<Int, ExperienceCardNames> = emptyMap()) {
     val isEmpty get() = catalogNames.isEmpty() && locals.isEmpty() && definitions.isEmpty() && experiences.isEmpty() && ingestions.isEmpty()
 }
 
@@ -119,5 +120,12 @@ fun projectJournalSearch(data: SubjectBrowserSnapshot, catalog: List<CatalogSear
         val matchingIds = terms.map { term -> hitsByTerm.getValue(term).map { it.ingestion.id }.toSet() }
         allHits.filter { hit -> matchingIds.all { hit.ingestion.id in it } }
     } else emptyList()
-    return JournalSearchProjection(data.tags.generation, request, visibleCatalog, visibleLocals, visibleDefinitions, experiences, ingestions)
+    val visibleIds = experiences.mapTo(mutableSetOf()) { it.id }
+    val definitionUnits = definitions.mapValues { it.value.unit }
+    val definitionComponents = definitions.mapValues { it.value.components }
+    val names = data.journal.filter { it.experience.id in visibleIds }.associate { entry ->
+        checkCancelled()
+        entry.experience.id to experienceCardNames(entry.ingestions, definitionUnits, definitionComponents, checkCancelled)
+    }
+    return JournalSearchProjection(data.tags.generation, request, visibleCatalog, visibleLocals, visibleDefinitions, experiences, ingestions, names)
 }

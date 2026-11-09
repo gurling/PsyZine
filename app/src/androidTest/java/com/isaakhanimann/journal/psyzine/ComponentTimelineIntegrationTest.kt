@@ -61,6 +61,28 @@ class ComponentTimelineIntegrationTest {
     }
     @After fun cleanup() { if (::db.isInitialized) db.close() }
 
+    @Test fun experienceCardsObserveIngredientEditsThroughTheExistingRoomRelation() = runBlocking<Unit> {
+        val values = Channel<List<com.isaakhanimann.journal.data.room.experiences.relations.ExperienceWithIngestionsCompanionsAndRatings>>(Channel.UNLIMITED)
+        val watch = launch { db.experienceDao().getSortedExperienceWithIngestionsCompanionsAndRatingsFlow().collect { values.send(it) } }
+        try {
+            val initial = withTimeout(15000) { values.receive() }.single().ingestionsWithCompanions.single()
+            assertEquals("Caffeine", initial.customUnitComponents.single().substanceName)
+            db.withTransaction {
+                db.definitionDao().deleteComponents(1)
+                db.definitionDao().insertComponents(listOf(DoseComponent(10, 1, "Pregabalin", "mg", dose = 5.0)))
+            }
+            val updated = withTimeout(15000) {
+                var next = values.receive().single().ingestionsWithCompanions.single()
+                while (next.customUnitComponents.single().substanceName != "Pregabalin") next = values.receive().single().ingestionsWithCompanions.single()
+                next
+            }
+            val summary = experienceCardNames(listOf(updated.ingestion), mapOf(1 to updated.customUnit!!), mapOf(1 to updated.customUnitComponents))
+            assertEquals(listOf("Synthetic blend"), summary.parents)
+            assertEquals(listOf("Pregabalin"), summary.components)
+            assertEquals(2.0, db.experienceDao().getIngestion(1)!!.dose!!, 0.0)
+        } finally { watch.cancelAndJoin(); values.close() }
+    }
+
     @Test fun componentAndRouteEditsInvalidateCoherentRecordAndExternalPresentationSnapshots() = runBlocking<Unit> {
         val snapshots = Channel<JournalTimelineRecord>(Channel.UNLIMITED)
         val activeChanges = Channel<Unit>(Channel.UNLIMITED)

@@ -221,6 +221,9 @@ fun SearchScreen(
                             Column(Modifier.padding(12.dp)) {
                                 Text(experience.title.ifBlank { "Untitled experience" }, style = MaterialTheme.typography.titleMedium)
                                 Text(searchDate(experience.sortDate), style = MaterialTheme.typography.bodySmall)
+                                val names = results.experienceNames[experience.id]?.selected(
+                                    com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.showComponents).orEmpty()
+                                if (names.isNotEmpty()) Text(names.joinToString(", "), style = MaterialTheme.typography.bodyMedium)
                                 if (experience.isFavorite) Text("Favorite", style = MaterialTheme.typography.labelLarge)
                                 if (experience.text.isNotBlank()) Text(experience.text, maxLines = 3,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)

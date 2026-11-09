@@ -1,5 +1,8 @@
 # PsyZine verification and acceptance
 
+The 9 November 2026 [journal display controls](journal-display-controls.md) record
+the focused development checks for persistent card and timeline options.
+
 The 3 November 2026 [component timeline verification](component-timeline-verification.md)
 records the latest source-slice checks for custom-definition curves, ingredient
 details, cumulative quantities and shared external presentation. Its results and

@@ -60,7 +60,8 @@ import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 fun ExperienceRow(
     @PreviewParameter(ExperienceWithIngestionsCompanionsAndRatingsPreviewProvider::class) experienceWithIngestionsCompanionsAndRatings: ExperienceWithIngestionsCompanionsAndRatings,
     navigateToExperienceScreen: () -> Unit = {},
-    isTimeRelativeToNow: Boolean = true
+    isTimeRelativeToNow: Boolean = true,
+    showComponents: Boolean = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.showComponents,
 ) {
     val ingestions = experienceWithIngestionsCompanionsAndRatings.ingestionsWithCompanions.sortedBy { it.ingestion.time }
     val experience = experienceWithIngestionsCompanionsAndRatings.experience
@@ -84,9 +85,11 @@ fun ExperienceRow(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth()
         ) {
-            val substanceNames = remember(ingestions) {
-                ingestions.map { it.displayName }.distinct()
-                    .joinToString(separator = ", ")
+            val substanceNames = remember(ingestions, showComponents) {
+                com.isaakhanimann.journal.data.definitions.experienceCardNames(
+                    ingestions.map { it.ingestion }, ingestions.mapNotNull { it.customUnit }.associateBy { it.id },
+                    ingestions.mapNotNull { row -> row.ingestion.customUnitId?.let { it to row.customUnitComponents } }.toMap()
+                ).selected(showComponents).joinToString(separator = ", ")
             }
             if (substanceNames.isNotEmpty()) {
                 Text(text = substanceNames, modifier = Modifier.weight(1f))

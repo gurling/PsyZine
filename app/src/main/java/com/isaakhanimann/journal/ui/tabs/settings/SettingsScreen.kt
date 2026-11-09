@@ -74,6 +74,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -149,6 +151,9 @@ fun SettingsScreen(
         saveIsTimelineHidden = viewModel::saveIsTimelineHidden,
         areSubstanceHeightsIndependent = viewModel.areSubstanceHeightsIndependentFlow.collectAsStateWithLifecycle().value,
         saveAreSubstanceHeightsIndependent = viewModel::saveAreSubstanceHeightsIndependent,
+        journalDisplaySettings = viewModel.journalDisplaySettings.collectAsStateWithLifecycle().value,
+        saveShowComponents = viewModel::saveShowComponents,
+        saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
     )
 }
 
@@ -180,6 +185,9 @@ fun SettingsScreen(
     saveIsTimelineHidden: (Boolean) -> Unit,
     areSubstanceHeightsIndependent: Boolean,
     saveAreSubstanceHeightsIndependent: (Boolean) -> Unit,
+    journalDisplaySettings: com.isaakhanimann.journal.data.preferences.JournalDisplaySettings = com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(),
+    saveShowComponents: (Boolean) -> Unit = {},
+    saveHideTimelineQuantities: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -249,6 +257,12 @@ fun SettingsScreen(
                         onCheckedChange = saveIsTimelineHidden
                     )
                 }
+                HorizontalDivider()
+                JournalDisplaySwitch("Show components in experience", journalDisplaySettings.showComponents,
+                    "Use direct ingredient names on experience cards. Nested definitions keep their name.", saveShowComponents)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide timeline quantity details", journalDisplaySettings.hideTimelineQuantities,
+                    "Keep the graph and time cursor visible.", saveHideTimelineQuantities)
                 HorizontalDivider()
                 Row(
                     modifier = Modifier
@@ -497,6 +511,19 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun JournalDisplaySwitch(label: String, checked: Boolean, description: String, save: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .toggleable(checked, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = save)
+        .padding(horizontal = horizontalPadding, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(label)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

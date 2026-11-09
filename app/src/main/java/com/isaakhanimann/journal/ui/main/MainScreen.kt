@@ -49,6 +49,7 @@ fun MainScreen(
 ) {
     val accepted = viewModel.isAcceptedFlow.collectAsStateWithLifecycle().value
     if (accepted == null) return
+    val displaySettings by viewModel.journalDisplaySettings.collectAsStateWithLifecycle()
     if (accepted) {
         val navController = rememberNavController()
         androidx.compose.runtime.LaunchedEffect(experienceRequest?.token) {
@@ -113,6 +114,9 @@ fun MainScreen(
             } == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
             items = items
         ) {
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings provides displaySettings
+            ) {
             NavHost(
                 navController,
                 startDestination = JournalTopLevelRoute
@@ -124,6 +128,7 @@ fun MainScreen(
                 settingsGraph(navController)
                 tagsGraph(navController)
                 definitionsGraph(navController)
+            }
             }
         }
     } else {

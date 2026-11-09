@@ -44,7 +44,12 @@ val ARE_CONDITIONS_ACCEPTED = booleanPreferencesKey("are_conditions_accepted")
 class MainScreenViewModel @Inject constructor(
     private val dataStore: DataStore<Preferences>,
     private val database: AppDatabase,
+    userPreferences: com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences,
 ) : ViewModel() {
+
+    val journalDisplaySettings = userPreferences.journalDisplaySettingsFlow
+        .catch { if (it is java.io.IOException) emit(com.isaakhanimann.journal.data.preferences.JournalDisplaySettings()) else throw it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), com.isaakhanimann.journal.data.preferences.JournalDisplaySettings())
 
     val isAcceptedFlow: StateFlow<Boolean?> = dataStore.data
         .catch { if (it is java.io.IOException) emit(emptyPreferences()) else throw it }

@@ -29,6 +29,24 @@ class PreferencesParityTest {
         user.saveAreSubstanceHeightsIndependent(false)
         assertFalse(UserPreferences(store).areSubstanceHeightsIndependentFlow.first())
     }
+    @Test fun journalDisplayChoicesPersistAndAbsentBackupFieldsRetainCurrentValues() = runTest {
+        val store = Store(); val user = UserPreferences(store)
+        assertEquals(JournalDisplaySettings(), user.journalDisplaySettingsFlow.first())
+        user.saveShowComponents(false); user.saveHideTimelineQuantities(true)
+        val restored = UserPreferences(store)
+        assertEquals(JournalDisplaySettings(false, true), restored.journalDisplaySettingsFlow.first())
+        restored.restoreJournalDisplaySettings(null, null)
+        assertEquals(JournalDisplaySettings(false, true), restored.journalDisplaySettingsFlow.first())
+        restored.restoreJournalDisplaySettings(true, null)
+        assertEquals(JournalDisplaySettings(true, true), restored.journalDisplaySettingsFlow.first())
+        assertTrue(restored.areSubstanceHeightsIndependentFlow.first())
+    }
+    @Test fun failedJournalDisplayWriteIsAtomicAndKeepsBothChoices() = runTest {
+        val store = Store(); val user = UserPreferences(store)
+        user.restoreJournalDisplaySettings(false, true); store.fail = true
+        try { user.restoreJournalDisplaySettings(true, false); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(JournalDisplaySettings(false, true), user.journalDisplaySettingsFlow.first())
+    }
     @Test fun everyThemePersistsAndUnknownSelectionRecovers() = runTest {
         val store = Store(); val appearance = AppearanceRepository(store)
         ThemeId.entries.forEach { theme ->

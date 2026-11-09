@@ -148,6 +148,11 @@ fun ExperienceScreen(
     val experience = record.value?.experience
     val photos = record.value?.photos.orEmpty()
     val isFavorite = experience?.isFavorite ?: false
+    viewModel.displayPreferenceError?.let { message ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = viewModel::clearDisplayPreferenceError,
+            title = { Text("Preference could not be saved") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::clearDisplayPreferenceError) { Text("OK") } })
+    }
     val oneExperienceScreenModel = OneExperienceScreenModel(
         isFavorite = isFavorite,
         title = experience?.title ?: "",
@@ -196,7 +201,9 @@ fun ExperienceScreen(
         onChangeTimeDisplayOption = viewModel::saveTimeDisplayOption,
         navigateToTimelineScreen = navigateToTimelineScreen,
         areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsStateWithLifecycle().value,
-        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value
+        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value,
+        saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
+        savingDisplayPreference = viewModel.savingDisplayPreference,
     )
 }
 
@@ -260,6 +267,8 @@ fun ExperienceScreen(
     isTimelineHidden: Boolean,
     photosContent: @Composable () -> Unit = {},
     lazyPhotos: LazyListScope.() -> Unit = {},
+    saveHideTimelineQuantities: (Boolean) -> Unit = {},
+    savingDisplayPreference: Boolean = false,
 ) {
     Scaffold(
         topBar = {
@@ -295,6 +304,8 @@ fun ExperienceScreen(
                 timeDisplayOption = timeDisplayOption,
                 isOralDisclaimerHidden = isOralDisclaimerHidden,
                 onChangeIsOralDisclaimerHidden = onChangeIsOralDisclaimerHidden,
+                saveHideTimelineQuantities = saveHideTimelineQuantities,
+                savingDisplayPreference = savingDisplayPreference,
             )
             }
             if (oneExperienceScreenModel.ingestionElements.isNotEmpty()) {
@@ -469,6 +480,7 @@ private fun ConsumerSection(
                         model = timelineModel,
                         timeDisplayOption = timeDisplayOption,
                         isShowingCurrentTime = true,
+                        hideQuantities = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTimelineQuantities,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
@@ -712,6 +724,8 @@ private fun MyTimelineSection(
     timeDisplayOption: TimeDisplayOption,
     isOralDisclaimerHidden: Boolean,
     onChangeIsOralDisclaimerHidden: (Boolean) -> Unit,
+    saveHideTimelineQuantities: (Boolean) -> Unit,
+    savingDisplayPreference: Boolean,
 ) {
     when (timelineDisplayOption) {
         TimelineDisplayOption.Hidden -> {}
@@ -743,14 +757,19 @@ private fun MyTimelineSection(
                         .padding(bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    val hideQuantities = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTimelineQuantities
                     AllTimelines(
                         model = timelineModel,
                         timeDisplayOption = timeDisplayOption,
                         isShowingCurrentTime = true,
+                        hideQuantities = hideQuantities,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
                     )
+                    TextButton(onClick = { saveHideTimelineQuantities(!hideQuantities) }, enabled = !savingDisplayPreference) {
+                        Text(if (hideQuantities) "Show quantity details" else "Hide quantity details")
+                    }
                     val hasOralIngestion =
                         oneExperienceScreenModel.ingestionElements.any { it.ingestionWithCompanionAndCustomUnit.ingestion.administrationRoute == AdministrationRoute.ORAL }
                     if (hasOralIngestion && !isOralDisclaimerHidden) {

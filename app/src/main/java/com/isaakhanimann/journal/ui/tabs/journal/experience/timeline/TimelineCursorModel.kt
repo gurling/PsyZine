@@ -59,6 +59,8 @@ class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
         }
     }
 
+    val ingestions: List<DataForOneEffectLine> = curves.map { it.ingestion }
+
     fun at(time: Instant): List<TimelineCursorReadout> = curves.map { (line, full) ->
         val seconds = Duration.between(line.startTime, time).toMillis() / 1000f
         val fraction = if (full != null) {

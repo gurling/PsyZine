@@ -136,9 +136,11 @@ class AttachmentBackupIntegrationTest {
     @Test fun photoInclusiveRoundTripRestoresAssociationsAndPreferences() = runBlocking {
         val original = seededPhoto()
         appearance.select(ThemeId.NORD); presentation.widgetDetails(false)
+        userPreferences.restoreJournalDisplaySettings(false, true)
         val archive = File(directory, "roundtrip.psyzine")
         backup.export(Uri.fromFile(archive))
         appearance.select(ThemeId.DRACULA); presentation.widgetDetails(true)
+        userPreferences.restoreJournalDisplaySettings(true, false)
         assertNull(backup.restore(Uri.fromFile(archive)))
         val restored = database.photoAttachmentDao().all().single()
         assertNotEquals(original.id, restored.id)
@@ -147,6 +149,7 @@ class AttachmentBackupIntegrationTest {
         assertEquals(original.sha256, storage.hash(storage.file(restored.relativePath)))
         assertEquals(ThemeId.NORD, appearance.theme.first()); assertFalse(presentation.settings.first().widgetDetails)
         assertFalse(presentation.settings.first().lockScreenDetails)
+        assertEquals(com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(false, true), userPreferences.journalDisplaySettingsFlow.first())
     }
     @Test fun nativeDefinitionsTagsAndPhotosRoundTripWithoutFlattening() = runBlocking {
         val original = seededPhoto()
@@ -182,6 +185,7 @@ class AttachmentBackupIntegrationTest {
             val manifest = org.json.JSONObject(content.getValue("manifest.json").toString(Charsets.UTF_8))
             if (future) manifest.put("toleranceStatsPeriod", "FUTURE_UNSUPPORTED_PERIOD")
             else { manifest.put("version", 1); manifest.remove("toleranceStatsPeriod") }
+            manifest.remove("journalDisplay")
             val archive = File(directory, "tolerance-$future.psyzine")
             ZipOutputStream(archive.outputStream()).use { zip ->
                 content.forEach { (name, bytes) ->
@@ -191,9 +195,11 @@ class AttachmentBackupIntegrationTest {
                 }
             }
             userPreferences.saveToleranceStatsPeriod(TolerancePeriod.PAST_3D)
+            userPreferences.restoreJournalDisplaySettings(false, true)
             val warning = backup.restore(Uri.fromFile(archive))
             if (future) assertTrue(warning!!.contains("current period was retained")) else assertNull(warning)
             assertEquals(TolerancePeriod.PAST_3D, userPreferences.toleranceStatsPeriodFlow.first())
+            assertEquals(com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(false, true), userPreferences.journalDisplaySettingsFlow.first())
             assertNotNull(database.experienceDao().getExperience(1))
         }
     }

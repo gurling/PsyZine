@@ -47,6 +47,25 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT = booleanPreferencesKey("KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT")
         val KEY_IS_TIMELINE_HIDDEN = booleanPreferencesKey("KEY_IS_TIMELINE_HIDDEN")
         val KEY_TOLERANCE_STATS_PERIOD = stringPreferencesKey("tolerance_stats_period")
+        val KEY_SHOW_COMPONENTS = booleanPreferencesKey("KEY_ARE_SUB_COMPONENTS_SHOWN")
+        val KEY_HIDE_TIMELINE_QUANTITIES = booleanPreferencesKey("key_hide_timeline_quantity_info")
+    }
+
+    val journalDisplaySettingsFlow = dataStore.data.map {
+        com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(
+            showComponents = it[PreferencesKeys.KEY_SHOW_COMPONENTS] ?: true,
+            hideTimelineQuantities = it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] ?: false)
+    }
+
+    suspend fun saveShowComponents(value: Boolean) = restoreJournalDisplaySettings(value, null)
+    suspend fun saveHideTimelineQuantities(value: Boolean) = restoreJournalDisplaySettings(null, value)
+
+    /** Absent backup fields retain current choices; apply present fields in one edit. */
+    suspend fun restoreJournalDisplaySettings(showComponents: Boolean?, hideTimelineQuantities: Boolean?) {
+        dataStore.edit {
+            showComponents?.let { value -> it[PreferencesKeys.KEY_SHOW_COMPONENTS] = value }
+            hideTimelineQuantities?.let { value -> it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] = value }
+        }
     }
 
     val toleranceStatsPeriodFlow = dataStore.data.map {

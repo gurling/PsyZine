@@ -44,6 +44,11 @@ class SettingsViewModel @Inject constructor(
     private val presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences,
 ) : ViewModel() {
 
+    val journalDisplaySettings = userPreferences.journalDisplaySettingsFlow.stateIn(viewModelScope,
+        SharingStarted.WhileSubscribed(0), com.isaakhanimann.journal.data.preferences.JournalDisplaySettings())
+    fun saveShowComponents(value: Boolean) = savePresentation { userPreferences.saveShowComponents(value) }
+    fun saveHideTimelineQuantities(value: Boolean) = savePresentation { userPreferences.saveHideTimelineQuantities(value) }
+
     fun saveDosageDotsAreHidden(value: Boolean) = savePresentation {
         userPreferences.saveDosageDotsAreHidden(value)
     }

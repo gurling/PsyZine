@@ -84,6 +84,7 @@ fun TimelineScreen(
      title: String,
      timelineDisplayOption: TimelineDisplayOption,
      timeDisplayOption: TimeDisplayOption,
+     hideTimelineQuantities: Boolean = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTimelineQuantities,
 ) {
     Scaffold(
         topBar = {
@@ -119,6 +120,7 @@ fun TimelineScreen(
                             model = timelineDisplayOption.allTimelinesModel,
                             timeDisplayOption = timeDisplayOption,
                             isShowingCurrentTime = true,
+                            hideQuantities = hideTimelineQuantities || !isOrientationPortrait,
                             modifier = Modifier
                                 .fillMaxHeight(if (isOrientationPortrait) 0.5f else 0.8f)
                                 .width(canvasWidth.dp)

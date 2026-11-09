@@ -21,6 +21,8 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
@@ -78,6 +80,21 @@ class ExperienceViewModel @Inject constructor(
     records: com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository,
     state: SavedStateHandle
 ) : ViewModel() {
+    var displayPreferenceError by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    var savingDisplayPreference by androidx.compose.runtime.mutableStateOf(false)
+        private set
+    fun clearDisplayPreferenceError() { displayPreferenceError = null }
+    fun saveHideTimelineQuantities(value: Boolean) {
+        if (savingDisplayPreference) return
+        savingDisplayPreference = true
+        viewModelScope.launch {
+            try { userPreferences.saveHideTimelineQuantities(value); displayPreferenceError = null }
+            catch (error: kotlinx.coroutines.CancellationException) { throw error }
+            catch (_: Exception) { displayPreferenceError = "The timeline display preference could not be saved. Please try again." }
+            finally { savingDisplayPreference = false }
+        }
+    }
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
 
     private val areSubstanceHeightsIndependentFlow =

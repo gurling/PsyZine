@@ -29,6 +29,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -144,6 +146,7 @@ fun AllTimelines(
     isShowingCurrentTime: Boolean,
     timeDisplayOption: TimeDisplayOption,
     modifier: Modifier = Modifier,
+    hideQuantities: Boolean = false,
 ) {
     val isDarkTheme = LocalPsyZinePalette.current
     val density = LocalDensity.current
@@ -186,17 +189,32 @@ fun AllTimelines(
         return true
     }
     val accessibleTime = cursorPoint?.let { model.startTime.plusMillis((it.x.coerceIn(0f, canvasWidthPx.toFloat()) / maxOf(1, canvasWidthPx) * model.widthInSeconds * 1000).toLong()) }
+    val nowX = if (isShowingCurrentTime && canvasWidthPx > 0 && model.widthInSeconds > 0) {
+        val seconds = Duration.between(model.startTime, currentTime).seconds.toDouble()
+        (seconds / model.widthInSeconds * canvasWidthPx).toFloat().takeIf {
+            seconds >= 0 && seconds <= model.widthInSeconds && it >= visibleLeft && it <= visibleRight
+        }
+    } else null
+    val panelPoint = cursorPoint ?: nowX?.takeIf { !hideQuantities }?.let { Offset(it, 0f) }
+    val panelTime = accessibleTime ?: currentTime.takeIf { panelPoint != null }
+    val readouts = remember(model, panelTime, hideQuantities) {
+        if (panelTime != null && !hideQuantities) model.cursorModel.at(panelTime) else emptyList()
+    }
     val cursorSummary = accessibleTime?.let { time ->
-        cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + ". " + model.cursorModel.at(time).joinToString { value ->
+        cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption) + if (hideQuantities) "" else ". " + readouts.joinToString { value ->
             "${value.ingestion.substanceName}, ${value.ingestion.route.displayText}, " +
                 (value.peakFraction?.let { "${(it * 100).roundToInt()} percent of peak" } ?: "peak percentage unavailable") + ", " +
                 value.equivalentText()
         }
     } ?: "Cursor hidden"
 
+    val chartDescription = remember(model) {
+        "Estimated effect timeline from ${model.startTime.getShortTimeText()}. " +
+            model.cursorModel.ingestions.joinToString { "${it.substanceName}, ${it.route.displayText}, ${it.recordedTime.getShortTimeText()}" }
+    }
+
     Box(modifier = modifier.semantics {
-        contentDescription = "Estimated effect timeline from ${model.startTime.getShortTimeText()}. " +
-            model.cursorModel.at(model.startTime).joinToString { "${it.ingestion.substanceName}, ${it.ingestion.route.displayText}, ${it.ingestion.recordedTime.getShortTimeText()}" }
+        contentDescription = chartDescription
         stateDescription = cursorSummary
         customActions = listOf(
             CustomAccessibilityAction("Move cursor earlier by 15 minutes") { moveCursor(-1) },
@@ -229,8 +247,7 @@ fun AllTimelines(
                 }
             }
         }
-    }) {
-        Canvas(modifier = Modifier.matchParentSize().testTag("timeline_canvas").pointerInput(model) {
+    }.pointerInput(model) {
             awaitEachGesture {
                 val down = awaitFirstDown(requireUnconsumed = false)
                 dragPoint = down.position
@@ -247,7 +264,8 @@ fun AllTimelines(
                     dragPoint = null
                 }
             }
-        }) {
+    }) {
+        Canvas(modifier = Modifier.matchParentSize().testTag("timeline_canvas")) {
             val canvasWithLabelsHeight = size.height
             val labelsHeight = axisLabelSize.toPx()
             val canvasWidth = size.width
@@ -311,10 +329,8 @@ fun AllTimelines(
                 textPaint = axisLabelTextPaint
             )
         }
-        cursorPoint?.takeIf { canvasWidthPx > 0 }?.let { point ->
-            val seconds = point.x.coerceIn(0f, canvasWidthPx.toFloat()) / canvasWidthPx * model.widthInSeconds
-            val time = model.startTime.plusMillis((seconds * 1000).toLong())
-            val readouts = model.cursorModel.at(time)
+        panelPoint?.takeIf { canvasWidthPx > 0 }?.let { point ->
+            val time = checkNotNull(panelTime)
             val margin = with(density) { 8.dp.toPx() }
             val right = visibleRight.takeIf { it > visibleLeft } ?: canvasWidthPx.toFloat()
             val panelWidth = min(with(density) { 260.dp.toPx() }, right - visibleLeft - 2 * margin).coerceAtLeast(1f)
@@ -324,16 +340,17 @@ fun AllTimelines(
                 modifier = Modifier.offset { IntOffset(panelX.roundToInt(), margin.roundToInt()) }
                     .width(with(density) { panelWidth.toDp() })
                     .heightIn(max = with(density) { (canvasHeightPx - 2 * margin).coerceAtLeast(1f).toDp() })
-                    .testTag("timeline_readout"),
+                    .testTag(if (cursorPoint == null) "timeline_now_readout" else "timeline_readout"),
                 color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = RoundedCornerShape(12.dp),
                 shadowElevation = 4.dp
             ) {
                 Column(modifier = Modifier.padding(10.dp)) {
-                    Text(cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
+                    Text(if (cursorPoint == null) "Now · ${time.getShortTimeText()}" else cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
                         style = MaterialTheme.typography.labelLarge)
-                    Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
-                        readouts.forEach { readout ->
+                    if (!hideQuantities) {
+                    LazyColumn(Modifier.weight(1f, fill = false).fillMaxWidth().testTag("timeline-quantity-list")) {
+                        itemsIndexed(readouts, key = { index, value -> "${value.ingestion.sourceIngestionId}:${value.ingestion.componentPath}:$index" }) { _, readout ->
                             Text("${readout.ingestion.substanceName} · ${readout.ingestion.route.displayText} · ${readout.ingestion.recordedTime.getShortTimeText()}",
                                 style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
                             val percentage = readout.peakFraction?.let { "${(it * 100).roundToInt()}% of peak" }
@@ -344,6 +361,7 @@ fun AllTimelines(
                     }
                     Text("Per-ingestion timeline estimate", style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
+                    }
                 }
             }
         }

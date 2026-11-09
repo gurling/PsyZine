@@ -56,6 +56,65 @@ class JournalMutationRegressionTest {
     private suspend fun rejected(action: suspend () -> Unit) {
         try { action(); fail("Stale mutation must fail") } catch (_: IllegalStateException) { }
     }
+
+    private class DelayedPreferenceStore : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
+        val values = kotlinx.coroutines.flow.MutableStateFlow(androidx.datastore.preferences.core.emptyPreferences())
+        override val data: kotlinx.coroutines.flow.Flow<androidx.datastore.preferences.core.Preferences> = values
+        val gate = CompletableDeferred<Unit>()
+        val started = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        val attempts = java.util.concurrent.atomic.AtomicInteger()
+        var reject = true
+        override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences): androidx.datastore.preferences.core.Preferences {
+            attempts.incrementAndGet(); started.send(Unit); gate.await()
+            if (reject) throw java.io.IOException("injected write failure")
+            return transform(values.value).also { values.value = it }
+        }
+    }
+    private fun displayModel(store: DelayedPreferenceStore): com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel {
+        val substances = com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository(
+            InstrumentationRegistry.getInstrumentation().targetContext, com.isaakhanimann.journal.data.substances.parse.SubstanceParser())
+        return com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel(entries, attachments, substances,
+            com.isaakhanimann.journal.ui.tabs.journal.addingestion.interactions.InteractionChecker(substances),
+            com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store),
+            com.isaakhanimann.journal.ui.tabs.settings.combinations.CombinationSettingsStorage(store), guard,
+            com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository(db, guard), SavedStateHandle(mapOf("experienceId" to 42)))
+    }
+    @Test fun failedDisplayPreferenceWritesExplainTheErrorAndRejectDuplicateTapsUntilRetry() = runBlocking<Unit> {
+        val store = DelayedPreferenceStore()
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
+        try {
+            withContext(Dispatchers.Main) {
+                model = displayModel(store); models.put("display", model)
+                model.saveHideTimelineQuantities(true); model.saveHideTimelineQuantities(false)
+            }
+            withTimeout(10000) { store.started.receive() }
+            assertEquals(1, store.attempts.get())
+            store.gate.complete(Unit)
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertTrue(model.displayPreferenceError!!.contains("could not be saved"))
+            assertFalse(com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store).journalDisplaySettingsFlow.first().hideTimelineQuantities)
+            withContext(Dispatchers.Main) { store.reject = false; model.clearDisplayPreferenceError(); model.saveHideTimelineQuantities(true) }
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertEquals(2, store.attempts.get()); assertNull(model.displayPreferenceError)
+            assertTrue(com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store).journalDisplaySettingsFlow.first().hideTimelineQuantities)
+            assertEquals("original", db.experienceDao().getExperience(42)!!.title)
+        } finally { withContext(Dispatchers.Main) { models.clear() } }
+    }
+    @Test fun cancellingADisplayPreferenceWriteKeepsThePreviousValueWithoutAnError() = runBlocking<Unit> {
+        val store = DelayedPreferenceStore()
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
+        try {
+            withContext(Dispatchers.Main) { model = displayModel(store); models.put("display", model); model.saveHideTimelineQuantities(true) }
+            withTimeout(10000) { store.started.receive() }
+            withContext(Dispatchers.Main) { models.clear() }
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertNull(model.displayPreferenceError)
+            assertTrue(store.values.value.asMap().isEmpty())
+            assertEquals(1, store.attempts.get())
+        } finally { withContext(Dispatchers.Main) { models.clear() } }
+    }
     private suspend fun staleActions(generation: String) {
         rejected { entries.insert(note.copy(id=0),generation) }
         rejected { entries.insert(rating.copy(id=0),generation) }
