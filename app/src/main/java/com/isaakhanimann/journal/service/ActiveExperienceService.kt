@@ -33,6 +33,7 @@ class ActiveExperienceService : Service() {
     @Inject lateinit var active: ActiveExperienceRepository
     @Inject lateinit var preferences: PresentationPreferences
     @Inject lateinit var appearance: AppearanceRepository
+    @Inject lateinit var coordinator: ActiveExperienceCoordinator
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private var updateJob: Job? = null
     @Volatile private var latestStartId = 0
@@ -57,7 +58,8 @@ class ActiveExperienceService : Service() {
                     preferences.notificationEnabled(false)
                     stopFailed = false
                     val observedStartId = latestStartId
-                    if (!preferences.settings.first().enabled && stopSelfResult(observedStartId)) {
+                    val fresh = preferences.settings.first()
+                    if (!fresh.enabled && fresh.manualTarget == null && stopSelfResult(observedStartId)) {
                         updateJob?.cancel()
                         stopForeground(STOP_FOREGROUND_REMOVE)
                     }
@@ -69,6 +71,7 @@ class ActiveExperienceService : Service() {
             }
             return START_NOT_STICKY
         }
+        if (intent?.action == ACTION_SHOW_MANUAL) stopFailed = false
         if (updateJob?.isActive == true) return START_STICKY
         val loading = renderer.base().setContentTitle(getString(R.string.live_activity_loading)).build()
         try {
@@ -84,13 +87,12 @@ class ActiveExperienceService : Service() {
                 .debounce(100).collect {
                     try {
                         val settings = preferences.settings.first()
-                        val data = active.current()
-                        if (!settings.enabled || !settings.accepted || !activeNotificationsAllowed(this@ActiveExperienceService) || data == null) {
+                        val data = coordinator.notificationData()
+                        if (!settings.accepted || !activeNotificationsAllowed(this@ActiveExperienceService) || data == null) {
                             val observedStartId = latestStartId
                             // Clear placed widgets before stopping; periodic widget updates remain independent.
                             updateWidgets()
-                            val fresh = preferences.settings.first()
-                            if (fresh.enabled && fresh.accepted && activeNotificationsAllowed(this@ActiveExperienceService) && active.current() != null) return@collect
+                            if (activeNotificationsAllowed(this@ActiveExperienceService) && coordinator.notificationData() != null) return@collect
                             // A new start can arrive while the widget/DB work suspends. Do not
                             // cancel the sole updater or remove that newer start's notification.
                             if (!stopSelfResult(observedStartId)) return@collect
@@ -122,6 +124,7 @@ class ActiveExperienceService : Service() {
         catch (e: Exception) { android.util.Log.w("TimelineWidget", "Update unavailable: ${e.javaClass.simpleName}") }
     }
     companion object {
+        const val ACTION_SHOW_MANUAL = "app.psyzine.SHOW_MANUAL_NOTIFICATION"
         const val ACTION_STOP = "app.psyzine.STOP_AUTOMATIC_NOTIFICATION"
         const val CHANNEL_ID = "active_experience"; const val NOTIFICATION_ID = 101; const val UPDATE_INTERVAL_MS = 30_000L
     }

@@ -56,7 +56,7 @@ class ActiveNotificationRenderer(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         return base().setStyle(NotificationCompat.DecoratedCustomViewStyle()).setCustomContentView(collapsed).setCustomBigContentView(expanded)
             .addAction(0, "Log ingestion", log)
-            .addAction(0, "Stop automatic notification", stop)
+            .addAction(0, "Stop notification", stop)
             .setContentTitle(context.getString(R.string.live_activity_channel_name)).setContentText(summary)
             .setContentIntent(tap).setCategory(NotificationCompat.CATEGORY_STOPWATCH).setUsesChronometer(true)
             .setWhen(data.firstIngestionTime.toEpochMilli()).setPublicVersion(public)
@@ -68,7 +68,7 @@ class ActiveNotificationRenderer(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val open = PendingIntent.getActivity(context, 1, android.content.Intent(context, com.isaakhanimann.journal.MainActivity::class.java),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        return base().setContentTitle("Could not stop automatic notification")
+        return base().setContentTitle("Could not stop notification")
             .setContentText("The setting could not be saved. Retry or open PsyZine Settings.")
             .setContentIntent(open).addAction(0, "Retry stop", retry).build()
     }

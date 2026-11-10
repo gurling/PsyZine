@@ -148,6 +148,12 @@ fun ExperienceScreen(
     val experience = record.value?.experience
     val photos = record.value?.photos.orEmpty()
     val isFavorite = experience?.isFavorite ?: false
+    val notificationSettings by viewModel.notificationSettings.collectAsStateWithLifecycle()
+    viewModel.notificationError?.let { message ->
+        AlertDialog(onDismissRequest = viewModel::clearNotificationError,
+            title = { Text("Live notification") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::clearNotificationError) { Text("OK") } })
+    }
     viewModel.displayPreferenceError?.let { message ->
         androidx.compose.material3.AlertDialog(onDismissRequest = viewModel::clearDisplayPreferenceError,
             title = { Text("Preference could not be saved") }, text = { Text(message) },
@@ -172,6 +178,19 @@ fun ExperienceScreen(
         calculationNotices = viewModel.cumulativeProjectionFlow.collectAsStateWithLifecycle().value.notices,
     )
     ExperienceScreen(
+        notificationContent = {
+            val selected = notificationSettings.manualTarget?.let {
+                it.experienceId == experience?.id && it.generation == viewModel.session.generation
+            } == true
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                TextButton(onClick = { viewModel.changeLiveNotification(selected) }, enabled = !viewModel.notificationBusy) {
+                    Text(if (viewModel.notificationBusy) "Updating live notification…"
+                        else if (selected) "Stop live notification" else "Show this entry in live notification")
+                }
+                if (selected) Text("Selected for the live notification while its estimated timeline remains active.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
         toleranceContent = { com.isaakhanimann.journal.ui.tabs.stats.tolerance.ExperienceTolerance() },
         lazyPhotos = {
             item(key = "photo-title") {
@@ -271,6 +290,7 @@ fun ExperienceScreen(
     saveHideTimelineQuantities: (Boolean) -> Unit = {},
     savingDisplayPreference: Boolean = false,
     toleranceContent: @Composable () -> Unit = {},
+    notificationContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -297,6 +317,7 @@ fun ExperienceScreen(
                 .padding(horizontal = horizontalPadding)
         ) {
             val verticalCardPadding = 4.dp
+            item(key = "live-notification") { notificationContent() }
             item(key = "timeline") { MyTimelineSection(
                 timelineDisplayOption = timelineDisplayOption,
                 verticalCardPadding = verticalCardPadding,

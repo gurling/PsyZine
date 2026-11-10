@@ -78,8 +78,32 @@ class ExperienceViewModel @Inject constructor(
     combinationSettingsStorage: CombinationSettingsStorage,
     private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
     records: com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository,
+    presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences,
+    private val notificationCoordinator: com.isaakhanimann.journal.service.ActiveExperienceCoordinator,
     state: SavedStateHandle
 ) : ViewModel() {
+    val notificationSettings = presentation.settings.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0),
+        com.isaakhanimann.journal.data.preferences.PresentationSettings())
+    var notificationBusy by androidx.compose.runtime.mutableStateOf(false)
+        private set
+    var notificationError by androidx.compose.runtime.mutableStateOf<String?>(null)
+        private set
+    fun clearNotificationError() { notificationError = null }
+    fun changeLiveNotification(stop: Boolean) {
+        if (!session.ready || session.busy || notificationBusy) return
+        val generation = session.generation ?: return
+        notificationBusy = true
+        viewModelScope.launch {
+            try {
+                if (stop) notificationCoordinator.stopNotification()
+                else notificationCoordinator.startExperience(experienceId, generation)
+                notificationError = null
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: com.isaakhanimann.journal.service.NotificationActionException) { notificationError = e.message }
+            catch (_: Exception) { notificationError = "The live notification could not be updated. Your journal is unchanged. Please try again." }
+            finally { notificationBusy = false }
+        }
+    }
     var displayPreferenceError by androidx.compose.runtime.mutableStateOf<String?>(null)
         private set
     var savingDisplayPreference by androidx.compose.runtime.mutableStateOf(false)

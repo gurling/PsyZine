@@ -77,7 +77,12 @@ class JournalMutationRegressionTest {
             com.isaakhanimann.journal.ui.tabs.journal.addingestion.interactions.InteractionChecker(substances),
             com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store),
             com.isaakhanimann.journal.ui.tabs.settings.combinations.CombinationSettingsStorage(store), guard,
-            com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository(db, guard), SavedStateHandle(mapOf("experienceId" to 42)))
+            com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository(db, guard),
+            com.isaakhanimann.journal.data.preferences.PresentationPreferences(store),
+            com.isaakhanimann.journal.service.ActiveExperienceCoordinator(InstrumentationRegistry.getInstrumentation().targetContext,
+                com.isaakhanimann.journal.data.active.ActiveExperienceRepository(db, substances, java.time.Clock.systemUTC()),
+                com.isaakhanimann.journal.data.preferences.PresentationPreferences(store)),
+            SavedStateHandle(mapOf("experienceId" to 42)))
     }
     @Test fun failedDisplayPreferenceWritesExplainTheErrorAndRejectDuplicateTapsUntilRetry() = runBlocking<Unit> {
         val store = DelayedPreferenceStore()

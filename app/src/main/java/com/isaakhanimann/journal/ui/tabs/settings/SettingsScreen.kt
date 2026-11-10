@@ -330,6 +330,11 @@ fun SettingsScreen(
                     Text("Ongoing notification", Modifier.weight(1f))
                     Switch(presentation.enabled, saveNotificationEnabled)
                 }
+                if (presentation.manualTarget != null) {
+                    Text("A specific entry is selected for the live notification. The automatic setting resumes when that selection expires.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { saveNotificationEnabled(true) }) { Text("Use automatic selection") }
+                    TextButton(onClick = { saveNotificationEnabled(false) }) { Text("Stop live notification") }
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Show details on lock screen", Modifier.weight(1f))
                     Switch(presentation.lockScreenDetails, saveLockScreenDetails)
@@ -338,7 +343,7 @@ fun SettingsScreen(
                     Text("Show details in home-screen widget", Modifier.weight(1f))
                     Switch(presentation.widgetDetails, saveWidgetDetails)
                 }
-                Text("Phases are estimates from reference durations. Notifications update while an experience has an ingestion in the past 12 hours.", style = MaterialTheme.typography.bodySmall)
+                Text("Phases are estimates from reference durations. Automatic notifications use ingestions from the past 12 hours. You can select an entry with a remaining estimated timeline from its detail screen.", style = MaterialTheme.typography.bodySmall)
                 val notificationContext = LocalContext.current
                 TextButton(onClick = { notificationContext.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, notificationContext.packageName)) }) { Text("Android notification settings") }
             }

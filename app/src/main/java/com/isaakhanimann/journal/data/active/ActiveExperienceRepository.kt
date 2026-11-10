@@ -36,20 +36,27 @@ class ActiveExperienceRepository @Inject constructor(private val db: AppDatabase
     // Observe invalidations without loading the entire private journal for every update.
     val changes = db.experienceDao().observeActiveChanges(SimpleSQLiteQuery("SELECT 1")).map { Unit }
 
-    suspend fun current(): ActiveExperience? = withContext(Dispatchers.Default) {
+    suspend fun current(): ActiveExperience? = load(null)
+
+    suspend fun forNotification(target: com.isaakhanimann.journal.data.preferences.ManualNotificationTarget): ActiveExperience? =
+        load(target)?.takeIf { it.hasRemainingNotificationTimeline() }
+
+    private suspend fun load(target: com.isaakhanimann.journal.data.preferences.ManualNotificationTarget?): ActiveExperience? = withContext(Dispatchers.Default) {
         substances.initialize()
         val now = clock.instant()
         val snapshot = db.withTransaction {
             val generation = db.photoAttachmentDao().generation() ?: java.util.UUID.randomUUID().toString().also {
                 db.photoAttachmentDao().setGeneration(com.isaakhanimann.journal.data.room.attachments.JournalState(generation = it))
             }
-            Snapshot(db.experienceDao().getMostRecentActiveExperience(now.minus(12, ChronoUnit.HOURS), now), generation,
+            val relation = if (target == null) db.experienceDao().getMostRecentActiveExperience(now.minus(12, ChronoUnit.HOURS), now)
+                else if (target.generation == generation) db.experienceDao().getExperienceWithIngestionsCompanionsAndRatings(target.experienceId) else null
+            Snapshot(relation, generation,
                 db.experienceDao().definitionContents(), db.experienceDao().getAllSubstanceCompanions())
         }
         val experience = snapshot.relation ?: return@withContext null
         val graph = snapshot.definitions.toGraph()
         val companions = snapshot.companions.associateBy { it.substanceName }
-        val ingestions = experience.ingestionsWithCompanions.sortedBy { it.ingestion.time }
+        val ingestions = experience.ingestionsWithCompanions.sortedWith(compareBy({ it.ingestion.time }, { it.ingestion.id }))
         if (ingestions.isEmpty()) return@withContext null
         val sourceSubstances = substances.getAllSubstances()
         val context = kotlinx.coroutines.currentCoroutineContext()
@@ -68,4 +75,14 @@ class ActiveExperienceRepository @Inject constructor(private val db: AppDatabase
             AllTimelinesModel(lines, emptyList(), emptyList(), true) else null
         ActiveExperience(experience.experience.id, snapshot.generation, experience.experience.title, display, model, ingestions.first().ingestion.time, now)
     }
+}
+
+/** Use rendered curve ends, excluding axis padding and the graph's minimum display width. */
+fun ActiveExperience.hasRemainingNotificationTimeline(): Boolean {
+    if (firstIngestionTime > updatedAt) return false
+    val model = timeline ?: return false
+    val endSeconds = model.groupDrawables.maxOfOrNull { it.endOfLineRelativeToStartInSeconds } ?: return false
+    if (!endSeconds.isFinite() || endSeconds <= 0f) return false
+    val elapsed = java.time.Duration.between(model.startTime, updatedAt)
+    return elapsed.seconds.toDouble() + elapsed.nano / 1_000_000_000.0 < endSeconds.toDouble()
 }

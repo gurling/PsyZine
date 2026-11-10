@@ -14,6 +14,44 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun manualNotificationSelectionSurvivesReentryWithoutEnablingAutomaticNotificationsOrChangingWidgetPrivacy() = runTest {
+        val store = Store(); val prefs = PresentationPreferences(store)
+        prefs.notificationEnabled(false); prefs.widgetDetails(false)
+        val target = ManualNotificationTarget(42, "journal-one")
+        prefs.selectManualNotification(target)
+        val restored = PresentationPreferences(store).settings.first()
+        assertEquals(target, restored.manualTarget)
+        assertFalse(restored.enabled); assertFalse(restored.widgetDetails)
+        store.fail = true
+        try { prefs.selectManualNotification(ManualNotificationTarget(99, "journal-two")); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(target, prefs.settings.first().manualTarget)
+        try { prefs.notificationEnabled(false); fail("Stop unexpectedly succeeded") } catch (_: IOException) { }
+        assertEquals(target, prefs.settings.first().manualTarget)
+        store.fail = false
+        prefs.notificationEnabled(false)
+        assertNull(prefs.settings.first().manualTarget)
+    }
+    @Test fun expiryOfAnOldSelectionCannotClearANewerJournalOrExperience() = runTest {
+        val store = Store(); val prefs = PresentationPreferences(store)
+        val old = ManualNotificationTarget(42, "old")
+        val replacement = ManualNotificationTarget(42, "new")
+        prefs.selectManualNotification(old); prefs.selectManualNotification(replacement)
+        prefs.clearManualNotification(old)
+        assertEquals(replacement, prefs.settings.first().manualTarget)
+        prefs.clearManualNotification(ManualNotificationTarget(99, "new"))
+        assertEquals(replacement, prefs.settings.first().manualTarget)
+        prefs.clearManualNotification(replacement)
+        assertNull(prefs.settings.first().manualTarget)
+        assertTrue(prefs.settings.first().enabled)
+    }
+    @Test fun explicitAutomaticModeAndPortableRestoreClearLocalNotificationTargets() = runTest {
+        val prefs = PresentationPreferences(Store()); val target = ManualNotificationTarget(42, "local-journal")
+        prefs.selectManualNotification(target); prefs.notificationEnabled(true)
+        assertNull(prefs.settings.first().manualTarget)
+        prefs.selectManualNotification(target); prefs.restore(BackupPresentation(false, false, true))
+        assertNull(prefs.settings.first().manualTarget)
+        assertFalse(prefs.settings.first().enabled)
+    }
     @Test fun notificationTimeResetIsAtomicAndDoesNotChangePresentationPreferences() = runTest {
         val store = Store(); val prefs = UserPreferences(store)
         val time = java.time.Instant.ofEpochSecond(123)
