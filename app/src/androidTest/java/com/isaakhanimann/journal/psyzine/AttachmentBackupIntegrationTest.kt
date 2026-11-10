@@ -136,11 +136,11 @@ class AttachmentBackupIntegrationTest {
     @Test fun photoInclusiveRoundTripRestoresAssociationsAndPreferences() = runBlocking {
         val original = seededPhoto()
         appearance.select(ThemeId.NORD); presentation.widgetDetails(false)
-        userPreferences.restoreJournalDisplaySettings(false, true)
+        userPreferences.restoreJournalDisplaySettings(false, true, relativeDates = true)
         val archive = File(directory, "roundtrip.psyzine")
         backup.export(Uri.fromFile(archive))
         appearance.select(ThemeId.DRACULA); presentation.widgetDetails(true)
-        userPreferences.restoreJournalDisplaySettings(true, false)
+        userPreferences.restoreJournalDisplaySettings(true, false, relativeDates = false)
         assertNull(backup.restore(Uri.fromFile(archive)))
         val restored = database.photoAttachmentDao().all().single()
         assertNotEquals(original.id, restored.id)
@@ -149,7 +149,7 @@ class AttachmentBackupIntegrationTest {
         assertEquals(original.sha256, storage.hash(storage.file(restored.relativePath)))
         assertEquals(ThemeId.NORD, appearance.theme.first()); assertFalse(presentation.settings.first().widgetDetails)
         assertFalse(presentation.settings.first().lockScreenDetails)
-        assertEquals(com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(false, true), userPreferences.journalDisplaySettingsFlow.first())
+        assertEquals(com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(false, true, relativeDates = true), userPreferences.journalDisplaySettingsFlow.first())
     }
     @Test fun nativeDefinitionsTagsAndPhotosRoundTripWithoutFlattening() = runBlocking {
         val original = seededPhoto()

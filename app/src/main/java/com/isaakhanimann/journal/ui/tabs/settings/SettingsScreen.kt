@@ -156,6 +156,7 @@ fun SettingsScreen(
         saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
         saveHideInteractions = viewModel::saveHideInteractions,
         saveHideTolerance = viewModel::saveHideTolerance,
+        saveRelativeDates = viewModel::saveRelativeDates,
     )
 }
 
@@ -192,6 +193,7 @@ fun SettingsScreen(
     saveHideTimelineQuantities: (Boolean) -> Unit = {},
     saveHideInteractions: (Boolean) -> Unit = {},
     saveHideTolerance: (Boolean) -> Unit = {},
+    saveRelativeDates: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -264,6 +266,9 @@ fun SettingsScreen(
                 HorizontalDivider()
                 JournalDisplaySwitch("Show components in experience", journalDisplaySettings.showComponents,
                     "Use direct ingredient names on experience cards. Nested definitions keep their name.", saveShowComponents)
+                HorizontalDivider()
+                JournalDisplaySwitch("Show relative dates", journalDisplaySettings.relativeDates,
+                    "Use elapsed or upcoming time on experience cards. Calendar views keep calendar dates.", saveRelativeDates)
                 HorizontalDivider()
                 JournalDisplaySwitch("Hide timeline quantity details", journalDisplaySettings.hideTimelineQuantities,
                     "Keep the graph and time cursor visible.", saveHideTimelineQuantities)

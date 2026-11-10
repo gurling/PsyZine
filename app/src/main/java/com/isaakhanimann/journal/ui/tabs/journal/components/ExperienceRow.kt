@@ -60,7 +60,7 @@ import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
 fun ExperienceRow(
     @PreviewParameter(ExperienceWithIngestionsCompanionsAndRatingsPreviewProvider::class) experienceWithIngestionsCompanionsAndRatings: ExperienceWithIngestionsCompanionsAndRatings,
     navigateToExperienceScreen: () -> Unit = {},
-    isTimeRelativeToNow: Boolean = true,
+    isTimeRelativeToNow: Boolean = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.relativeDates,
     showComponents: Boolean = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.showComponents,
 ) {
     val ingestions = experienceWithIngestionsCompanionsAndRatings.ingestionsWithCompanions.sortedBy { it.ingestion.time }

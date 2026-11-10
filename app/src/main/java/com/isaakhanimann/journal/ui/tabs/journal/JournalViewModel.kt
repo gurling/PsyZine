@@ -19,6 +19,8 @@
 package com.isaakhanimann.journal.ui.tabs.journal
 
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -34,6 +36,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -49,10 +53,23 @@ class JournalViewModel @Inject constructor(
 ) : ViewModel() {
 
 
-    val isTimeRelativeToNow = mutableStateOf(false)
-
+    val isTimeRelativeToNow = userPreferences.journalDisplaySettingsFlow.map { it.relativeDates }
+        .catch { if (it is java.io.IOException) emit(false) else throw it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), false)
+    var savingDatePreference by mutableStateOf(false)
+        private set
+    var datePreferenceError by mutableStateOf<String?>(null)
+        private set
+    fun clearDatePreferenceError() { datePreferenceError = null }
     fun onChangeRelative(isRelative: Boolean) {
-        isTimeRelativeToNow.value = isRelative
+        if (savingDatePreference) return
+        savingDatePreference = true
+        viewModelScope.launch {
+            try { userPreferences.saveRelativeDates(isRelative); datePreferenceError = null }
+            catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (_: Exception) { datePreferenceError = "The date display preference could not be saved. Please try again." }
+            finally { savingDatePreference = false }
+        }
     }
 
     val isSearchEnabled = mutableStateOf(false)

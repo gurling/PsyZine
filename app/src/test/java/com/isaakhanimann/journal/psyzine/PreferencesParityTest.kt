@@ -14,6 +14,20 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun relativeDatesPersistAndPartialRestoresAndFailedWritesKeepThePreviousChoice() = runTest {
+        val store = Store(); val prefs = UserPreferences(store)
+        assertFalse(prefs.journalDisplaySettingsFlow.first().relativeDates)
+        prefs.saveRelativeDates(true)
+        assertTrue(UserPreferences(store).journalDisplaySettingsFlow.first().relativeDates)
+        prefs.restoreJournalDisplaySettings(false, true)
+        assertTrue(prefs.journalDisplaySettingsFlow.first().relativeDates)
+        store.fail = true
+        try { prefs.saveRelativeDates(false); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertTrue(prefs.journalDisplaySettingsFlow.first().relativeDates)
+        store.fail = false
+        prefs.restoreJournalDisplaySettings(null, null, relativeDates = false)
+        assertEquals(JournalDisplaySettings(false, true), prefs.journalDisplaySettingsFlow.first())
+    }
     @Test fun manualNotificationSelectionSurvivesReentryWithoutEnablingAutomaticNotificationsOrChangingWidgetPrivacy() = runTest {
         val store = Store(); val prefs = PresentationPreferences(store)
         prefs.notificationEnabled(false); prefs.widgetDetails(false)

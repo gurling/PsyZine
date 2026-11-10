@@ -85,6 +85,7 @@ fun JournalScreen(
     viewModel: JournalViewModel = hiltViewModel()
 ) {
     val experiences = viewModel.experiences.collectAsStateWithLifecycle().value
+    com.isaakhanimann.journal.ui.utils.JournalActionErrorDialog(viewModel.datePreferenceError, viewModel::clearDatePreferenceError)
     LaunchedEffect(Unit) {
         viewModel.maybeMigrate()
     }
@@ -97,7 +98,8 @@ fun JournalScreen(
         navigateToCalendar = navigateToCalendar,
         isFavoriteEnabled = viewModel.isFavoriteEnabledFlow.collectAsStateWithLifecycle().value,
         onChangeIsFavorite = viewModel::onChangeFavorite,
-        isTimeRelativeToNow = viewModel.isTimeRelativeToNow.value,
+        isTimeRelativeToNow = viewModel.isTimeRelativeToNow.collectAsStateWithLifecycle().value,
+        savingDatePreference = viewModel.savingDatePreference,
         onChangeIsRelative = viewModel::onChangeRelative,
         searchText = viewModel.searchTextFlow.collectAsStateWithLifecycle().value,
         onChangeSearchText = viewModel::search,
@@ -147,6 +149,7 @@ fun JournalScreen(
     isSearchEnabled: Boolean,
     onChangeIsSearchEnabled: (Boolean) -> Unit,
     experiences: List<ExperienceWithIngestionsCompanionsAndRatings>,
+    savingDatePreference: Boolean = false,
 ) {
     Scaffold(
         topBar = {
@@ -155,12 +158,13 @@ fun JournalScreen(
                 actions = {
                     IconToggleButton(
                         checked = isTimeRelativeToNow,
+                        enabled = !savingDatePreference,
                         onCheckedChange = onChangeIsRelative
                     ) {
                         if (isTimeRelativeToNow) {
-                            Icon(Icons.Filled.Timer, contentDescription = "Regular time")
+                            Icon(Icons.Filled.Timer, contentDescription = "Show calendar dates")
                         } else {
-                            Icon(Icons.Outlined.Timer, contentDescription = "Time relative to now")
+                            Icon(Icons.Outlined.Timer, contentDescription = "Show relative dates")
                         }
                     }
                     IconToggleButton(

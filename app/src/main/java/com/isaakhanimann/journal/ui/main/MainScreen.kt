@@ -126,8 +126,10 @@ fun MainScreen(
             } == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
             items = items
         ) {
+            val journalDateTime = com.isaakhanimann.journal.ui.utils.rememberUiTime(displaySettings.relativeDates, 60_000L)
             androidx.compose.runtime.CompositionLocalProvider(
-                com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings provides displaySettings
+                com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings provides displaySettings,
+                com.isaakhanimann.journal.ui.utils.LocalJournalDateTime provides journalDateTime
             ) {
             NavHost(
                 navController,

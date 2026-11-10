@@ -52,6 +52,7 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_HIDE_TIMELINE_QUANTITIES = booleanPreferencesKey("key_hide_timeline_quantity_info")
         val KEY_HIDE_INTERACTIONS = booleanPreferencesKey("journal_hide_interactions")
         val KEY_HIDE_TOLERANCE = booleanPreferencesKey("journal_hide_tolerance")
+        val KEY_RELATIVE_DATES = booleanPreferencesKey("journal_relative_dates")
         val KEY_ADVANCED_STATS_METRIC = stringPreferencesKey("advanced_stats_metric")
         val KEY_ADVANCED_STATS_PERIOD = stringPreferencesKey("advanced_stats_period")
         val KEY_ADVANCED_STATS_START = stringPreferencesKey("advanced_stats_start")
@@ -63,22 +64,25 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
             showComponents = it[PreferencesKeys.KEY_SHOW_COMPONENTS] ?: true,
             hideTimelineQuantities = it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] ?: false,
             hideInteractions = it[PreferencesKeys.KEY_HIDE_INTERACTIONS] ?: false,
-            hideTolerance = it[PreferencesKeys.KEY_HIDE_TOLERANCE] ?: false)
+            hideTolerance = it[PreferencesKeys.KEY_HIDE_TOLERANCE] ?: false,
+            relativeDates = it[PreferencesKeys.KEY_RELATIVE_DATES] ?: false)
     }
 
     suspend fun saveShowComponents(value: Boolean) = restoreJournalDisplaySettings(value, null)
     suspend fun saveHideTimelineQuantities(value: Boolean) = restoreJournalDisplaySettings(null, value)
     suspend fun saveHideInteractions(value: Boolean) = restoreJournalDisplaySettings(null, null, hideInteractions = value)
     suspend fun saveHideTolerance(value: Boolean) = restoreJournalDisplaySettings(null, null, hideTolerance = value)
+    suspend fun saveRelativeDates(value: Boolean) = restoreJournalDisplaySettings(null, null, relativeDates = value)
 
     /** Absent backup fields retain current choices; apply present fields in one edit. */
     suspend fun restoreJournalDisplaySettings(showComponents: Boolean?, hideTimelineQuantities: Boolean?,
-        hideInteractions: Boolean? = null, hideTolerance: Boolean? = null) {
+        hideInteractions: Boolean? = null, hideTolerance: Boolean? = null, relativeDates: Boolean? = null) {
         dataStore.edit {
             showComponents?.let { value -> it[PreferencesKeys.KEY_SHOW_COMPONENTS] = value }
             hideTimelineQuantities?.let { value -> it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] = value }
             hideInteractions?.let { value -> it[PreferencesKeys.KEY_HIDE_INTERACTIONS] = value }
             hideTolerance?.let { value -> it[PreferencesKeys.KEY_HIDE_TOLERANCE] = value }
+            relativeDates?.let { value -> it[PreferencesKeys.KEY_RELATIVE_DATES] = value }
         }
     }
 
