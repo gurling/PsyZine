@@ -53,6 +53,7 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_HIDE_INTERACTIONS = booleanPreferencesKey("journal_hide_interactions")
         val KEY_HIDE_TOLERANCE = booleanPreferencesKey("journal_hide_tolerance")
         val KEY_RELATIVE_DATES = booleanPreferencesKey("journal_relative_dates")
+        val KEY_RECENT_TIME_PRESETS = booleanPreferencesKey("ingestion_recent_time_presets")
         val KEY_ADVANCED_STATS_METRIC = stringPreferencesKey("advanced_stats_metric")
         val KEY_ADVANCED_STATS_PERIOD = stringPreferencesKey("advanced_stats_period")
         val KEY_ADVANCED_STATS_START = stringPreferencesKey("advanced_stats_start")
@@ -65,7 +66,8 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
             hideTimelineQuantities = it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] ?: false,
             hideInteractions = it[PreferencesKeys.KEY_HIDE_INTERACTIONS] ?: false,
             hideTolerance = it[PreferencesKeys.KEY_HIDE_TOLERANCE] ?: false,
-            relativeDates = it[PreferencesKeys.KEY_RELATIVE_DATES] ?: false)
+            relativeDates = it[PreferencesKeys.KEY_RELATIVE_DATES] ?: false,
+            recentTimePresets = it[PreferencesKeys.KEY_RECENT_TIME_PRESETS] ?: false)
     }
 
     suspend fun saveShowComponents(value: Boolean) = restoreJournalDisplaySettings(value, null)
@@ -73,16 +75,19 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
     suspend fun saveHideInteractions(value: Boolean) = restoreJournalDisplaySettings(null, null, hideInteractions = value)
     suspend fun saveHideTolerance(value: Boolean) = restoreJournalDisplaySettings(null, null, hideTolerance = value)
     suspend fun saveRelativeDates(value: Boolean) = restoreJournalDisplaySettings(null, null, relativeDates = value)
+    suspend fun saveRecentTimePresets(value: Boolean) = restoreJournalDisplaySettings(null, null, recentTimePresets = value)
 
     /** Absent backup fields retain current choices; apply present fields in one edit. */
     suspend fun restoreJournalDisplaySettings(showComponents: Boolean?, hideTimelineQuantities: Boolean?,
-        hideInteractions: Boolean? = null, hideTolerance: Boolean? = null, relativeDates: Boolean? = null) {
+        hideInteractions: Boolean? = null, hideTolerance: Boolean? = null, relativeDates: Boolean? = null,
+        recentTimePresets: Boolean? = null) {
         dataStore.edit {
             showComponents?.let { value -> it[PreferencesKeys.KEY_SHOW_COMPONENTS] = value }
             hideTimelineQuantities?.let { value -> it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] = value }
             hideInteractions?.let { value -> it[PreferencesKeys.KEY_HIDE_INTERACTIONS] = value }
             hideTolerance?.let { value -> it[PreferencesKeys.KEY_HIDE_TOLERANCE] = value }
             relativeDates?.let { value -> it[PreferencesKeys.KEY_RELATIVE_DATES] = value }
+            recentTimePresets?.let { value -> it[PreferencesKeys.KEY_RECENT_TIME_PRESETS] = value }
         }
     }
 

@@ -15,6 +15,9 @@ import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.SegmentedButtonDefaults
 import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.MaterialTheme
+import com.isaakhanimann.journal.data.preferences.RecentIngestionTime
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,12 +34,17 @@ fun TimePointOrRangePicker(
     localDateTimeStart: LocalDateTime,
     onChangeStartDateOrTime: (LocalDateTime) -> Unit,
     localDateTimeEnd: LocalDateTime,
-    onChangeEndDateOrTime: (LocalDateTime) -> Unit
+    onChangeEndDateOrTime: (LocalDateTime) -> Unit,
+    recentTimePresets: Boolean = false,
+    onSelectRecentStart: (RecentIngestionTime) -> Unit = {},
+    onSelectRecentEnd: (RecentIngestionTime) -> Unit = {},
+    enabled: Boolean = true,
 ) {
     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
         SegmentedButton(
             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
             onClick = { onChangeTimePickerOption(IngestionTimePickerOption.POINT_IN_TIME) },
+            enabled = enabled,
             selected = ingestionTimePickerOption == IngestionTimePickerOption.POINT_IN_TIME
         ) {
             Text("Point in time")
@@ -44,12 +52,20 @@ fun TimePointOrRangePicker(
         SegmentedButton(
             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
             onClick = { onChangeTimePickerOption(IngestionTimePickerOption.TIME_RANGE) },
+            enabled = enabled,
             selected = ingestionTimePickerOption == IngestionTimePickerOption.TIME_RANGE
         ) {
             Text("Time range")
         }
     }
-    AnimatedContent(
+    if (recentTimePresets) {
+        Column {
+            RecentTimePresets(if (ingestionTimePickerOption == IngestionTimePickerOption.TIME_RANGE) "Start" else "Time",
+                localDateTimeStart, enabled, onSelectRecentStart)
+            if (ingestionTimePickerOption == IngestionTimePickerOption.TIME_RANGE)
+                RecentTimePresets("End", localDateTimeEnd, enabled, onSelectRecentEnd)
+        }
+    } else AnimatedContent(
         targetState = ingestionTimePickerOption,
         label = "ingestionTimePicker"
     ) { option ->
@@ -142,6 +158,19 @@ fun TimePointOrRangePicker(
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun RecentTimePresets(label: String, selected: LocalDateTime, enabled: Boolean,
+    onSelect: (RecentIngestionTime) -> Unit) {
+    Text("$label: ${selected.getDateWithWeekdayText()} ${selected.getShortTimeText()}",
+        style = MaterialTheme.typography.bodyMedium)
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        RecentIngestionTime.entries.forEach { preset ->
+            OutlinedButton(onClick = { onSelect(preset) }, enabled = enabled) { Text(preset.label) }
         }
     }
 }

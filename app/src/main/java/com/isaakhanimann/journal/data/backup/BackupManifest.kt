@@ -19,4 +19,4 @@ data class BackupPresentation(val enabled: Boolean = true, val lockScreenDetails
 @Serializable
 data class BackupJournalDisplay(val showComponents: Boolean? = null, val hideTimelineQuantities: Boolean? = null,
     val hideInteractions: Boolean? = null, val hideTolerance: Boolean? = null,
-    val relativeDates: Boolean? = null)
+    val relativeDates: Boolean? = null, val recentTimePresets: Boolean? = null)

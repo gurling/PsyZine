@@ -14,6 +14,20 @@ import org.junit.Test
 import java.io.IOException
 
 class PreferencesParityTest {
+    @Test fun timeEntryModePersistsWithoutChangingDateDisplayAndSurvivesOldBackupsAndFailedWrites() = runTest {
+        val store = Store(); val prefs = UserPreferences(store)
+        assertFalse(prefs.journalDisplaySettingsFlow.first().recentTimePresets)
+        prefs.saveRelativeDates(true); prefs.saveRecentTimePresets(true)
+        assertTrue(UserPreferences(store).journalDisplaySettingsFlow.first().recentTimePresets)
+        prefs.restoreJournalDisplaySettings(null, null, relativeDates = false)
+        assertTrue(prefs.journalDisplaySettingsFlow.first().recentTimePresets)
+        store.fail = true
+        try { prefs.saveRecentTimePresets(false); fail("Write unexpectedly succeeded") } catch (_: IOException) { }
+        assertTrue(prefs.journalDisplaySettingsFlow.first().recentTimePresets)
+        store.fail = false
+        prefs.restoreJournalDisplaySettings(null, null, recentTimePresets = false)
+        assertEquals(JournalDisplaySettings(), prefs.journalDisplaySettingsFlow.first())
+    }
     @Test fun relativeDatesPersistAndPartialRestoresAndFailedWritesKeepThePreviousChoice() = runTest {
         val store = Store(); val prefs = UserPreferences(store)
         assertFalse(prefs.journalDisplaySettingsFlow.first().relativeDates)

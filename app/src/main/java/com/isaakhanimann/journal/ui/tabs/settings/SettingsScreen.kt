@@ -157,6 +157,7 @@ fun SettingsScreen(
         saveHideInteractions = viewModel::saveHideInteractions,
         saveHideTolerance = viewModel::saveHideTolerance,
         saveRelativeDates = viewModel::saveRelativeDates,
+        saveRecentTimePresets = viewModel::saveRecentTimePresets,
     )
 }
 
@@ -194,6 +195,7 @@ fun SettingsScreen(
     saveHideInteractions: (Boolean) -> Unit = {},
     saveHideTolerance: (Boolean) -> Unit = {},
     saveRelativeDates: (Boolean) -> Unit = {},
+    saveRecentTimePresets: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -269,6 +271,9 @@ fun SettingsScreen(
                 HorizontalDivider()
                 JournalDisplaySwitch("Show relative dates", journalDisplaySettings.relativeDates,
                     "Use elapsed or upcoming time on experience cards. Calendar views keep calendar dates.", saveRelativeDates)
+                HorizontalDivider()
+                JournalDisplaySwitch("Use recent-time presets", journalDisplaySettings.recentTimePresets,
+                    "Open new-ingestion time entry with relative presets. Switching modes retains the entered times.", saveRecentTimePresets)
                 HorizontalDivider()
                 JournalDisplaySwitch("Hide timeline quantity details", journalDisplaySettings.hideTimelineQuantities,
                     "Keep the graph and time cursor visible.", saveHideTimelineQuantities)

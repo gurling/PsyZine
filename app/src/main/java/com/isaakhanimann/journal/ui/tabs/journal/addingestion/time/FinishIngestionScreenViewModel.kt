@@ -49,6 +49,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.Duration
@@ -68,10 +69,49 @@ enum class IngestionTimePickerOption {
 @HiltViewModel
 class FinishIngestionScreenViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
-    userPreferences: UserPreferences,
+    private val userPreferences: UserPreferences,
     private val sessionGuard: JournalSessionGuard,
-    state: SavedStateHandle
+    state: SavedStateHandle,
+    private val clock: java.time.Clock = java.time.Clock.systemUTC(),
 ) : ViewModel() {
+    val recentTimePresets = userPreferences.journalDisplaySettingsFlow.map { it.recentTimePresets }
+        .catch { if (it is java.io.IOException) emit(false) else throw it }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), false)
+    var savingTimeInputPreference by mutableStateOf(false)
+        private set
+    fun setRecentTimePresets(value: Boolean) {
+        if (isSaving || savingTimeInputPreference) return
+        savingTimeInputPreference = true
+        viewModelScope.launch {
+            try { userPreferences.saveRecentTimePresets(value) }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) { saveError = "The time-entry preference could not be saved. Your entered times are unchanged. Please try again." }
+            finally { savingTimeInputPreference = false }
+        }
+    }
+    var timeAdjustmentMessage by mutableStateOf<String?>(null)
+        private set
+    var isUpdatingTime by mutableStateOf(false)
+        private set
+    var timeUpdateFailed by mutableStateOf(false)
+        private set
+    private var timeUpdateVersion = 0
+    private var timeUpdateJob: kotlinx.coroutines.Job? = null
+    private fun updateTime(action: suspend () -> Unit) {
+        if (isSaving || isLoadingColor) return
+        val version = ++timeUpdateVersion
+        timeUpdateJob?.cancel()
+        isUpdatingTime = true
+        timeUpdateJob = viewModelScope.launch {
+            try { action(); timeUpdateFailed = false }
+            catch (e: CancellationException) { throw e }
+            catch (_: Exception) {
+                timeUpdateFailed = true
+                saveError = "The time could not be applied. Choose the time again before saving."
+            }
+            finally { if (timeUpdateVersion == version) isUpdatingTime = false }
+        }
+    }
     private var expectedDefinitionFingerprint: String? = null
     private var nativeDefinition = false
     private var generation: String? = null
@@ -82,7 +122,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         private set
     fun dismissSaveError() { saveError = null }
     var substanceName by mutableStateOf("")
-    private var presetStart = Instant.now()
+    private var presetStart = clock.instant()
     private var presetEnd = presetStart.plus(30, ChronoUnit.MINUTES)
     private var loadedStartLocal = presetStart.getLocalDateTime()
     private var loadedEndLocal = presetEnd.getLocalDateTime()
@@ -93,6 +133,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
     val ingestionTimePickerOptionFlow = MutableStateFlow(IngestionTimePickerOption.POINT_IN_TIME)
     val experiencesInRangeFlow = MutableStateFlow<List<ExperienceWithIngestions>>(emptyList())
     val selectedExperienceFlow = MutableStateFlow<ExperienceWithIngestions?>(null)
+    private var suggestedExperienceStart: Instant? = null
     var enteredTitle by mutableStateOf(LocalDateTime.now().getStringOfPattern("dd MMMM yyyy"))
     val isEnteredTitleOk get() = enteredTitle.isNotEmpty()
     var consumerName by mutableStateOf("")
@@ -238,7 +279,26 @@ class FinishIngestionScreenViewModel @Inject constructor(
             selectedExperienceFlow.emit(experienceWithIngestions)
         }
 
-    fun onChangeStartDateOrTime(newLocalDateTime: LocalDateTime) = viewModelScope.launch {
+    fun onChangeStartDateOrTime(newLocalDateTime: LocalDateTime) = updateTime { changeStartDateOrTime(newLocalDateTime) }
+
+    fun selectRecentStart(preset: com.isaakhanimann.journal.data.preferences.RecentIngestionTime) {
+        val time = preset.at(clock)
+        updateTime {
+            presetStart = time
+            loadedStartLocal = time.getLocalDateTime()
+            changeStartDateOrTime(loadedStartLocal)
+        }
+    }
+    fun selectRecentEnd(preset: com.isaakhanimann.journal.data.preferences.RecentIngestionTime) {
+        val time = preset.at(clock)
+        updateTime {
+            presetEnd = time
+            loadedEndLocal = time.getLocalDateTime()
+            changeEndDateOrTime(loadedEndLocal)
+        }
+    }
+    private suspend fun changeStartDateOrTime(newLocalDateTime: LocalDateTime) {
+        timeAdjustmentMessage = null
         localDateTimeStartFlow.emit(newLocalDateTime)
         updateExperiencesBasedOnSelectedTime()
         val startTime = selectedStartInstant()
@@ -248,19 +308,30 @@ class FinishIngestionScreenViewModel @Inject constructor(
         val endTime = selectedEndInstant()
         if (startTime > endTime || Duration.between(startTime, endTime).toHours() > 24) {
             val newEndTime = startTime.plus(30, ChronoUnit.MINUTES)
-            localDateTimeEndFlow.emit(newEndTime.getLocalDateTime())
+            presetEnd = newEndTime
+            loadedEndLocal = newEndTime.getLocalDateTime()
+            localDateTimeEndFlow.emit(loadedEndLocal)
+            if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
+                timeAdjustmentMessage = "End time was moved to 30 minutes after the selected start."
         }
     }
 
-    fun onChangeEndDateOrTime(newLocalDateTime: LocalDateTime) = viewModelScope.launch {
+    fun onChangeEndDateOrTime(newLocalDateTime: LocalDateTime) = updateTime { changeEndDateOrTime(newLocalDateTime) }
+    private suspend fun changeEndDateOrTime(newLocalDateTime: LocalDateTime) {
+        timeAdjustmentMessage = null
         localDateTimeEndFlow.emit(newLocalDateTime)
         val endTime = selectedEndInstant()
         val startTime =
             selectedStartInstant()
         if (startTime > endTime) {
             val newStartTime = endTime.minus(30, ChronoUnit.MINUTES)
-            localDateTimeStartFlow.emit(newStartTime.getLocalDateTime())
+            presetStart = newStartTime
+            loadedStartLocal = newStartTime.getLocalDateTime()
+            localDateTimeStartFlow.emit(loadedStartLocal)
+            timeAdjustmentMessage = "Start time was moved to 30 minutes before the selected end."
         }
+        if (selectedStartInstant() != suggestedExperienceStart) updateExperiencesBasedOnSelectedTime()
+        if (!hasTitleBeenChanged) updateTitleBasedOnTime(selectedStartInstant())
     }
 
     private fun updateTitleBasedOnTime(time: Instant) {
@@ -290,10 +361,11 @@ class FinishIngestionScreenViewModel @Inject constructor(
             return@firstOrNull selectedInstant in lowerBound..finalUpperBound
         }
         selectedExperienceFlow.emit(closestExperience)
+        suggestedExperienceStart = selectedInstant
     }
 
     fun createSaveAndDismissAfter(dismiss: () -> Unit) {
-        if (isSaving || isLoadingColor) return
+        if (isSaving || isLoadingColor || isUpdatingTime || timeUpdateFailed) return
         isSaving = true
         viewModelScope.launch {
             try {

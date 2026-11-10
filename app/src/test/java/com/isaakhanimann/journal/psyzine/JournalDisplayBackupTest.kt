@@ -12,10 +12,10 @@ class JournalDisplayBackupTest {
     private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
     @Test fun displayOptionsRoundTripWithoutChangingThePortableFormatVersion() {
-        val value = BackupManifest(version = 2, journal = JournalExport(), journalDisplay = BackupJournalDisplay(false, true, true, false, true))
+        val value = BackupManifest(version = 2, journal = JournalExport(), journalDisplay = BackupJournalDisplay(false, true, true, false, true, true))
         val restored = json.decodeFromString<BackupManifest>(json.encodeToString(value))
         assertEquals(2, restored.version)
-        assertEquals(BackupJournalDisplay(false, true, true, false, true), restored.journalDisplay)
+        assertEquals(BackupJournalDisplay(false, true, true, false, true, true), restored.journalDisplay)
         BackupValidation.manifest(restored)
     }
 
@@ -28,5 +28,6 @@ class JournalDisplayBackupTest {
         assertNull(partial.journalDisplay.hideInteractions)
         assertNull(partial.journalDisplay.hideTolerance)
         assertNull(partial.journalDisplay.relativeDates)
+        assertNull(partial.journalDisplay.recentTimePresets)
     }
 }

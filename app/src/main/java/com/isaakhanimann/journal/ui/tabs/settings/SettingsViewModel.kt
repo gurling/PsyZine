@@ -51,6 +51,7 @@ class SettingsViewModel @Inject constructor(
     fun saveHideInteractions(value: Boolean) = savePresentation { userPreferences.saveHideInteractions(value) }
     fun saveHideTolerance(value: Boolean) = savePresentation { userPreferences.saveHideTolerance(value) }
     fun saveRelativeDates(value: Boolean) = savePresentation { userPreferences.saveRelativeDates(value) }
+    fun saveRecentTimePresets(value: Boolean) = savePresentation { userPreferences.saveRecentTimePresets(value) }
 
     fun saveDosageDotsAreHidden(value: Boolean) = savePresentation {
         userPreferences.saveDosageDotsAreHidden(value)
