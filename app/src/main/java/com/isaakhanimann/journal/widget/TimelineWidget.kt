@@ -35,7 +35,7 @@ class TimelineWidget : GlanceAppWidget() {
         suspend fun load(): WidgetSnapshot {
             val settings = dependencies.presentationPreferences().settings.first()
             val systemDark = context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
-            val palette = ThemePalettes.get(dependencies.appearanceRepository().theme.first(), systemDark)
+            val palette = paletteForContext(dependencies.appearanceRepository().theme.first(), context, systemDark)
             return try { WidgetSnapshot(if (settings.accepted) dependencies.activeExperienceRepository().current() else null, settings, palette) }
                 catch (e: CancellationException) { throw e }
                 catch (_: Exception) { WidgetSnapshot(null, settings, palette, true) }

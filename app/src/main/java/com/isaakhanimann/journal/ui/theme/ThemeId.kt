@@ -15,11 +15,13 @@ enum class ThemeId(val key: String, val label: String) {
     SOLARIZED_DARK("solarized-dark", "Solarized Dark"),
     SOLARIZED_LIGHT("solarized-light", "Solarized Light"),
     ONE_DARK("one-dark", "One Dark"),
-    ROSE_PINE("rose-pine", "Rosé Pine");
+    ROSE_PINE("rose-pine", "Rosé Pine"),
+    DYNAMIC("android-system-colors", "Android system colors");
     companion object {
         fun fromKey(key: String?) = entries.firstOrNull { it.key == key } ?: SYSTEM
     }
-    fun resolve(systemDark: Boolean) = if (this == SYSTEM) {
+    // Resource-free callers and older devices use the existing system fallback.
+    fun resolve(systemDark: Boolean) = if (this == SYSTEM || this == DYNAMIC) {
         if (systemDark) MOCHA else LATTE
     } else this
 }

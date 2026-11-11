@@ -99,7 +99,7 @@ class ActiveExperienceService : Service() {
                             stopForeground(STOP_FOREGROUND_REMOVE); throw CancellationException("Active presentation ended")
                         }
                         val systemDark = resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK == android.content.res.Configuration.UI_MODE_NIGHT_YES
-                        val palette = ThemePalettes.get(appearance.theme.first(), systemDark)
+                        val palette = paletteForContext(appearance.theme.first(), this@ActiveExperienceService, systemDark)
                         getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID,
                             if (stopFailed) renderer.stopFailure() else renderer.notification(data, settings.lockScreenDetails, palette))
                         updateWidgets()
