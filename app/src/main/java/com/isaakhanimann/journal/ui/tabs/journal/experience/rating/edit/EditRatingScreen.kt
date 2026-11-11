@@ -80,7 +80,10 @@ fun EditRatingScreen(
         onDelete = {
             viewModel.delete(navigateBack)
         },
-        isOverallRating = viewModel.isOverallRatingFlow.collectAsStateWithLifecycle().value
+        isOverallRating = viewModel.isOverallRatingFlow.collectAsStateWithLifecycle().value,
+        isHiddenInTimeline = viewModel.isHiddenInTimeline,
+        changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
+        timelineControlEnabled = viewModel.session.ready && !viewModel.session.busy,
     )
 }
 
@@ -93,7 +96,10 @@ fun EditRatingScreen(
     selectedRating: ShulginRatingOption,
     onRatingChange: (ShulginRatingOption) -> Unit,
     onDelete: () -> Unit,
-    isOverallRating: Boolean
+    isOverallRating: Boolean,
+    isHiddenInTimeline: Boolean = false,
+    changeHiddenInTimeline: (Boolean) -> Unit = {},
+    timelineControlEnabled: Boolean = true,
 ) {
     Scaffold(
         topBar = {
@@ -127,7 +133,9 @@ fun EditRatingScreen(
             Spacer(modifier = Modifier.height(3.dp))
             if (!isOverallRating) {
                 TimePickerSection(selectedTime = selectedTime, onTimeChange = onTimeChange)
-            }
+                com.isaakhanimann.journal.ui.utils.TimelineVisibilitySwitch(isHiddenInTimeline, changeHiddenInTimeline,
+                    "Controls this timed rating's marker. The rating stays in the experience.", timelineControlEnabled)
+            } else Text("Overall ratings have no timeline marker.", style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
             RatingPickerSection(selectedRating = selectedRating, onRatingChange = onRatingChange)
             RatingsExplanationSection()
         }

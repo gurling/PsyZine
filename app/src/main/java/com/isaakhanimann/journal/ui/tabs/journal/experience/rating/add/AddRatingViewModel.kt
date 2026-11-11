@@ -47,11 +47,18 @@ import javax.inject.Inject
 class AddRatingViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var selectedRating by mutableStateOf(ShulginRatingOption.TWO_PLUS)
     var isThisOverallRating by mutableStateOf(false)
+    var isHiddenInTimeline by mutableStateOf(false)
+        private set
+    fun changeHiddenInTimeline(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isHiddenInTimeline = value
+        state["ratingHiddenInTimeline"] = value
+    }
     val experienceId = AddRatingRoute(state.journalRecordId("experienceId")).experienceId
     var localDateTimeFlow = MutableStateFlow(LocalDateTime.now())
 
@@ -65,6 +72,7 @@ class AddRatingViewModel @Inject constructor(
 
     init {
         session.load {
+            isHiddenInTimeline = state.get<Boolean>("ratingHiddenInTimeline") ?: false
             check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted. Close this screen." }
             val experience = experienceRepo.getExperience(id = experienceId) ?: error("This entry was deleted. Close this screen.")
             val isOldExperience = experience.sortDate.isBefore(Instant.now().minus(12, ChronoUnit.HOURS))
@@ -95,7 +103,8 @@ class AddRatingViewModel @Inject constructor(
                 time = selectedInstant,
                 creationDate = Instant.now(),
                 option = selectedRating,
-                experienceId = experienceId
+                experienceId = experienceId,
+                isHiddenInTimeline = isHiddenInTimeline,
             )
             experienceRepo.insert(newRating, session.generation)
         }

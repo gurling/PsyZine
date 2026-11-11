@@ -188,6 +188,35 @@ class JournalMutationRegressionTest {
         assertEquals(ingestion.dose!!.toRawBits(),actual.dose!!.toRawBits())
         assertEquals(ingestion.estimatedDoseStandardDeviation!!.toRawBits(),actual.estimatedDoseStandardDeviation!!.toRawBits())
     }
+    @Test fun ratingEditorRetainsImportedHiddenChoiceAndCanExplicitlyShowTheMarker() = runBlocking<Unit> {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val imported = entries.getRating(1)!!.copy(isHiddenInTimeline = true)
+        db.experienceDao().update(imported)
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.rating.edit.EditRatingViewModel
+        try {
+            instrumentation.runOnMainSync {
+                model = com.isaakhanimann.journal.ui.tabs.journal.experience.rating.edit.EditRatingViewModel(
+                    entries, guard, SavedStateHandle(mapOf("ratingId" to 1)))
+                models.put("rating", model)
+            }
+            withTimeout(10000) { while (model.session.loading) delay(10) }
+            assertTrue(model.session.error, model.session.ready)
+            assertTrue(model.isHiddenInTimeline)
+            val first = CompletableDeferred<Unit>()
+            instrumentation.runOnMainSync { model.onChangeRating(ShulginRatingOption.TWO_PLUS); model.onDoneTap { first.complete(Unit) } }
+            withTimeout(10000) { first.await(); while (model.session.busy) delay(10) }
+            assertTrue(entries.getRating(1)!!.isHiddenInTimeline)
+            val second = CompletableDeferred<Unit>()
+            instrumentation.runOnMainSync { model.changeHiddenInTimeline(false); model.onDoneTap { second.complete(Unit) } }
+            withTimeout(10000) { second.await(); while (model.session.busy) delay(10) }
+            val saved = entries.getRating(1)!!
+            assertFalse(saved.isHiddenInTimeline)
+            assertEquals(ShulginRatingOption.TWO_PLUS, saved.option)
+            assertEquals(rating.time, saved.time)
+            assertEquals(imported.creationDate, saved.creationDate)
+        } finally { instrumentation.runOnMainSync { models.clear() } }
+    }
     @Test fun ingestionEditorNoteOnlySavePreservesUnflaggedUncertaintyAndMissingUnitIsNotSilentlyCleared() = runBlocking<Unit> {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val preferenceScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)

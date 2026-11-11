@@ -42,11 +42,18 @@ import javax.inject.Inject
 class EditRatingViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     private val ratingId: Int
     var selectedRatingOption by mutableStateOf(ShulginRatingOption.TWO_PLUS)
+    var isHiddenInTimeline by mutableStateOf(false)
+        private set
+    fun changeHiddenInTimeline(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isHiddenInTimeline = value
+        state["ratingHiddenInTimeline"] = value
+    }
     private var loadedInstant: java.time.Instant = java.time.Instant.now()
     private var loadedLocal: LocalDateTime = loadedInstant.getLocalDateTime()
     var localDateTimeFlow = MutableStateFlow(loadedLocal)
@@ -61,6 +68,7 @@ class EditRatingViewModel @Inject constructor(
             val loadedRating = experienceRepo.getRating(id = ratingId) ?: error("This entry was deleted. Close this screen.")
             check(experienceRepo.getExperience(loadedRating.experienceId) != null) { "This experience was deleted." }
             rating = loadedRating
+            isHiddenInTimeline = state.get<Boolean>("ratingHiddenInTimeline") ?: loadedRating.isHiddenInTimeline
             loadedRating.time?.also { time ->
                 loadedInstant = time
                 loadedLocal = time.getLocalDateTime()
@@ -88,7 +96,8 @@ class EditRatingViewModel @Inject constructor(
 
     fun onDoneTap(onSuccess: () -> Unit) = session.run(onSuccess) {
         val current = checkNotNull(rating)
-        val updated = current.copy(time = if (isOverallRatingFlow.value) null else com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant), option = selectedRatingOption)
+        val updated = current.copy(time = if (isOverallRatingFlow.value) null else com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant),
+            option = selectedRatingOption, isHiddenInTimeline = isHiddenInTimeline)
         experienceRepo.update(updated, session.generation)
     }
 }

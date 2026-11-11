@@ -84,7 +84,10 @@ fun AddRatingScreen(
         onRatingChange = viewModel::onChangeRating,
         canAddOverallRating = !viewModel.isThereAlreadyAnOverallRatingFlow.collectAsStateWithLifecycle().value,
         isOverallRating = viewModel.isThisOverallRating,
-        onChangeIsOverallRating = { viewModel.isThisOverallRating = it }
+        onChangeIsOverallRating = { viewModel.isThisOverallRating = it },
+        isHiddenInTimeline = viewModel.isHiddenInTimeline,
+        changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
+        timelineControlEnabled = viewModel.session.ready && !viewModel.session.busy,
     )
 }
 
@@ -98,7 +101,10 @@ fun AddRatingScreen(
     onRatingChange: (ShulginRatingOption) -> Unit,
     canAddOverallRating: Boolean,
     isOverallRating: Boolean,
-    onChangeIsOverallRating: (Boolean) -> Unit
+    onChangeIsOverallRating: (Boolean) -> Unit,
+    isHiddenInTimeline: Boolean = false,
+    changeHiddenInTimeline: (Boolean) -> Unit = {},
+    timelineControlEnabled: Boolean = true,
 ) {
     Scaffold(
         topBar = {
@@ -145,6 +151,10 @@ fun AddRatingScreen(
             AnimatedVisibility(visible = !isOverallRating) {
                 TimePickerSection(selectedTime = selectedTime, onTimeChange = onTimeChange)
             }
+            if (!isOverallRating) {
+                com.isaakhanimann.journal.ui.utils.TimelineVisibilitySwitch(isHiddenInTimeline, changeHiddenInTimeline,
+                    "Controls this timed rating's marker. The rating stays in the experience.", timelineControlEnabled)
+            } else Text("Overall ratings have no timeline marker.", style = MaterialTheme.typography.bodySmall)
             RatingPickerSection(selectedRating = selectedRating, onRatingChange = onRatingChange)
             RatingsExplanationSection()
         }

@@ -35,4 +35,17 @@ class TimelineDisplayContentTest {
         assertTrue(buildTimelineDisplay(emptyList(), listOf(rating), emptyList(), true) is TimelineDisplayOption.Shown)
         assertTrue(buildTimelineDisplay(emptyList(), emptyList(), listOf(note), false) is TimelineDisplayOption.Shown)
     }
+    @Test fun showingAHiddenRatingRestoresItsMarkerWithoutChangingRatingOrTime() {
+        val hidden = rating.copy(isHiddenInTimeline = true)
+        assertEquals(TimelineDisplayOption.NotWorthDrawing,
+            buildTimelineDisplay(emptyList(), listOf(hidden), emptyList(), true))
+        val shown = hidden.copy(isHiddenInTimeline = false)
+        val display = buildTimelineDisplay(emptyList(), listOf(shown), emptyList(), true) as TimelineDisplayOption.Shown
+        assertEquals(rating.time, display.allTimelinesModel.dataForRatings.single().time)
+        assertEquals(rating.option, display.allTimelinesModel.dataForRatings.single().option)
+        assertEquals(hidden.id, shown.id)
+        assertEquals(hidden.experienceId, shown.experienceId)
+        assertEquals(hidden.creationDate, shown.creationDate)
+        assertTrue(hidden.isHiddenInTimeline)
+    }
 }

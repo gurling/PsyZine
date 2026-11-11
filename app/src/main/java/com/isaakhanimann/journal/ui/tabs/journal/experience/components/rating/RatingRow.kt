@@ -20,6 +20,7 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.components.rating
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -34,13 +35,14 @@ import com.isaakhanimann.journal.data.room.experiences.entities.ShulginRating
 fun TimedRatingRow(
     modifier: Modifier = Modifier,
     ratingSign: String,
+    isHiddenInTimeline: Boolean = false,
     timeText: @Composable () -> Unit
 ) {
-    RatingRow(
-        modifier = modifier,
-        ratingSign = ratingSign,
-        content = timeText
-    )
+    Column(modifier) {
+        RatingRow(modifier = Modifier.fillMaxWidth(), ratingSign = ratingSign, content = timeText)
+        if (isHiddenInTimeline) Text("Hidden from timeline", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }
 
 @Composable
