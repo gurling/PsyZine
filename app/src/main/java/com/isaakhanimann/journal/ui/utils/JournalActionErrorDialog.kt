@@ -7,11 +7,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 
 @Composable
-fun JournalActionErrorDialog(message: String?, onDismiss: () -> Unit) {
+fun JournalActionErrorDialog(message: String?, onDismiss: () -> Unit, title: String = "Could not save changes") {
     if (message != null) {
         AlertDialog(
             onDismissRequest = onDismiss,
-            title = { Text("Could not save changes") },
+            title = { Text(title) },
             text = { Text(message) },
             confirmButton = { TextButton(onClick = onDismiss) { Text("OK") } },
         )

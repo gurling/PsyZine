@@ -16,9 +16,15 @@ class JournalEditorSession(private val scope: CoroutineScope, private val guard:
     var busy by mutableStateOf(false); private set
     var ready by mutableStateOf(false); private set
     var error by mutableStateOf<String?>(null); private set
+    var unavailableMessage by mutableStateOf<String?>(null); private set
     var generation: String? = null; private set
     private var generationMonitor: Job? = null
     fun dismissError() { error = null }
+    private fun unavailable(message: String) {
+        ready = false
+        unavailableMessage = message
+        error = message
+    }
 
     fun load(action: suspend () -> Unit) {
         scope.launch {
@@ -30,20 +36,20 @@ class JournalEditorSession(private val scope: CoroutineScope, private val guard:
                 }
                 ready = true
                 loading = false
+                unavailableMessage = null
+                error = null
                 generationMonitor?.cancel()
                 generationMonitor = scope.launch {
                     guard.generations.catch {
-                        ready = false
-                        error = "The journal could not be checked. Close this screen and reopen the record."
+                        unavailable("The journal could not be checked. Close this screen and reopen the record.")
                     }.collect { current ->
                         if (current != generation) {
-                            ready = false
-                            error = "The journal changed after this screen opened. Close it and choose the record again."
+                            unavailable("The journal changed after this screen opened. Close it and choose the record again.")
                         }
                     }
                 }
             } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "Could not load this entry. Close this screen and try again."; loading = false }
+            catch (e: Exception) { unavailable(e.message ?: "Could not load this entry. Close this screen and try again."); loading = false }
         }
     }
 
@@ -53,7 +59,11 @@ class JournalEditorSession(private val scope: CoroutineScope, private val guard:
         scope.launch {
             try { action(); onSuccess() }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { error = e.message ?: "Could not save changes. Your draft is still open." }
+            catch (e: Exception) {
+                if (e is com.isaakhanimann.journal.data.room.StaleJournalSession)
+                    unavailable(e.message ?: "The journal changed. Close this screen and choose the record again.")
+                else error = e.message ?: "Could not save changes. Your draft is still open."
+            }
             finally { busy = false }
         }
     }
@@ -69,9 +79,22 @@ fun JournalRecordUnavailable(back: () -> Unit, message: String = "This record is
 
 @Composable
 fun JournalEditorStatus(session: JournalEditorSession) {
-    JournalActionErrorDialog(session.error, session::dismissError)
+    JournalActionErrorDialog(session.error, session::dismissError,
+        title = if (session.ready) "Could not save changes" else "Entry unavailable")
     if (session.busy || session.loading && session.error == null) {
         androidx.compose.material3.AlertDialog(onDismissRequest = {}, title = { androidx.compose.material3.Text(if (session.loading) "Loading entry" else "Saving changes") },
             text = { androidx.compose.material3.CircularProgressIndicator() }, confirmButton = {})
     }
+}
+
+/** Hide unusable form actions, while leaving a failed-save draft open when the session is valid. */
+@Composable
+fun JournalEditorGate(session: JournalEditorSession, back: () -> Unit): Boolean {
+    JournalEditorStatus(session)
+    if (session.ready) return true
+    if (!session.loading) {
+        val message = session.unavailableMessage
+        if (message == null) JournalRecordUnavailable(back) else JournalRecordUnavailable(back, message)
+    }
+    return false
 }

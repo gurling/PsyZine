@@ -68,7 +68,7 @@ fun EditRatingScreen(
     viewModel: EditRatingViewModel = hiltViewModel(),
     navigateBack: () -> Unit
 ) {
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     EditRatingScreen(
         onDone = {
             viewModel.onDoneTap(navigateBack)
