@@ -324,44 +324,10 @@ class ExperienceViewModel @Inject constructor(
         isTimelineHiddenFlow,
         ratingsFlow,
         timedNotesSortedFlow,
-        ingestionElementsFlow,
         areSubstanceHeightsIndependentFlow
-    ) { dataForEffectLines, isTimelineHidden, ratings, timedNotesSorted, ingestionElements, areSubstanceHeightsIndependent ->
-        if (isTimelineHidden) {
-            return@combine TimelineDisplayOption.Hidden
-        } else if (dataForEffectLines.isEmpty()) {
-            return@combine TimelineDisplayOption.NotWorthDrawing
-        } else {
-            val dataForRatings = ratings.filterNot { it.isHiddenInTimeline }.mapNotNull {
-                val ratingTime = it.time
-                return@mapNotNull if (ratingTime == null) {
-                    null
-                } else {
-                    DataForOneRating(
-                        time = ratingTime,
-                        option = it.option
-                    )
-                }
-            }
-            val dataForTimedNotes =
-                timedNotesSorted.filter { it.isPartOfTimeline }
-                    .map {
-                        DataForOneTimedNote(time = it.time, color = it.color)
-                    }
-            val isWorthDrawing =
-                dataForEffectLines.any { it.roaDuration != null } || dataForRatings.isNotEmpty() || dataForTimedNotes.isNotEmpty()
-            if (isWorthDrawing) {
-                val model = AllTimelinesModel(
-                    dataForLines = dataForEffectLines,
-                    dataForRatings = dataForRatings,
-                    timedNotes = dataForTimedNotes,
-                    areSubstanceHeightsIndependent = areSubstanceHeightsIndependent
-                )
-                return@combine TimelineDisplayOption.Shown(model)
-            } else {
-                return@combine TimelineDisplayOption.NotWorthDrawing
-            }
-        }
+    ) { lines, hidden, ratings, notes, independent ->
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.buildTimelineDisplay(
+            lines, ratings, notes, independent, hidden)
     }.flowOn(Dispatchers.Default)
         .stateIn(
             initialValue = TimelineDisplayOption.Loading,

@@ -43,6 +43,24 @@ class ComponentPresentationTest {
     private fun project(rows: List<IngestionWithCompanionAndCustomUnit>, graph: CustomDefinitionGraph = graph()) =
         TimelineModelFactory.projectRecords(rows, catalog, graph, emptyMap())
 
+    @Test fun hidingIndividualPlainOrNativeRecordsSuppressesCurvesWithoutChangingAmountsOrTotals() {
+        val native = row()
+        val plain = native.copy(ingestion = native.ingestion.copy(customUnitId = null, substanceName = "A", units = "mg"), customUnit = null)
+        for (source in listOf(native, plain)) {
+            val visible = project(listOf(source)).single()
+            val hidden = project(listOf(source.copy(ingestion = source.ingestion.copy(isHiddenInTimeline = true)))).single()
+            assertTrue(visible.curves.isNotEmpty())
+            assertTrue(hidden.curves.isEmpty())
+            assertEquals(visible.contributions.map { it.subject to it.quantity }, hidden.contributions.map { it.subject to it.quantity })
+            val lookup = catalog.associateBy { it.name }
+            assertEquals(projectedCumulativeDoses(listOf(visible), graph(), lookup),
+                projectedCumulativeDoses(listOf(hidden), graph(), lookup))
+            assertEquals(source.ingestion.time, hidden.element.ingestionWithCompanionAndCustomUnit.ingestion.time)
+            assertEquals(source.ingestion.dose, hidden.element.ingestionWithCompanionAndCustomUnit.ingestion.dose)
+            assertEquals(source.ingestion.id, hidden.element.ingestionWithCompanionAndCustomUnit.ingestion.id)
+        }
+    }
+
     @Test fun parentCurveDoesNotReplaceLeafDetailsOrCreateAdditionalStoredRecords() {
         val rows = listOf(row(2), row(1))
         val result = project(rows)

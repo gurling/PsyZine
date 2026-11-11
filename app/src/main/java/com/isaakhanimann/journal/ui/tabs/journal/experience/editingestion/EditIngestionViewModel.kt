@@ -66,6 +66,13 @@ class EditIngestionViewModel @Inject constructor(
     private var loadedEnd: LocalDateTime? = null
     private var initialEndInstant: java.time.Instant? = null
     var note by mutableStateOf("")
+    var isHiddenInTimeline by mutableStateOf(false)
+        private set
+    fun changeHiddenInTimeline(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isHiddenInTimeline = value
+        state["ingestionHiddenInTimeline"] = value
+    }
     var stomachFullness by mutableStateOf<StomachFullness?>(null)
         private set
     fun changeStomachFullness(value: StomachFullness?) {
@@ -115,6 +122,7 @@ class EditIngestionViewModel @Inject constructor(
             ingestionFlow.emit(ing)
             ingestion = ing
             note = ing.notes ?: ""
+            isHiddenInTimeline = state.get<Boolean>("ingestionHiddenInTimeline") ?: ing.isHiddenInTimeline
             stomachFullness = if (state.get<Boolean>("stomachFullnessEdited") == true)
                 com.isaakhanimann.journal.data.room.experiences.stomachFullnessSelection(state.get<String>("stomachFullness"))
                 else ing.stomachFullness
@@ -239,6 +247,7 @@ class EditIngestionViewModel @Inject constructor(
             estimatedDoseStandardDeviation = if (retainUncertainty) estimatedDoseStandardDeviation.toDoubleOrNull() else null,
             units = if (units == current.units.orEmpty()) current.units else units, customUnitId = selectedCustomUnitId,
             stomachFullness = stomachFullness,
+            isHiddenInTimeline = isHiddenInTimeline,
             time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeStartFlow.value, loadedStart, current.time),
             endTime = if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
                 com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeEndFlow.value, loadedEnd, initialEndInstant) else null,

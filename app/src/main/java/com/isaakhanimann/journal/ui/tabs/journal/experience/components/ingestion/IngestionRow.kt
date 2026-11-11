@@ -108,6 +108,8 @@ fun IngestionRow(
         }
         ingestionElement.calculationError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         CalculatedComponents(ingestion.id, ingestionElement.components, areDosageDotsHidden)
+        if (ingestion.isHiddenInTimeline) Text("Hidden from timeline", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         ingestion.stomachFullness?.let { fullness ->
             Text("Stomach fullness: ${fullness.text}", style = MaterialTheme.typography.bodySmall)
         }

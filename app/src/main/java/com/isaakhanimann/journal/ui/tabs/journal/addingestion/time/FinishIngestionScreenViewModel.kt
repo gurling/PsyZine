@@ -158,6 +158,13 @@ class FinishIngestionScreenViewModel @Inject constructor(
     var isShowingColorPicker by mutableStateOf(false)
     var selectedColor by mutableStateOf(AdaptiveColor.BLUE)
     var note by mutableStateOf("")
+    var isHiddenInTimeline by mutableStateOf(false)
+        private set
+    fun changeHiddenInTimeline(value: Boolean) {
+        if (isSaving || isLoadingColor) return
+        isHiddenInTimeline = value
+        state["ingestionHiddenInTimeline"] = value
+    }
     var stomachFullness by mutableStateOf<StomachFullness?>(null)
         private set
     fun changeStomachFullness(value: StomachFullness?) {
@@ -236,6 +243,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
             try {
                 generation = sessionGuard.readSession(state.get<String>("journalGeneration") ?: finishIngestionRoute.journalGeneration) { token -> token }.also { state["journalGeneration"] = it }
                 stomachFullness = com.isaakhanimann.journal.data.room.experiences.stomachFullnessSelection(state.get<String>("stomachFullness"))
+                isHiddenInTimeline = state.get<Boolean>("ingestionHiddenInTimeline") ?: false
                 val lastIngestionTimeOfExperience =
                     userPreferences.lastIngestionTimeOfExperienceFlow.first().takeUnless { finishIngestionRoute.startAtNow }
                 val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first().takeUnless { finishIngestionRoute.startAtNow }
@@ -457,7 +465,8 @@ class FinishIngestionScreenViewModel @Inject constructor(
             consumerName = consumerName.ifBlank {
                 null
             },
-            customUnitId = customUnitId
+            customUnitId = customUnitId,
+            isHiddenInTimeline = isHiddenInTimeline,
         )
     }
 }

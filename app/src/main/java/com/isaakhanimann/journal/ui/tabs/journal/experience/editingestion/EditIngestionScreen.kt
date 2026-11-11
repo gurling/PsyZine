@@ -125,12 +125,14 @@ fun EditIngestionScreen(
     }
     EditIngestionScreen(
         note = viewModel.note,
+        isHiddenInTimeline = viewModel.isHiddenInTimeline,
+        changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
         stomachFullness = viewModel.stomachFullness,
         changeStomachFullness = viewModel::changeStomachFullness,
         showStomachFullness = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL ||
             viewModel.ingestion?.stomachFullness != null,
         fullnessAffectsTimeline = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL,
-        fullnessEnabled = !viewModel.session.busy,
+        editorControlsEnabled = !viewModel.session.busy,
         onNoteChange = { viewModel.note = it },
         isEstimate = viewModel.isEstimate,
         onChangeIsEstimate = viewModel::onChangeIsEstimate,
@@ -249,7 +251,9 @@ fun EditIngestionScreen(
     stomachFullness: com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness? = null,
     changeStomachFullness: (com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness?) -> Unit = {},
     fullnessAffectsTimeline: Boolean = true,
-    fullnessEnabled: Boolean = true,
+    editorControlsEnabled: Boolean = true,
+    isHiddenInTimeline: Boolean = false,
+    changeHiddenInTimeline: (Boolean) -> Unit = {},
 ) {
     val density = LocalDensity.current
     var fabHeight by remember { mutableStateOf(56.dp) }
@@ -475,9 +479,11 @@ fun EditIngestionScreen(
             }
             if (showStomachFullness) CardWithTitle(title = "Stomach fullness") {
                 com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.StomachFullnessPicker(
-                    stomachFullness, changeStomachFullness, enabled = fullnessEnabled, affectsTimeline = fullnessAffectsTimeline)
+                    stomachFullness, changeStomachFullness, enabled = editorControlsEnabled, affectsTimeline = fullnessAffectsTimeline)
             }
             CardWithTitle(title = "Time") {
+                com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.IngestionTimelineVisibility(
+                    isHiddenInTimeline, changeHiddenInTimeline, enabled = editorControlsEnabled)
                 Column(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,

@@ -140,42 +140,11 @@ class TimelineScreenViewModel @Inject constructor(
         areSubstanceHeightsIndependentFlow
     ) { dataForEffectLines, ratings, timedNotesSorted, areSubstanceHeightsIndependent ->
 
-        val newRatings = if (consumerName == YOU) ratings.filterNot { it.isHiddenInTimeline } else emptyList()
-        val newTimedNotes = if (consumerName == YOU) timedNotesSorted else emptyList()
-
-        if (dataForEffectLines.isEmpty()) {
-            return@combine TimelineDisplayOption.NotWorthDrawing
-        } else {
-            val dataForRatings = newRatings.mapNotNull {
-                val ratingTime = it.time
-                return@mapNotNull if (ratingTime == null) {
-                    null
-                } else {
-                    DataForOneRating(
-                        time = ratingTime,
-                        option = it.option
-                    )
-                }
-            }
-            val dataForTimedNotes =
-                newTimedNotes.filter { it.isPartOfTimeline }
-                    .map {
-                        DataForOneTimedNote(time = it.time, color = it.color)
-                    }
-            val isWorthDrawing =
-                dataForEffectLines.isNotEmpty() && !(dataForEffectLines.all { it.roaDuration == null } && newRatings.isEmpty() && newTimedNotes.isEmpty())
-            if (isWorthDrawing) {
-                val model = AllTimelinesModel(
-                    dataForLines = dataForEffectLines,
-                    dataForRatings = dataForRatings,
-                    timedNotes = dataForTimedNotes,
-                    areSubstanceHeightsIndependent = areSubstanceHeightsIndependent
-                )
-                return@combine TimelineDisplayOption.Shown(model)
-            } else {
-                return@combine TimelineDisplayOption.NotWorthDrawing
-            }
-        }
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.buildTimelineDisplay(
+            dataForEffectLines,
+            if (consumerName == YOU) ratings else emptyList(),
+            if (consumerName == YOU) timedNotesSorted else emptyList(),
+            areSubstanceHeightsIndependent)
     }.flowOn(Dispatchers.Default)
         .stateIn(
         initialValue = TimelineDisplayOption.Loading,
