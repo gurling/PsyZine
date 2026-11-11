@@ -28,10 +28,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
@@ -84,7 +87,7 @@ fun AddRatingScreen(
         onRatingChange = viewModel::onChangeRating,
         canAddOverallRating = !viewModel.isThereAlreadyAnOverallRatingFlow.collectAsStateWithLifecycle().value,
         isOverallRating = viewModel.isThisOverallRating,
-        onChangeIsOverallRating = { viewModel.isThisOverallRating = it },
+        onChangeIsOverallRating = viewModel::changeOverallRating,
         isHiddenInTimeline = viewModel.isHiddenInTimeline,
         changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
         timelineControlEnabled = viewModel.session.ready && !viewModel.session.busy,
@@ -126,7 +129,7 @@ fun AddRatingScreen(
                 .padding(horizontal = horizontalPadding)
         ) {
             Spacer(modifier = Modifier.height(3.dp))
-            if (canAddOverallRating) {
+            if (canAddOverallRating || isOverallRating) {
                 ElevatedCard(
                     modifier = Modifier
                         .padding(vertical = 5.dp)
@@ -135,17 +138,26 @@ fun AddRatingScreen(
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 3.dp)
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                            .toggleable(isOverallRating, enabled = timelineControlEnabled, role = Role.Switch,
+                                onValueChange = { if (!it || canAddOverallRating) onChangeIsOverallRating(it) })
+                            .padding(horizontal = horizontalPadding, vertical = 3.dp)
                     ) {
                         Switch(
                             checked = isOverallRating,
-                            onCheckedChange = { onChangeIsOverallRating(it) }
+                            onCheckedChange = null,
+                            enabled = timelineControlEnabled,
                         )
                         Text(
                             text = "Overall rating",
-                            style = MaterialTheme.typography.titleMedium
+                            style = MaterialTheme.typography.titleMedium,
+                            modifier = Modifier.weight(1f),
                         )
                     }
+                    if (isOverallRating && !canAddOverallRating) Text(
+                        "An overall rating is already saved. Turn off Overall rating to add a timed rating.",
+                        modifier = Modifier.padding(horizontal = horizontalPadding, vertical = 8.dp),
+                        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                 }
             }
             AnimatedVisibility(visible = !isOverallRating) {

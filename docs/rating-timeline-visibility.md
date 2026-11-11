@@ -27,3 +27,20 @@ passed.
 Switch interaction, SavedState recreation, actual editor/database saves,
 large-text layouts and screen-reader behavior have not been exercised on a
 device for this batch.
+
+## Overall-rating conflict recovery
+
+If another overall rating is saved while the add form is set to Overall, the
+switch remains available so the user can return to timed entry. A readable
+message explains the conflict. The selected rating, timestamp and visibility
+choice are retained; the existing transactional duplicate check still prevents
+writing a second overall rating. The row is a single accessible switch with a
+48dp minimum target and is disabled while the editor is loading or saving.
+
+The focused `RatingConflictUiTest` simulates the availability change and checks
+that timed entry remains reachable without resetting the entered rating/time.
+
+The recovery fix passed the Direct debug APK build, instrumentation-source
+compilation and diff checks on 11 November 2026. Android MCP `list_devices`
+returned no attached devices, so the focused UI regression was not executed.
+No JVM tests were rerun for this UI-only fix.

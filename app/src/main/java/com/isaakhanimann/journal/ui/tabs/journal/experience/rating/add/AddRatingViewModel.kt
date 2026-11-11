@@ -52,6 +52,10 @@ class AddRatingViewModel @Inject constructor(
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var selectedRating by mutableStateOf(ShulginRatingOption.TWO_PLUS)
     var isThisOverallRating by mutableStateOf(false)
+    fun changeOverallRating(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isThisOverallRating = value
+    }
     var isHiddenInTimeline by mutableStateOf(false)
         private set
     fun changeHiddenInTimeline(value: Boolean) {
