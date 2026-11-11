@@ -70,7 +70,15 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
                 tags = { navController.navigate(TagsRoute("Settings")) },
                 subjectTags = { navController.navigate(SubjectTagsRoute(SubjectId.Definition(it).key, "Settings")) })
         }
-        composableWithTransitions<AboutRoute> { com.isaakhanimann.journal.ui.tabs.settings.about.AboutScreen() }
+        composableWithTransitions<AboutRoute> { com.isaakhanimann.journal.ui.tabs.settings.about.AboutScreen(
+            navigateToSupportInfo = { navController.navigate(SupportInfoRoute) },
+            navigateToReleaseNotes = { navController.navigate(ReleaseNotesRoute) }) }
+        composableWithTransitions<SupportInfoRoute> {
+            com.isaakhanimann.journal.ui.tabs.settings.about.SupportInfoScreen { navController.popBackStack() }
+        }
+        composableWithTransitions<ReleaseNotesRoute> {
+            com.isaakhanimann.journal.ui.tabs.settings.about.ReleaseNotesScreen { navController.popBackStack() }
+        }
         composableWithTransitions<FAQRoute> { FAQScreen() }
         composableWithTransitions<DonateRoute> { DonateScreen() }
         composableWithTransitions<CombinationSettingsRoute> { CombinationSettingsScreen() }
@@ -126,3 +134,5 @@ data class EditCustomUnitRoute(val customUnitId: Int)
 
 @Serializable object AppearanceRoute
 @Serializable object AboutRoute
+@Serializable object SupportInfoRoute
+@Serializable object ReleaseNotesRoute
