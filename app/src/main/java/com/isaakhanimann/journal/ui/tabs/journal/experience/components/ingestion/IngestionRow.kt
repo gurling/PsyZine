@@ -108,6 +108,9 @@ fun IngestionRow(
         }
         ingestionElement.calculationError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         CalculatedComponents(ingestion.id, ingestionElement.components, areDosageDotsHidden)
+        ingestion.stomachFullness?.let { fullness ->
+            Text("Stomach fullness: ${fullness.text}", style = MaterialTheme.typography.bodySmall)
+        }
         val note = ingestion.notes
         if (!note.isNullOrBlank()) {
             Text(text = note, style = MaterialTheme.typography.bodySmall)

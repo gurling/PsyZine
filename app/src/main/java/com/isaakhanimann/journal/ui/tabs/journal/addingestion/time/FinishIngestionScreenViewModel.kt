@@ -32,6 +32,7 @@ import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.entities.Experience
 import com.isaakhanimann.journal.data.room.experiences.entities.Ingestion
+import com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness
 import com.isaakhanimann.journal.data.room.experiences.entities.SubstanceCompanion
 import com.isaakhanimann.journal.data.room.experiences.relations.ExperienceWithIngestions
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
@@ -71,7 +72,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     private val userPreferences: UserPreferences,
     private val sessionGuard: JournalSessionGuard,
-    state: SavedStateHandle,
+    private val state: SavedStateHandle,
     private val clock: java.time.Clock = java.time.Clock.systemUTC(),
 ) : ViewModel() {
     val recentTimePresets = userPreferences.journalDisplaySettingsFlow.map { it.recentTimePresets }
@@ -157,6 +158,13 @@ class FinishIngestionScreenViewModel @Inject constructor(
     var isShowingColorPicker by mutableStateOf(false)
     var selectedColor by mutableStateOf(AdaptiveColor.BLUE)
     var note by mutableStateOf("")
+    var stomachFullness by mutableStateOf<StomachFullness?>(null)
+        private set
+    fun changeStomachFullness(value: StomachFullness?) {
+        if (isSaving || isLoadingColor) return
+        stomachFullness = value
+        state["stomachFullness"] = value?.serialized
+    }
     private var hasTitleBeenChanged = false
 
     fun changeTitle(newTitle: String) {
@@ -177,7 +185,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000)
         )
 
-    private val administrationRoute: AdministrationRoute
+    val administrationRoute: AdministrationRoute
     private val dose: Double?
     private val units: String?
     private val isEstimate: Boolean
@@ -227,6 +235,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 generation = sessionGuard.readSession(state.get<String>("journalGeneration") ?: finishIngestionRoute.journalGeneration) { token -> token }.also { state["journalGeneration"] = it }
+                stomachFullness = com.isaakhanimann.journal.data.room.experiences.stomachFullnessSelection(state.get<String>("stomachFullness"))
                 val lastIngestionTimeOfExperience =
                     userPreferences.lastIngestionTimeOfExperienceFlow.first().takeUnless { finishIngestionRoute.startAtNow }
                 val clonedIngestionTime = userPreferences.clonedIngestionTimeFlow.first().takeUnless { finishIngestionRoute.startAtNow }
@@ -444,7 +453,7 @@ class FinishIngestionScreenViewModel @Inject constructor(
             units = units,
             experienceId = experienceId,
             notes = note,
-            stomachFullness = null, // todo: allow to add real stomach fullness
+            stomachFullness = stomachFullness,
             consumerName = consumerName.ifBlank {
                 null
             },

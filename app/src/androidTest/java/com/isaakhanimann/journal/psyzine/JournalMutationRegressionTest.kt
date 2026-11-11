@@ -194,17 +194,19 @@ class JournalMutationRegressionTest {
         val store=androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(scope=preferenceScope) { File(directory,"editor-preferences.preferences_pb") }
         val preferences=com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store)
         try {
-            db.experienceDao().update(ingestion.copy(isDoseAnEstimate=false))
+            db.experienceDao().update(ingestion.copy(isDoseAnEstimate=false, stomachFullness=StomachFullness.HALF_FULL))
             lateinit var vm: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { vm=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }
             withTimeout(10000) { while(vm.session.loading) delay(10) }
             assertTrue(vm.session.error, vm.session.ready)
+            assertEquals(StomachFullness.HALF_FULL, vm.stomachFullness)
             val done=CompletableDeferred<Unit>()
             instrumentation.runOnMainSync { vm.note="only note changed"; vm.onDoneTap { done.complete(Unit) } }
             withTimeout(10000) { done.await() }
             val saved=entries.getIngestionFlow(1).first()!!.ingestion
             assertEquals(ingestion.dose!!.toRawBits(),saved.dose!!.toRawBits())
             assertEquals(ingestion.estimatedDoseStandardDeviation!!.toRawBits(),saved.estimatedDoseStandardDeviation!!.toRawBits())
+            assertEquals(StomachFullness.HALF_FULL, saved.stomachFullness)
             db.experienceDao().update(saved.copy(customUnitId=999))
             lateinit var missing: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { missing=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }

@@ -30,6 +30,7 @@ import com.isaakhanimann.journal.data.definitions.definitionFingerprint
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
 import com.isaakhanimann.journal.data.room.experiences.entities.Ingestion
+import com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness
 import com.isaakhanimann.journal.ui.main.navigation.graphs.EditIngestionRoute
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.IngestionTimePickerOption
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toPreservedString
@@ -56,7 +57,7 @@ class EditIngestionViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     private val userPreferences: UserPreferences,
     private val sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     private var ingestionFlow: MutableStateFlow<Ingestion?> = MutableStateFlow(null)
@@ -65,6 +66,14 @@ class EditIngestionViewModel @Inject constructor(
     private var loadedEnd: LocalDateTime? = null
     private var initialEndInstant: java.time.Instant? = null
     var note by mutableStateOf("")
+    var stomachFullness by mutableStateOf<StomachFullness?>(null)
+        private set
+    fun changeStomachFullness(value: StomachFullness?) {
+        if (!session.ready || session.busy) return
+        stomachFullness = value
+        state["stomachFullnessEdited"] = true
+        state["stomachFullness"] = value?.serialized
+    }
     var isEstimate by mutableStateOf(false)
     var isKnown by mutableStateOf(true)
     var dose by mutableStateOf("")
@@ -106,6 +115,9 @@ class EditIngestionViewModel @Inject constructor(
             ingestionFlow.emit(ing)
             ingestion = ing
             note = ing.notes ?: ""
+            stomachFullness = if (state.get<Boolean>("stomachFullnessEdited") == true)
+                com.isaakhanimann.journal.data.room.experiences.stomachFullnessSelection(state.get<String>("stomachFullness"))
+                else ing.stomachFullness
             isEstimate = ing.isDoseAnEstimate
             estimatedDoseStandardDeviation = ing.estimatedDoseStandardDeviation?.toPreservedString() ?: ""
             experienceId = ing.experienceId
@@ -226,6 +238,7 @@ class EditIngestionViewModel @Inject constructor(
             dose = if (isKnown) dose.toDoubleOrNull() else null,
             estimatedDoseStandardDeviation = if (retainUncertainty) estimatedDoseStandardDeviation.toDoubleOrNull() else null,
             units = if (units == current.units.orEmpty()) current.units else units, customUnitId = selectedCustomUnitId,
+            stomachFullness = stomachFullness,
             time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeStartFlow.value, loadedStart, current.time),
             endTime = if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
                 com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeEndFlow.value, loadedEnd, initialEndInstant) else null,

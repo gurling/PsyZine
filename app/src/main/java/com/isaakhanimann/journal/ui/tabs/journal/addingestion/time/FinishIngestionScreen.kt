@@ -120,6 +120,9 @@ fun FinishIngestionScreen(
         otherColors = viewModel.otherColorsFlow.collectAsStateWithLifecycle().value,
         previousNotes = viewModel.previousNotesFlow.collectAsStateWithLifecycle().value,
         note = viewModel.note,
+        showStomachFullness = viewModel.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL,
+        stomachFullness = viewModel.stomachFullness,
+        changeStomachFullness = viewModel::changeStomachFullness,
         onNoteChange = {
             viewModel.note = it
         },
@@ -212,6 +215,9 @@ fun FinishIngestionScreen(
     onSelectRecentEnd: (com.isaakhanimann.journal.data.preferences.RecentIngestionTime) -> Unit = {},
     timeAdjustmentMessage: String? = null,
     timeControlsEnabled: Boolean = true,
+    showStomachFullness: Boolean = false,
+    stomachFullness: com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness? = null,
+    changeStomachFullness: (com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness?) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     Scaffold(
@@ -274,6 +280,9 @@ fun FinishIngestionScreen(
                         enabled = timeControlsEnabled,
                     )
                     timeAdjustmentMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                }
+                if (showStomachFullness) CardWithTitle(title = "Stomach fullness") {
+                    StomachFullnessPicker(stomachFullness, changeStomachFullness, enabled = timeControlsEnabled)
                 }
                 CardWithTitle(title = "Experience", modifier = Modifier.fillMaxWidth()) {
                     var isShowingDropDownMenu by remember { mutableStateOf(false) }

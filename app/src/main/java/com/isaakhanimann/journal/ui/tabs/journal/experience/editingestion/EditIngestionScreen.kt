@@ -125,6 +125,12 @@ fun EditIngestionScreen(
     }
     EditIngestionScreen(
         note = viewModel.note,
+        stomachFullness = viewModel.stomachFullness,
+        changeStomachFullness = viewModel::changeStomachFullness,
+        showStomachFullness = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL ||
+            viewModel.ingestion?.stomachFullness != null,
+        fullnessAffectsTimeline = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL,
+        fullnessEnabled = !viewModel.session.busy,
         onNoteChange = { viewModel.note = it },
         isEstimate = viewModel.isEstimate,
         onChangeIsEstimate = viewModel::onChangeIsEstimate,
@@ -238,7 +244,12 @@ fun EditIngestionScreen(
     customUnit: CustomUnit?,
     onCustomUnitChange: (CustomUnit?) -> Unit,
     otherCustomUnits: List<CustomUnit>,
-    addIngestionWithClonedTime: () -> Unit
+    addIngestionWithClonedTime: () -> Unit,
+    showStomachFullness: Boolean = false,
+    stomachFullness: com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness? = null,
+    changeStomachFullness: (com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness?) -> Unit = {},
+    fullnessAffectsTimeline: Boolean = true,
+    fullnessEnabled: Boolean = true,
 ) {
     val density = LocalDensity.current
     var fabHeight by remember { mutableStateOf(56.dp) }
@@ -461,6 +472,10 @@ fun EditIngestionScreen(
                     ),
                     singleLine = true
                 )
+            }
+            if (showStomachFullness) CardWithTitle(title = "Stomach fullness") {
+                com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.StomachFullnessPicker(
+                    stomachFullness, changeStomachFullness, enabled = fullnessEnabled, affectsTimeline = fullnessAffectsTimeline)
             }
             CardWithTitle(title = "Time") {
                 Column(
