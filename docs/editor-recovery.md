@@ -78,3 +78,25 @@ On 20 November 2026 the Direct Debug APK build, instrumentation-source compilati
 and diff check passed. The two new tests were compiled, not executed: Android MCP
 reported no connected devices. Actual process recreation, error recovery, deletion
 and keyboard/font behavior remain device checks.
+
+## Timed-note draft recovery
+
+Add and edit timed-note forms now retain text, selected local time, color and
+timeline visibility in SavedStateHandle, under the existing journal-generation
+check. Blank text and an explicit hidden marker survive recovery. New-note color
+and visibility defaults are applied only when there is no recovered value.
+
+Time selection updates synchronously, so Save reads the most recent choice. Each
+save captures the complete form before starting its mutation; busy forms reject
+additional field changes and duplicate submissions. Note-only edits keep the
+existing instant-preservation rule, including repeated local times at DST changes.
+No schema, backup, notification or palette behavior changes.
+
+`TimedNoteDraftRecoveryTest` covers both forms with isolated in-memory Room data:
+reconstructed draft fields, immediate time selection followed by Save, duplicate
+taps, and an edited note retaining its unmodified recorded instant.
+
+On 20 November 2026, the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two new cases were compiled, not executed. Android MCP
+found no connected device; actual process recreation, form interaction and DST
+behavior still require runtime verification.
