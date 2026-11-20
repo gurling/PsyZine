@@ -55,3 +55,26 @@ The Direct debug APK and instrumentation Kotlin compilation passed on
 20 November 2026, along with `git diff --check`. The two new cases were compiled,
 not executed: Android MCP found no connected devices. Actual process recreation,
 field-error accessibility and keyboard/font behavior remain manual checks.
+
+## Editing custom substances
+
+The existing custom-substance editor now loads its record and generation in one
+guarded session. SavedStateHandle retains name, units and description; blank
+values remain blank after recovery instead of being replaced by database values.
+The shared gate hides the form until loading succeeds and supplies a reason and
+Back action when loading fails or the journal changes. Missing required fields
+use the same guidance as creation.
+
+Save captures one draft snapshot, checks the target inside the guarded mutation,
+and navigates only after success. Delete uses the same session and target check.
+Stale actions cannot change reused IDs after journal replacement. Ordinary write
+failures keep the draft open. No schemas, attachments or backup formats change.
+
+`CustomSubstanceEditorRecoveryTest` adds isolated in-memory tests for draft
+reconstruction, captured save values, duplicate taps and reused IDs in a
+replacement journal.
+
+On 20 November 2026 the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two new tests were compiled, not executed: Android MCP
+reported no connected devices. Actual process recreation, error recovery, deletion
+and keyboard/font behavior remain device checks.
