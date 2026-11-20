@@ -43,7 +43,7 @@ fun AddCustomSubstanceAndContinueScreen(
     viewModel: AddCustomSubstanceViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
-        viewModel.name = initialName
+        viewModel.initializeName(initialName)
     }
     if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     Scaffold(
@@ -72,6 +72,7 @@ fun AddCustomSubstanceAndContinueScreen(
     ) { padding ->
         AddOrEditCustomSubstanceContent(
             padding = padding,
+            showRequiredErrors = true,
             name = viewModel.name,
             units = viewModel.units,
             description = viewModel.description,

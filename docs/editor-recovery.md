@@ -38,3 +38,20 @@ The Direct debug APK build and instrumentation-source compilation passed for
 this increment, as did `git diff --check`. Existing recovery tests were compiled
 but not executed. Android MCP reported no connected devices; Back navigation,
 restore recovery and large-font wrapping still require runtime verification.
+
+## Custom-substance draft recovery
+
+New custom-substance forms now store name, units and description in SavedStateHandle,
+with the existing journal-generation token. Reopening the composition initializes
+the search suggestion only once, including when the user deliberately clears the
+name. A restored draft cannot save into a replacement journal. Save captures all
+three fields together before launching the mutation. Missing name and units show
+field-level explanations; description remains optional.
+
+Two additional instrumentation cases cover draft reconstruction, stale-draft
+rejection and required-field explanations using an isolated in-memory database.
+
+The Direct debug APK and instrumentation Kotlin compilation passed on
+20 November 2026, along with `git diff --check`. The two new cases were compiled,
+not executed: Android MCP found no connected devices. Actual process recreation,
+field-error accessibility and keyboard/font behavior remain manual checks.

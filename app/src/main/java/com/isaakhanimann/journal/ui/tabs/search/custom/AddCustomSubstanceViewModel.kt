@@ -26,35 +26,52 @@ import androidx.lifecycle.viewModelScope
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class AddCustomSubstanceViewModel @Inject constructor(
     val experienceRepo: ExperienceRepository,
     private val guard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: androidx.lifecycle.SavedStateHandle,
+    private val state: androidx.lifecycle.SavedStateHandle,
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, guard, state)
     init { session.load {} }
 
-    var name by mutableStateOf("")
-    var units by mutableStateOf("")
-    var description by mutableStateOf("")
+    private var draftName by mutableStateOf(state.get<String>("customSubstanceName") ?: "")
+    private var draftUnits by mutableStateOf(state.get<String>("customSubstanceUnits") ?: "")
+    private var draftDescription by mutableStateOf(state.get<String>("customSubstanceDescription") ?: "")
+
+    var name: String
+        get() = draftName
+        set(value) {
+            draftName = value
+            state["customSubstanceName"] = value
+        }
+    var units: String
+        get() = draftUnits
+        set(value) {
+            draftUnits = value
+            state["customSubstanceUnits"] = value
+        }
+    var description: String
+        get() = draftDescription
+        set(value) {
+            draftDescription = value
+            state["customSubstanceDescription"] = value
+        }
+
+    fun initializeName(initialName: String) {
+        if (!state.contains("customSubstanceName")) name = initialName
+    }
 
     val isValid get() = name.isNotBlank() && units.isNotBlank()
 
     fun addCustomSubstance(onDone: (customSubstanceName: String) -> Unit) {
         if (!isValid) return
-        val savedName = name
-        session.run(onSuccess = { onDone(savedName) }) {
+        val customSubstance = CustomSubstance(name = name, units = units, description = description)
+        session.run(onSuccess = { onDone(customSubstance.name) }) {
             guard.withSession(session.generation) {
-            val customSubstance = CustomSubstance(
-                name = name,
-                units = units,
-                description = description
-            )
-            experienceRepo.insert(customSubstance)
+                experienceRepo.insert(customSubstance)
             }
         }
     }

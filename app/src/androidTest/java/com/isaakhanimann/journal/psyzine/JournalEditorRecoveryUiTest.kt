@@ -84,4 +84,67 @@ class JournalEditorRecoveryUiTest {
         compose.onNodeWithText("Back").assertDoesNotExist()
         compose.runOnIdle { assertTrue(session.ready); assertNull(session.unavailableMessage) }
     }
+
+    @Test fun customSubstanceDraftSurvivesRecreationAndSearchNameDoesNotOverwriteEdits() {
+        val state = SavedStateHandle()
+        val store = androidx.lifecycle.ViewModelStore()
+        fun model(handle: SavedStateHandle): com.isaakhanimann.journal.ui.tabs.search.custom.AddCustomSubstanceViewModel {
+            val guard = JournalSessionGuard(database, JournalMutationLock())
+            val repository = com.isaakhanimann.journal.data.room.experiences.ExperienceRepository(
+                database.experienceDao(), database.photoAttachmentDao(),
+                com.isaakhanimann.journal.data.attachments.AttachmentStorage(
+                    InstrumentationRegistry.getInstrumentation().targetContext), JournalMutationLock(), guard)
+            return com.isaakhanimann.journal.ui.tabs.search.custom.AddCustomSubstanceViewModel(repository, guard, handle)
+        }
+        lateinit var original: com.isaakhanimann.journal.ui.tabs.search.custom.AddCustomSubstanceViewModel
+        lateinit var restored: com.isaakhanimann.journal.ui.tabs.search.custom.AddCustomSubstanceViewModel
+        try {
+            compose.runOnIdle {
+                original = model(state)
+                store.put("original", original)
+                original.initializeName("Search suggestion")
+                original.name = ""
+                original.units = "mL"
+                original.description = "Synthetic draft"
+                original.initializeName("Search suggestion")
+                assertEquals("", original.name)
+            }
+            compose.waitUntil(10000) { original.session.ready }
+            compose.runOnIdle {
+                val recovered = SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
+                store.clear()
+                restored = model(recovered)
+                store.put("restored", restored)
+                restored.initializeName("Search suggestion")
+                assertEquals("", restored.name)
+                assertEquals("mL", restored.units)
+                assertEquals("Synthetic draft", restored.description)
+                assertFalse(restored.isValid)
+            }
+            compose.waitUntil(10000) { restored.session.ready }
+            runBlocking { database.photoAttachmentDao().setGeneration(JournalState(generation = "changed-draft")) }
+            compose.waitUntil(10000) { !restored.session.ready }
+            compose.runOnIdle {
+                restored.name = "Synthetic name"
+                restored.addCustomSubstance { fail("Stale draft must not navigate") }
+            }
+            runBlocking { assertTrue(database.experienceDao().getAllCustomSubstances().isEmpty()) }
+        } finally {
+            compose.runOnIdle { store.clear() }
+        }
+    }
+
+    @Test fun customSubstanceFormExplainsMissingNameAndUnits() {
+        compose.setContent {
+            PsyZineTheme {
+                com.isaakhanimann.journal.ui.tabs.search.custom.AddOrEditCustomSubstanceContent(
+                    padding = androidx.compose.foundation.layout.PaddingValues(),
+                    name = " ", onNameChange = {}, units = "", onUnitsChange = {},
+                    description = "", onDescriptionChange = {}, showRequiredErrors = true)
+            }
+        }
+        compose.onNodeWithText("Enter a name for this substance.").assertExists()
+        compose.onNodeWithText("Enter a unit, such as mg or mL, or choose one below.").assertExists()
+    }
+
 }
