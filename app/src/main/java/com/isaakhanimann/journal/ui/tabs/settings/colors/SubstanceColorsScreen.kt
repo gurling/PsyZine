@@ -35,7 +35,6 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,9 +47,10 @@ import com.isaakhanimann.journal.ui.theme.horizontalPadding
 
 @Composable
 fun SubstanceColorsScreen(
+    navigateBack: () -> Unit,
     viewModel: SubstanceColorsViewModel = hiltViewModel(),
 ) {
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     SubstanceColorsScreenContent(
         substanceCompanions = viewModel.substanceCompanionsFlow.collectAsStateWithLifecycle().value,
         updateColor = viewModel::updateColor,
@@ -100,7 +100,7 @@ fun SubstanceColorsScreenContent(
                 .padding(horizontal = horizontalPadding)
                 .fillMaxSize()
         ) {
-            items(substanceCompanions) { substanceCompanion ->
+            items(substanceCompanions, key = { it.substanceName }) { substanceCompanion ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -110,6 +110,7 @@ fun SubstanceColorsScreenContent(
                 ) {
                     Text(
                         text = substanceCompanion.substanceName,
+                        modifier = Modifier.weight(1f).padding(end = 12.dp),
                         style = MaterialTheme.typography.titleMedium
                     )
                     ColorPicker(

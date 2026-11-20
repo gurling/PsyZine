@@ -44,7 +44,7 @@ fun AddCustomSubstanceScreen(
     LaunchedEffect(Unit) {
         viewModel.name = initialName
     }
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Add custom substance", maxLines = 1, overflow = TextOverflow.Ellipsis) })

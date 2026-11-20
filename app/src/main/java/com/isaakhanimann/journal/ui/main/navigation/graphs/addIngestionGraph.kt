@@ -98,6 +98,7 @@ fun NavGraphBuilder.addIngestionGraph(navController: NavController) {
         composableWithTransitions<AddCustomSubstanceRouteOnAddIngestionGraph> { backStackEntry ->
             val route = backStackEntry.toRoute<AddCustomSubstanceRouteOnAddIngestionGraph>()
             AddCustomSubstanceAndContinueScreen(
+                navigateBack = { navController.popBackStack() },
                 navigateToChooseRoa = { customSubstanceName ->
                     navController.navigate(CustomSubstanceChooseRouteRoute(customSubstanceName)) {
                         popUpTo(AddIngestionSearchRoute)

@@ -1,4 +1,4 @@
-# Rating and timed-note editor recovery
+# Journal editor recovery
 
 The add/edit rating and timed-note wrappers now use one editor-session gate.
 Loading keeps the existing progress dialog without exposing uninitialized form
@@ -25,3 +25,16 @@ passed. The three recovery regressions were compiled, not executed: Android MCP
 `list_devices` returned no attached devices. No JVM tests or broad regression
 suite were run for this batch. Actual error-dialog dismissal, Back navigation,
 restore invalidation and failed-save draft retention remain runtime checks.
+
+## Additional callers — 20 November 2026
+
+Substance colors and both custom-substance creation flows now use the same gate.
+Failed loading or journal replacement hides their mutation controls and leaves a
+readable reason plus Back navigation. Ordinary save failures keep the form open.
+Substance-color names wrap in the space beside the picker, and rows use stable
+substance-name keys. No storage formats or mutation contracts change.
+
+The Direct debug APK build and instrumentation-source compilation passed for
+this increment, as did `git diff --check`. Existing recovery tests were compiled
+but not executed. Android MCP reported no connected devices; Back navigation,
+restore recovery and large-font wrapping still require runtime verification.

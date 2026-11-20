@@ -82,7 +82,7 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
         composableWithTransitions<FAQRoute> { FAQScreen() }
         composableWithTransitions<DonateRoute> { DonateScreen() }
         composableWithTransitions<CombinationSettingsRoute> { CombinationSettingsScreen() }
-        composableWithTransitions<SubstanceColorsRoute> { SubstanceColorsScreen() }
+        composableWithTransitions<SubstanceColorsRoute> { SubstanceColorsScreen(navigateBack = { navController.popBackStack() }) }
         composableWithTransitions<CustomUnitArchiveRoute> {
             CustomUnitArchiveScreen(navigateToEditCustomUnit = { customUnitId ->
                 navController.navigate(EditCustomUnitRoute(customUnitId))
