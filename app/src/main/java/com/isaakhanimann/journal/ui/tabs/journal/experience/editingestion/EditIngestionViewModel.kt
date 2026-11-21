@@ -19,13 +19,13 @@
 package com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion
 
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.isaakhanimann.journal.ui.utils.journalRecordId
+import com.isaakhanimann.journal.data.room.editorFingerprint
 import com.isaakhanimann.journal.data.definitions.definitionFingerprint
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
@@ -64,7 +64,13 @@ class EditIngestionViewModel @Inject constructor(
     private var loadedStart: LocalDateTime? = null
     private var loadedEnd: LocalDateTime? = null
     private var initialEndInstant: java.time.Instant? = null
-    var note by mutableStateOf("")
+    private var draftNote by mutableStateOf("")
+    var note: String
+        get() = draftNote
+        set(value) {
+            draftNote = value
+            state["editIngestionNote"] = value
+        }
     var isHiddenInTimeline by mutableStateOf(false)
         private set
     fun changeHiddenInTimeline(value: Boolean) {
@@ -80,16 +86,58 @@ class EditIngestionViewModel @Inject constructor(
         state["stomachFullnessEdited"] = true
         state["stomachFullness"] = value?.serialized
     }
-    var isEstimate by mutableStateOf(false)
-    var isKnown by mutableStateOf(true)
-    var dose by mutableStateOf("")
-    var estimatedDoseStandardDeviation by mutableStateOf("")
-    var units by mutableStateOf("")
-    var experienceId by mutableIntStateOf(1)
+    private var draftIsEstimate by mutableStateOf(false)
+    var isEstimate: Boolean
+        get() = draftIsEstimate
+        set(value) {
+            draftIsEstimate = value
+            state["editIngestionEstimate"] = value
+        }
+    private var draftIsKnown by mutableStateOf(true)
+    var isKnown: Boolean
+        get() = draftIsKnown
+        set(value) {
+            draftIsKnown = value
+            state["editIngestionKnown"] = value
+        }
+    private var draftDose by mutableStateOf("")
+    var dose: String
+        get() = draftDose
+        set(value) {
+            draftDose = value
+            state["editIngestionDose"] = value
+        }
+    private var draftEstimatedDoseStandardDeviation by mutableStateOf("")
+    var estimatedDoseStandardDeviation: String
+        get() = draftEstimatedDoseStandardDeviation
+        set(value) {
+            draftEstimatedDoseStandardDeviation = value
+            state["editIngestionUncertainty"] = value
+        }
+    private var draftUnits by mutableStateOf("")
+    var units: String
+        get() = draftUnits
+        set(value) {
+            draftUnits = value
+            state["editIngestionUnits"] = value
+        }
+    private var draftExperienceId by mutableStateOf(1)
+    var experienceId: Int
+        get() = draftExperienceId
+        set(value) {
+            draftExperienceId = value
+            state["editIngestionParent"] = value
+        }
     val ingestionTimePickerOptionFlow = MutableStateFlow(IngestionTimePickerOption.POINT_IN_TIME)
     var localDateTimeStartFlow = MutableStateFlow(LocalDateTime.now())
     var localDateTimeEndFlow = MutableStateFlow(LocalDateTime.now())
-    var consumerName by mutableStateOf("")
+    private var draftConsumerName by mutableStateOf("")
+    var consumerName: String
+        get() = draftConsumerName
+        set(value) {
+            draftConsumerName = value
+            state["editIngestionConsumer"] = value
+        }
     private var selectedCustomUnitId: Int? = null
     private var selectedDefinitionFingerprint: String? = null
     var customUnit: CustomUnit? by mutableStateOf(null)
@@ -120,18 +168,18 @@ class EditIngestionViewModel @Inject constructor(
             check(experienceRepo.getExperience(ing.experienceId) != null) { "This experience was deleted." }
             ingestionFlow.emit(ing)
             ingestion = ing
-            note = ing.notes ?: ""
+            note = state.get<String>("editIngestionNote") ?: (ing.notes ?: "")
             isHiddenInTimeline = state.get<Boolean>("ingestionHiddenInTimeline") ?: ing.isHiddenInTimeline
             stomachFullness = if (state.get<Boolean>("stomachFullnessEdited") == true)
                 com.isaakhanimann.journal.data.room.experiences.stomachFullnessSelection(state.get<String>("stomachFullness"))
                 else ing.stomachFullness
-            isEstimate = ing.isDoseAnEstimate
-            estimatedDoseStandardDeviation = ing.estimatedDoseStandardDeviation?.toPreservedString() ?: ""
-            experienceId = ing.experienceId
-            dose = ing.dose?.toPreservedString() ?: ""
-            isKnown = ing.dose != null
-            units = ing.units ?: ""
-            consumerName = ing.consumerName ?: ""
+            isEstimate = state.get<Boolean>("editIngestionEstimate") ?: (ing.isDoseAnEstimate)
+            estimatedDoseStandardDeviation = state.get<String>("editIngestionUncertainty") ?: (ing.estimatedDoseStandardDeviation?.toPreservedString() ?: "")
+            experienceId = state.get<Int>("editIngestionParent") ?: (ing.experienceId)
+            dose = state.get<String>("editIngestionDose") ?: (ing.dose?.toPreservedString() ?: "")
+            isKnown = state.get<Boolean>("editIngestionKnown") ?: (ing.dose != null)
+            units = state.get<String>("editIngestionUnits") ?: (ing.units ?: "")
+            consumerName = state.get<String>("editIngestionConsumer") ?: (ing.consumerName ?: "")
             loadedStart = ing.time.getLocalDateTime()
             localDateTimeStartFlow.emit(checkNotNull(loadedStart))
             val endTime = ing.endTime
@@ -149,6 +197,29 @@ class EditIngestionViewModel @Inject constructor(
                 val fingerprint = experienceRepo.definitionContents().definitionFingerprint(definitionId)
                 check(state.get<String>("editDefinitionFingerprint")?.let { it == fingerprint } != false) { "This definition changed. Close this entry and reopen it." }
                 state["editDefinitionFingerprint"] = fingerprint
+                selectedDefinitionFingerprint = fingerprint
+            }
+            if (state.get<Boolean>("editSelectedUnitChosen") == true) {
+                val recoveredId = state.get<Int>("editSelectedUnitId")
+                val recovered = recoveredId?.let { id ->
+                    checkNotNull(experienceRepo.getCustomUnit(id)) { "The selected custom unit was deleted. Reopen this entry and choose a unit again." }
+                }
+                if (recovered != null) {
+                    check(recovered.substanceName == ing.substanceName && (recovered.substanceName == null || recovered.administrationRoute == ing.administrationRoute)) {
+                        "The selected custom unit changed. Reopen this entry and choose a unit again."
+                    }
+                    check(recovered.editorFingerprint() == state.get<String>("editSelectedUnitFingerprint")) {
+                        "The selected custom unit changed. Reopen this entry and choose a unit again."
+                    }
+                }
+                val fingerprint = recovered?.takeIf { it.substanceName == null }?.let {
+                    experienceRepo.definitionContents().definitionFingerprint(it.id)
+                }
+                check(fingerprint == state.get<String>("editSelectedDefinitionFingerprint")) {
+                    "The selected definition changed. Reopen this entry and choose it again."
+                }
+                selectedCustomUnitId = recoveredId
+                customUnit = recovered
                 selectedDefinitionFingerprint = fingerprint
             }
             loadedEnd = localDateTimeEndFlow.value
@@ -170,10 +241,30 @@ class EditIngestionViewModel @Inject constructor(
         )
 
     fun onChangeCustomUnit(newCustomUnit: CustomUnit?) {
-        selectedCustomUnitId = newCustomUnit?.id
-        customUnit = newCustomUnit
-        newCustomUnit?.unit?.let {
-            units = it
+        if (!session.ready || session.busy) return
+        val requestedFingerprint = newCustomUnit?.editorFingerprint()
+        session.run {
+            sessionGuard.withSession(session.generation) {
+                val current = checkNotNull(ingestion)
+                val selected = newCustomUnit?.let {
+                    checkNotNull(experienceRepo.getCustomUnit(it.id)) { "This custom unit was deleted. Choose a unit again." }
+                }
+                if (selected != null) {
+                    check(selected.editorFingerprint() == requestedFingerprint && selected.substanceName == current.substanceName &&
+                        (selected.substanceName == null || selected.administrationRoute == current.administrationRoute)) { "This custom unit changed. Choose a unit again." }
+                }
+                val fingerprint = selected?.takeIf { it.substanceName == null }?.let {
+                    experienceRepo.definitionContents().definitionFingerprint(it.id)
+                }
+                selectedCustomUnitId = selected?.id
+                customUnit = selected
+                selectedDefinitionFingerprint = fingerprint
+                selected?.unit?.let { units = it }
+                state["editSelectedUnitChosen"] = true
+                state["editSelectedUnitId"] = selected?.id
+                state["editSelectedUnitFingerprint"] = selected?.editorFingerprint()
+                state["editSelectedDefinitionFingerprint"] = fingerprint
+            }
         }
     }
 

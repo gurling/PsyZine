@@ -132,8 +132,8 @@ by 30 elapsed minutes. The paired adjustment is retained together in SavedState.
 
 Timing recovery runs after the existing generation and definition checks. Original
 loaded timestamps remain separate, preserving unchanged instants when editing.
-This increment covers timing controls; recovery of other ingestion draft fields
-remains separate work. No schema or backup format changes.
+The later ingestion draft increment below extends recovery to the remaining form
+fields. No schema or backup format changes.
 
 `IngestionTimingRecoveryTest` covers range reconstruction, paired adjustments,
 immediate time/mode selection followed by Save, duplicate taps and precise dose
@@ -143,3 +143,24 @@ On 21 November 2026, the Direct Debug APK build, instrumentation-source compilat
 and diff check passed. The two new cases were compiled, not executed. Android MCP
 found no connected devices; actual time-picker interaction, process recreation
 and DST behavior remain runtime checks.
+
+## Remaining ingestion draft fields
+
+The ingestion editor now retains note, dose and uncertainty text, known/estimate
+flags, units, consumer and selected experience alongside timing and visibility.
+Recovery preserves blank fields and exact numeric text under the journal-generation
+check. Selecting a custom unit verifies its identity in a guarded read before
+changing the draft; restoration rechecks the selected unit's fingerprint and any
+native definition composition fingerprint. Missing or changed selections require
+reopening instead of silently switching units. Original missing-unit records stay
+readable under the existing save validation.
+
+The screen now uses the shared recovery gate so unavailable reasons remain visible
+after the error dialog closes. Two added in-memory cases cover scalar draft
+reconstruction with a valid unit, precise save values, and a changed selected-unit
+fingerprint preventing recovery. No Room schema or backup format changes.
+
+On 21 November 2026 the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two additional cases were compiled, not executed.
+Android MCP reported no connected devices; process recreation, unit-selection
+interaction and error recovery still require device verification.

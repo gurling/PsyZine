@@ -36,6 +36,7 @@ class IngestionTimingRecoveryTest {
     private lateinit var preferences: UserPreferences
     private val store = ViewModelStore()
     private val original = Ingestion(id = 91, substanceName = "Synthetic", time = Instant.parse("2026-11-21T10:00:00Z"),
+        creationDate = Instant.parse("2026-11-21T10:00:00Z"),
         administrationRoute = AdministrationRoute.ORAL, dose = 0.0001, isDoseAnEstimate = false,
         estimatedDoseStandardDeviation = 0.00001, units = "mg", experienceId = 92,
         notes = "Synthetic timing test", stomachFullness = null, consumerName = null, customUnitId = null)
@@ -112,4 +113,72 @@ class IngestionTimingRecoveryTest {
         assertEquals(end.getInstant().minusSeconds(1800), saved.time)
         assertNull(saved.endTime)
     }
+
+    @Test fun recoveredFieldsKeepExactTextAndTheValidatedCustomUnitSelection() {
+        val unit = CustomUnit.mdmaSample.copy(id = 101, substanceName = original.substanceName, dose = 1.0, creationDate = original.time)
+        runBlocking { database.experienceDao().insert(unit) }
+        val state = SavedStateHandle(mapOf("ingestionId" to original.id))
+        val first = create(state)
+        compose.waitUntil(10000) { first.session.ready }
+        compose.runOnIdle { first.onChangeCustomUnit(unit) }
+        compose.waitUntil(10000) { !first.session.busy }
+        lateinit var recovered: SavedStateHandle
+        compose.runOnIdle {
+            first.note = ""
+            first.onDoseChange("0.000000123456789")
+            first.onChangeEstimatedDoseStandardDeviation("0.000000000123")
+            first.onChangeIsEstimate(true)
+            first.toggleIsKnown()
+            first.onChangeConsumerName("Synthetic consumer")
+            recovered = SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
+            store.clear()
+        }
+        val restored = create(recovered)
+        compose.waitUntil(10000) { restored.session.ready || !restored.session.loading }
+        compose.runOnIdle {
+            assertTrue(restored.session.error, restored.session.ready)
+            assertEquals("", restored.note)
+            assertEquals("0.000000123456789", restored.dose)
+            assertEquals("0.000000000123", restored.estimatedDoseStandardDeviation)
+            assertTrue(restored.isEstimate)
+            assertFalse(restored.isKnown)
+            assertEquals("Synthetic consumer", restored.consumerName)
+            assertEquals(unit.id, restored.customUnit?.id)
+            assertEquals(unit.unit, restored.units)
+            restored.toggleIsKnown()
+            restored.onDoneTap {}
+        }
+        compose.waitUntil(10000) { !restored.session.busy }
+        val saved = runBlocking { repository.getIngestion(original.id) }!!
+        assertEquals(unit.id, saved.customUnitId)
+        assertEquals("", saved.notes)
+        assertEquals(0.000000123456789, saved.dose!!, 0.0)
+        assertEquals(0.000000000123, saved.estimatedDoseStandardDeviation!!, 0.0)
+        assertEquals("Synthetic consumer", saved.consumerName)
+    }
+
+    @Test fun recoveredCustomUnitMustMatchTheSelectionFingerprint() {
+        val unit = CustomUnit.mdmaSample.copy(id = 101, substanceName = original.substanceName, dose = 1.0, creationDate = original.time)
+        runBlocking { database.experienceDao().insert(unit) }
+        val state = SavedStateHandle(mapOf("ingestionId" to original.id))
+        val first = create(state)
+        compose.waitUntil(10000) { first.session.ready }
+        compose.runOnIdle { first.onChangeCustomUnit(unit) }
+        compose.waitUntil(10000) { !first.session.busy }
+        lateinit var recovered: SavedStateHandle
+        compose.runOnIdle {
+            recovered = SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
+            store.clear()
+        }
+        runBlocking { database.experienceDao().insert(unit.copy(dose = 2.0)) }
+        val restored = create(recovered)
+        compose.waitUntil(10000) { !restored.session.loading }
+        compose.runOnIdle {
+            assertFalse(restored.session.ready)
+            assertTrue(restored.session.unavailableMessage.orEmpty().contains("selected custom unit changed"))
+            restored.onDoneTap { fail("Changed selection must not save") }
+        }
+        assertEquals(original, runBlocking { repository.getIngestion(original.id) })
+    }
+
 }
