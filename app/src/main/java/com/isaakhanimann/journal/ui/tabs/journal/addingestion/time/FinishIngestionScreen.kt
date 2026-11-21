@@ -56,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -104,7 +105,14 @@ fun FinishIngestionScreen(
         localDateTimeStart = localDateTime,
         localDateTimeEnd = viewModel.localDateTimeEndFlow.collectAsStateWithLifecycle().value,
         onChangeEndDateOrTime = viewModel::onChangeEndDateOrTime,
-        isLoadingColor = viewModel.isLoadingColor || viewModel.isSaving,
+        isLoadingColor = viewModel.isLoadingColor || viewModel.isSaving || viewModel.isUpdatingTime || viewModel.timeUpdateFailed,
+        recentTimePresets = viewModel.recentTimePresets.collectAsStateWithLifecycle().value,
+        saveRecentTimePresets = viewModel::setRecentTimePresets,
+        savingTimeInputPreference = viewModel.savingTimeInputPreference,
+        onSelectRecentStart = viewModel::selectRecentStart,
+        onSelectRecentEnd = viewModel::selectRecentEnd,
+        timeAdjustmentMessage = viewModel.timeAdjustmentMessage,
+        timeControlsEnabled = !viewModel.isLoadingColor && !viewModel.isSaving,
         isShowingColorPicker = viewModel.isShowingColorPicker,
         selectedColor = viewModel.selectedColor,
         onChangeColor = { viewModel.selectedColor = it },
@@ -112,6 +120,11 @@ fun FinishIngestionScreen(
         otherColors = viewModel.otherColorsFlow.collectAsStateWithLifecycle().value,
         previousNotes = viewModel.previousNotesFlow.collectAsStateWithLifecycle().value,
         note = viewModel.note,
+        isHiddenInTimeline = viewModel.isHiddenInTimeline,
+        changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
+        showStomachFullness = viewModel.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL,
+        stomachFullness = viewModel.stomachFullness,
+        changeStomachFullness = viewModel::changeStomachFullness,
         onNoteChange = {
             viewModel.note = it
         },
@@ -196,7 +209,19 @@ fun FinishIngestionScreen(
     isEnteredTitleOk: Boolean,
     consumerName: String,
     onChangeOfConsumerName: (String) -> Unit,
-    consumerNamesSorted: List<String>
+    consumerNamesSorted: List<String>,
+    recentTimePresets: Boolean = false,
+    saveRecentTimePresets: (Boolean) -> Unit = {},
+    savingTimeInputPreference: Boolean = false,
+    onSelectRecentStart: (com.isaakhanimann.journal.data.preferences.RecentIngestionTime) -> Unit = {},
+    onSelectRecentEnd: (com.isaakhanimann.journal.data.preferences.RecentIngestionTime) -> Unit = {},
+    timeAdjustmentMessage: String? = null,
+    timeControlsEnabled: Boolean = true,
+    showStomachFullness: Boolean = false,
+    stomachFullness: com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness? = null,
+    changeStomachFullness: (com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness?) -> Unit = {},
+    isHiddenInTimeline: Boolean = false,
+    changeHiddenInTimeline: (Boolean) -> Unit = {},
 ) {
     val focusManager = LocalFocusManager.current
     Scaffold(
@@ -236,14 +261,33 @@ fun FinishIngestionScreen(
             ) {
                 Spacer(modifier = Modifier.height(3.dp))
                 CardWithTitle(title = "Time") {
+                    androidx.compose.material3.SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+                        SegmentedButton(
+                            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(0, 2),
+                            selected = recentTimePresets, enabled = !savingTimeInputPreference && timeControlsEnabled,
+                            onClick = { saveRecentTimePresets(true) }) { Text("Recent times") }
+                        SegmentedButton(
+                            shape = androidx.compose.material3.SegmentedButtonDefaults.itemShape(1, 2),
+                            selected = !recentTimePresets, enabled = !savingTimeInputPreference && timeControlsEnabled,
+                            onClick = { saveRecentTimePresets(false) }) { Text("Calendar") }
+                    }
                     TimePointOrRangePicker(
                         onChangeTimePickerOption = onChangeTimePickerOption,
                         ingestionTimePickerOption = ingestionTimePickerOption,
                         localDateTimeStart = localDateTimeStart,
                         onChangeStartDateOrTime = onChangeStartDateOrTime,
                         localDateTimeEnd = localDateTimeEnd,
-                        onChangeEndDateOrTime = onChangeEndDateOrTime
+                        onChangeEndDateOrTime = onChangeEndDateOrTime,
+                        recentTimePresets = recentTimePresets,
+                        onSelectRecentStart = onSelectRecentStart,
+                        onSelectRecentEnd = onSelectRecentEnd,
+                        enabled = timeControlsEnabled,
                     )
+                    timeAdjustmentMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
+                    IngestionTimelineVisibility(isHiddenInTimeline, changeHiddenInTimeline, enabled = timeControlsEnabled)
+                }
+                if (showStomachFullness) CardWithTitle(title = "Stomach fullness") {
+                    StomachFullnessPicker(stomachFullness, changeStomachFullness, enabled = timeControlsEnabled)
                 }
                 CardWithTitle(title = "Experience", modifier = Modifier.fillMaxWidth()) {
                     var isShowingDropDownMenu by remember { mutableStateOf(false) }

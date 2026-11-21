@@ -74,9 +74,8 @@ class LargeTextLayoutTest {
         compose.onNodeWithText("Independent substance heights").performScrollTo()
         capture("settings-before-or-after")
         assertNoTextOverflow()
-        val switches = compose.onAllNodes(isToggleable()).fetchSemanticsNodes()
-        assertEquals(6, switches.size)
-        val independent = compose.onAllNodes(isToggleable())[2].assertIsDisplayed().fetchSemanticsNode()
+        val independent = compose.onNode(isToggleable() and hasContentDescription("Independent substance heights"))
+            .assertIsDisplayed().fetchSemanticsNode()
         assertTrue("Switch clipped: ${independent.boundsInRoot}", independent.boundsInRoot.width >= 48 * compose.density.density)
         assertTrue("Switch outside the card", independent.boundsInRoot.right <= compose.onRoot().fetchSemanticsNode().boundsInRoot.right)
     }

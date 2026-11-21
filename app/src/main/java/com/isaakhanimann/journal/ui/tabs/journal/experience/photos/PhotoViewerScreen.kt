@@ -29,8 +29,15 @@ import androidx.compose.ui.unit.IntSize
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 fun PhotoViewerScreen(navigateBack: () -> Unit, viewModel: PhotoViewerViewModel = hiltViewModel()) {
-    val files by viewModel.files.collectAsStateWithLifecycle()
-    PhotoViewerContent(files, viewModel.route.index, navigateBack)
+    val state by viewModel.viewerState.collectAsStateWithLifecycle()
+    when {
+        state.loading -> Column(Modifier.padding(24.dp)) {
+            CircularProgressIndicator()
+            Text("Loading photos")
+        }
+        state.error != null -> com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack, state.error!!)
+        else -> PhotoViewerContent(state.value.orEmpty(), viewModel.route.index, navigateBack)
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.ExperimentalFoundationApi::class)

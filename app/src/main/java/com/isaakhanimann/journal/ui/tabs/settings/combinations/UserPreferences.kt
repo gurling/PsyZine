@@ -46,6 +46,93 @@ class UserPreferences @Inject constructor(private val dataStore: DataStore<Prefe
         val KEY_HIDE_DOSAGE_DOTS = booleanPreferencesKey("key_hide_dosage_dots")
         val KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT = booleanPreferencesKey("KEY_ARE_SUBSTANCE_HEIGHTS_INDEPENDENT")
         val KEY_IS_TIMELINE_HIDDEN = booleanPreferencesKey("KEY_IS_TIMELINE_HIDDEN")
+        val KEY_TOLERANCE_STATS_PERIOD = stringPreferencesKey("tolerance_stats_period")
+        val KEY_TOLERANCE_EXPERIENCE_PERIOD = stringPreferencesKey("tolerance_experience_period")
+        val KEY_SHOW_COMPONENTS = booleanPreferencesKey("KEY_ARE_SUB_COMPONENTS_SHOWN")
+        val KEY_HIDE_TIMELINE_QUANTITIES = booleanPreferencesKey("key_hide_timeline_quantity_info")
+        val KEY_HIDE_INTERACTIONS = booleanPreferencesKey("journal_hide_interactions")
+        val KEY_HIDE_TOLERANCE = booleanPreferencesKey("journal_hide_tolerance")
+        val KEY_RELATIVE_DATES = booleanPreferencesKey("journal_relative_dates")
+        val KEY_RECENT_TIME_PRESETS = booleanPreferencesKey("ingestion_recent_time_presets")
+        val KEY_ADVANCED_STATS_METRIC = stringPreferencesKey("advanced_stats_metric")
+        val KEY_ADVANCED_STATS_PERIOD = stringPreferencesKey("advanced_stats_period")
+        val KEY_ADVANCED_STATS_START = stringPreferencesKey("advanced_stats_start")
+        val KEY_ADVANCED_STATS_END = stringPreferencesKey("advanced_stats_end")
+    }
+
+    val journalDisplaySettingsFlow = dataStore.data.map {
+        com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(
+            showComponents = it[PreferencesKeys.KEY_SHOW_COMPONENTS] ?: true,
+            hideTimelineQuantities = it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] ?: false,
+            hideInteractions = it[PreferencesKeys.KEY_HIDE_INTERACTIONS] ?: false,
+            hideTolerance = it[PreferencesKeys.KEY_HIDE_TOLERANCE] ?: false,
+            relativeDates = it[PreferencesKeys.KEY_RELATIVE_DATES] ?: false,
+            recentTimePresets = it[PreferencesKeys.KEY_RECENT_TIME_PRESETS] ?: false)
+    }
+
+    suspend fun saveShowComponents(value: Boolean) = restoreJournalDisplaySettings(value, null)
+    suspend fun saveHideTimelineQuantities(value: Boolean) = restoreJournalDisplaySettings(null, value)
+    suspend fun saveHideInteractions(value: Boolean) = restoreJournalDisplaySettings(null, null, hideInteractions = value)
+    suspend fun saveHideTolerance(value: Boolean) = restoreJournalDisplaySettings(null, null, hideTolerance = value)
+    suspend fun saveRelativeDates(value: Boolean) = restoreJournalDisplaySettings(null, null, relativeDates = value)
+    suspend fun saveRecentTimePresets(value: Boolean) = restoreJournalDisplaySettings(null, null, recentTimePresets = value)
+
+    /** Absent backup fields retain current choices; apply present fields in one edit. */
+    suspend fun restoreJournalDisplaySettings(showComponents: Boolean?, hideTimelineQuantities: Boolean?,
+        hideInteractions: Boolean? = null, hideTolerance: Boolean? = null, relativeDates: Boolean? = null,
+        recentTimePresets: Boolean? = null) {
+        dataStore.edit {
+            showComponents?.let { value -> it[PreferencesKeys.KEY_SHOW_COMPONENTS] = value }
+            hideTimelineQuantities?.let { value -> it[PreferencesKeys.KEY_HIDE_TIMELINE_QUANTITIES] = value }
+            hideInteractions?.let { value -> it[PreferencesKeys.KEY_HIDE_INTERACTIONS] = value }
+            hideTolerance?.let { value -> it[PreferencesKeys.KEY_HIDE_TOLERANCE] = value }
+            relativeDates?.let { value -> it[PreferencesKeys.KEY_RELATIVE_DATES] = value }
+            recentTimePresets?.let { value -> it[PreferencesKeys.KEY_RECENT_TIME_PRESETS] = value }
+        }
+    }
+
+    val toleranceStatsPeriodFlow = dataStore.data.map {
+        com.isaakhanimann.journal.data.definitions.TolerancePeriod.fromName(it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD])
+    }
+    val toleranceExperiencePeriodFlow = dataStore.data.map { values ->
+        com.isaakhanimann.journal.data.definitions.TolerancePeriod.entries.firstOrNull {
+            it.name == values[PreferencesKeys.KEY_TOLERANCE_EXPERIENCE_PERIOD]
+        } ?: com.isaakhanimann.journal.data.definitions.TolerancePeriod.PAST_1M
+    }
+    suspend fun saveToleranceExperiencePeriod(value: com.isaakhanimann.journal.data.definitions.TolerancePeriod) {
+        dataStore.edit { it[PreferencesKeys.KEY_TOLERANCE_EXPERIENCE_PERIOD] = value.name }
+    }
+
+    val advancedStatisticsSelectionFlow = dataStore.data.map { values ->
+        com.isaakhanimann.journal.data.definitions.StatisticsSelection(
+            com.isaakhanimann.journal.data.definitions.StatisticsMetric.entries.firstOrNull {
+                it.name == values[PreferencesKeys.KEY_ADVANCED_STATS_METRIC]
+            } ?: com.isaakhanimann.journal.data.definitions.StatisticsMetric.EXPERIENCES,
+            com.isaakhanimann.journal.data.definitions.StatisticsPeriod.entries.firstOrNull {
+                it.name == values[PreferencesKeys.KEY_ADVANCED_STATS_PERIOD]
+            } ?: com.isaakhanimann.journal.data.definitions.StatisticsPeriod.WEEKS_12,
+            values[PreferencesKeys.KEY_ADVANCED_STATS_START]?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() },
+            values[PreferencesKeys.KEY_ADVANCED_STATS_END]?.let { runCatching { java.time.LocalDate.parse(it) }.getOrNull() })
+    }
+
+    suspend fun saveAdvancedStatisticsSelection(metric: com.isaakhanimann.journal.data.definitions.StatisticsMetric? = null,
+        period: com.isaakhanimann.journal.data.definitions.StatisticsPeriod? = null,
+        customStart: java.time.LocalDate? = null, customEnd: java.time.LocalDate? = null) {
+        if (customStart != null || customEnd != null) {
+            require(customStart != null && customEnd != null && customStart <= customEnd) { "Enter a valid start and end date." }
+            require(customStart.year in 1..9999 && customEnd.year in 1..9999 && customEnd.year - customStart.year < 31) {
+                "Choose a range with at most 31 yearly buckets."
+            }
+        }
+        dataStore.edit { values ->
+            metric?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_METRIC] = it.name }
+            period?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_PERIOD] = it.name }
+            customStart?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_START] = it.toString() }
+            customEnd?.let { values[PreferencesKeys.KEY_ADVANCED_STATS_END] = it.toString() }
+        }
+    }
+    suspend fun saveToleranceStatsPeriod(value: com.isaakhanimann.journal.data.definitions.TolerancePeriod) {
+        dataStore.edit { it[PreferencesKeys.KEY_TOLERANCE_STATS_PERIOD] = value.name }
     }
 
     suspend fun saveTimeDisplayOption(value: SavedTimeDisplayOption) {

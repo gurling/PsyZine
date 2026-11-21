@@ -75,7 +75,7 @@ fun NavGraphBuilder.journalGraph(navController: NavHostController) {
             EditTimedNoteScreen(navigateBack = navController::popBackStack)
         }
         composableWithTransitions<TimelineScreenRoute> {
-            TimelineScreen()
+            TimelineScreen(navigateBack = { navController.popBackStack() })
         }
         composableWithTransitions<VolumetricDosingOnJournalTabRoute> {
             VolumetricDosingScreen()

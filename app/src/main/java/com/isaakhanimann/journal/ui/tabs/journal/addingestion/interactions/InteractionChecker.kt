@@ -29,7 +29,8 @@ import javax.inject.Singleton
 class InteractionChecker @Inject constructor(
     private val substanceRepo: SubstanceRepository,
 ) {
-    fun getInteractionBetween(aName: String, bName: String): Interaction? {
+    fun getInteractionBetween(aName: String?, bName: String?): Interaction? {
+        if (aName == null || bName == null) return null
         if (aName == bName) {
             return null
         }

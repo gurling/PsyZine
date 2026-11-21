@@ -14,26 +14,45 @@ import androidx.compose.ui.unit.dp
 import com.isaakhanimann.journal.BuildConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.CancellationException
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AboutScreen() {
+fun AboutScreen(navigateToSupportInfo: () -> Unit = {}, navigateToReleaseNotes: () -> Unit = {}) {
     val context = LocalContext.current
     var notice by remember { mutableStateOf("Loading local license notices…") }
     var license by remember { mutableStateOf<String?>(null) }
     var selectedNotice by remember { mutableStateOf<String?>(null) }
     var files by remember { mutableStateOf<List<String>>(emptyList()) }
-    LaunchedEffect(Unit) {
-        notice = withContext(Dispatchers.IO) { context.assets.open("licenses/NOTICES.txt").bufferedReader().use { it.readText() } }
-        files = withContext(Dispatchers.IO) { context.assets.list("licenses").orEmpty().filter { it != "NOTICES.txt" && it != "gruvbox-package.json" }.sorted() }
+    var noticeError by remember { mutableStateOf<String?>(null) }
+    var licenseError by remember { mutableStateOf<String?>(null) }
+    var noticeAttempt by remember { mutableStateOf(0) }
+    var licenseAttempt by remember { mutableStateOf(0) }
+    LaunchedEffect(noticeAttempt) {
+        noticeError = null
+        try {
+            val loaded = withContext(Dispatchers.IO) {
+                context.assets.open("licenses/NOTICES.txt").bufferedReader().use { it.readText() } to
+                    context.assets.list("licenses").orEmpty().filter { it != "NOTICES.txt" && it != "gruvbox-package.json" }.sorted()
+            }
+            notice = loaded.first
+            files = loaded.second
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { noticeError = "Local license notices could not be loaded. Please try again." }
     }
-    LaunchedEffect(selectedNotice) {
+    LaunchedEffect(selectedNotice, licenseAttempt) {
         license = null
-        selectedNotice?.let { name -> license = withContext(Dispatchers.IO) { context.assets.open("licenses/$name").bufferedReader().use { it.readText() } } }
+        licenseError = null
+        try {
+            selectedNotice?.let { name -> license = withContext(Dispatchers.IO) { context.assets.open("licenses/$name").bufferedReader().use { it.readText() } } }
+        } catch (e: CancellationException) { throw e }
+        catch (_: Exception) { licenseError = "This license text could not be loaded. Please try again." }
     }
     Scaffold(topBar = { TopAppBar(title = { Text("About and licenses", maxLines = 1, overflow = TextOverflow.Ellipsis) }) }) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("PsyZine ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleLarge)
+            TextButton(onClick = navigateToReleaseNotes) { Text("Release notes") }
+            TextButton(onClick = navigateToSupportInfo) { Text("Support info") }
             Text("An independent local journal, based on PsychonautWiki Journal. Copyright © 2022–2025 Isaak Hanimann and contributors. PsyZine modifications: 11 October 2026.")
             Text("GPL-3.0-or-later. Distributed without any warranty. See the full license below.")
             Text(if (BuildConfig.SOURCE_URL.isBlank()) "Local development build. Source repository has not been configured." else "Corresponding source: ${BuildConfig.SOURCE_URL}")
@@ -43,9 +62,19 @@ fun AboutScreen() {
                 TextButton(onClick = { selectedNotice = if (selectedNotice == name) null else name }) {
                     Text(if (name == "COPYING") "GPL license" else if (name == "PRIVACY.txt") "Privacy policy" else name.removeSuffix("-LICENSE").removeSuffix(".txt"))
                 }
-                if (selectedNotice == name) Text(license ?: "Loading…", style = MaterialTheme.typography.bodySmall)
+                if (selectedNotice == name) {
+                    val error = licenseError
+                    if (error != null) {
+                        Text(error, color = MaterialTheme.colorScheme.error)
+                        TextButton(onClick = { licenseAttempt++ }) { Text("Retry license") }
+                    } else Text(license ?: "Loading…", style = MaterialTheme.typography.bodySmall)
+                }
             }
-            Text(notice, style = MaterialTheme.typography.bodySmall)
+            val error = noticeError
+            if (error != null) {
+                Text(error, color = MaterialTheme.colorScheme.error)
+                TextButton(onClick = { noticeAttempt++ }) { Text("Retry notices") }
+            } else Text(notice, style = MaterialTheme.typography.bodySmall)
         }
     }
 }

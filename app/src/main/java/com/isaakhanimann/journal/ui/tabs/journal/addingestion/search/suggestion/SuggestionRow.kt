@@ -173,7 +173,7 @@ fun CustomUnitSuggestionRow(
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             ColorCircle(adaptiveColor = customUnitSuggestion.adaptiveColor)
             Text(
-                text = customUnit.substanceName + " " + customUnit.administrationRoute.displayText.lowercase() + ", " + customUnit.name,
+                text = customUnit.substanceName.orEmpty() + " " + customUnit.administrationRoute?.displayText?.lowercase().orEmpty() + ", " + customUnit.name,
                 style = MaterialTheme.typography.titleMedium
             )
         }
@@ -181,8 +181,8 @@ fun CustomUnitSuggestionRow(
             customUnitSuggestion.dosesAndUnit.forEach { customUnitDose ->
                 SuggestionChip(onClick = {
                     navigateToChooseTime(
-                        customUnit.substanceName,
-                        customUnit.administrationRoute,
+                        customUnit.substanceName ?: customUnit.name,
+                        customUnit.administrationRoute ?: return@SuggestionChip,
                         customUnitDose.dose,
                         customUnit.unit,
                         customUnitDose.isEstimate,

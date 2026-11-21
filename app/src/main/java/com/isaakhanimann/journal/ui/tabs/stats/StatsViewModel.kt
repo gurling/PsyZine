@@ -48,9 +48,8 @@ class StatsViewModel @Inject constructor(entries: ExperienceRepository, calendar
     }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0),
         StatsModel(TimePickerOption.WEEKS_26, false, "", emptyList(), emptyList(), null))
 
-    val sortedConsumerNamesFlow = entries.getSortedIngestions(200).map { ingestions ->
-        ingestions.mapNotNull { it.consumerName }.distinct()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    val sortedConsumerNamesFlow = entries.observeConsumerNames()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
 }
 
 /** Oldest first. Calendar months/years include the current partial period. */
@@ -85,13 +84,13 @@ fun aggregateStatistics(experiences: List<ExperienceWithIngestionsAndCompanions>
         .sortedWith(compareBy<ExperienceWithIngestionsAndCompanions> { it.sortInstant }.thenBy { it.experience.id })
     val filtered = relevant.associateWith { exp -> exp.ingestionsWithCompanionAndCustomUnit.filter { it.ingestion.consumerName == consumer } }
     val all = filtered.values.flatten()
-    val colors = all.sortedBy { it.ingestion.id }.associate { it.ingestion.substanceName to (it.substanceCompanion?.color ?: AdaptiveColor.RED) }
-    val stats = all.groupBy { it.ingestion.substanceName }.map { (name, records) ->
-        StatItem(name, colors.getValue(name), filtered.values.count { list -> list.any { it.ingestion.substanceName == name } }, records.size,
+    val colors = all.sortedBy { it.ingestion.id }.associate { it.displayName to (it.substanceCompanion?.color ?: AdaptiveColor.RED) }
+    val stats = all.groupBy { it.displayName }.map { (name, records) ->
+        StatItem(name, colors.getValue(name), filtered.values.count { list -> list.any { it.displayName == name } }, records.size,
             records.groupBy { it.ingestion.administrationRoute }.entries.sortedBy { it.key.name }.map { RouteCount(it.key, it.value.size) }, totalDose(records))
     }.sortedWith(compareByDescending<StatItem> { it.experienceCount }.thenBy { it.substanceName })
     val buckets = ranges.map { range ->
-        relevant.filter { it.sortInstant in range }.flatMap { exp -> filtered.getValue(exp).map { it.ingestion.substanceName }.distinct() }
+        relevant.filter { it.sortInstant in range }.flatMap { exp -> filtered.getValue(exp).map { it.displayName }.distinct() }
             .groupingBy { it }.eachCount().entries.sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }.thenBy { it.key })
             .map { ColorCount(colors.getValue(it.key), it.value, it.key) }
     }

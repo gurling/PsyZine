@@ -22,13 +22,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.tooling.preview.Preview
-import kotlinx.coroutines.delay
+import com.isaakhanimann.journal.ui.utils.rememberUiTime
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -37,13 +34,7 @@ fun TimeRelativeToNowText(
     time: Instant,
     style: TextStyle = MaterialTheme.typography.bodyMedium
 ) {
-    val now: MutableState<Instant> = remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(key1 = "updateTime") {
-        while (true) {
-            delay(10000L) // update every 10 seconds
-            now.value = Instant.now()
-        }
-    }
+    val now = rememberUiTime(active = true, intervalMillis = 10000L)
     val isInPast = time < now.value
     val relativeTime = if (isInPast) {
         getDurationText(fromInstant = time, toInstant = now.value) + " ago"

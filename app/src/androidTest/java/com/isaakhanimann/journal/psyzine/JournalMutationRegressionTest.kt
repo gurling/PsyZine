@@ -56,6 +56,70 @@ class JournalMutationRegressionTest {
     private suspend fun rejected(action: suspend () -> Unit) {
         try { action(); fail("Stale mutation must fail") } catch (_: IllegalStateException) { }
     }
+
+    private class DelayedPreferenceStore : androidx.datastore.core.DataStore<androidx.datastore.preferences.core.Preferences> {
+        val values = kotlinx.coroutines.flow.MutableStateFlow(androidx.datastore.preferences.core.emptyPreferences())
+        override val data: kotlinx.coroutines.flow.Flow<androidx.datastore.preferences.core.Preferences> = values
+        val gate = CompletableDeferred<Unit>()
+        val started = kotlinx.coroutines.channels.Channel<Unit>(kotlinx.coroutines.channels.Channel.UNLIMITED)
+        val attempts = java.util.concurrent.atomic.AtomicInteger()
+        var reject = true
+        override suspend fun updateData(transform: suspend (androidx.datastore.preferences.core.Preferences) -> androidx.datastore.preferences.core.Preferences): androidx.datastore.preferences.core.Preferences {
+            attempts.incrementAndGet(); started.send(Unit); gate.await()
+            if (reject) throw java.io.IOException("injected write failure")
+            return transform(values.value).also { values.value = it }
+        }
+    }
+    private fun displayModel(store: DelayedPreferenceStore): com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel {
+        val substances = com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository(
+            InstrumentationRegistry.getInstrumentation().targetContext, com.isaakhanimann.journal.data.substances.parse.SubstanceParser())
+        return com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel(entries, attachments, substances,
+            com.isaakhanimann.journal.ui.tabs.journal.addingestion.interactions.InteractionChecker(substances),
+            com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store),
+            com.isaakhanimann.journal.ui.tabs.settings.combinations.CombinationSettingsStorage(store), guard,
+            com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository(db, guard),
+            com.isaakhanimann.journal.data.preferences.PresentationPreferences(store),
+            com.isaakhanimann.journal.service.ActiveExperienceCoordinator(InstrumentationRegistry.getInstrumentation().targetContext,
+                com.isaakhanimann.journal.data.active.ActiveExperienceRepository(db, substances, java.time.Clock.systemUTC()),
+                com.isaakhanimann.journal.data.preferences.PresentationPreferences(store)),
+            SavedStateHandle(mapOf("experienceId" to 42)))
+    }
+    @Test fun failedDisplayPreferenceWritesExplainTheErrorAndRejectDuplicateTapsUntilRetry() = runBlocking<Unit> {
+        val store = DelayedPreferenceStore()
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
+        try {
+            withContext(Dispatchers.Main) {
+                model = displayModel(store); models.put("display", model)
+                model.saveHideTimelineQuantities(true); model.saveHideTimelineQuantities(false)
+            }
+            withTimeout(10000) { store.started.receive() }
+            assertEquals(1, store.attempts.get())
+            store.gate.complete(Unit)
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertTrue(model.displayPreferenceError!!.contains("could not be saved"))
+            assertFalse(com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store).journalDisplaySettingsFlow.first().hideTimelineQuantities)
+            withContext(Dispatchers.Main) { store.reject = false; model.clearDisplayPreferenceError(); model.saveHideTimelineQuantities(true) }
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertEquals(2, store.attempts.get()); assertNull(model.displayPreferenceError)
+            assertTrue(com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store).journalDisplaySettingsFlow.first().hideTimelineQuantities)
+            assertEquals("original", db.experienceDao().getExperience(42)!!.title)
+        } finally { withContext(Dispatchers.Main) { models.clear() } }
+    }
+    @Test fun cancellingADisplayPreferenceWriteKeepsThePreviousValueWithoutAnError() = runBlocking<Unit> {
+        val store = DelayedPreferenceStore()
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
+        try {
+            withContext(Dispatchers.Main) { model = displayModel(store); models.put("display", model); model.saveHideTimelineQuantities(true) }
+            withTimeout(10000) { store.started.receive() }
+            withContext(Dispatchers.Main) { models.clear() }
+            withTimeout(10000) { while (model.savingDisplayPreference) delay(10) }
+            assertNull(model.displayPreferenceError)
+            assertTrue(store.values.value.asMap().isEmpty())
+            assertEquals(1, store.attempts.get())
+        } finally { withContext(Dispatchers.Main) { models.clear() } }
+    }
     private suspend fun staleActions(generation: String) {
         rejected { entries.insert(note.copy(id=0),generation) }
         rejected { entries.insert(rating.copy(id=0),generation) }
@@ -76,6 +140,30 @@ class JournalMutationRegressionTest {
         assertEquals("restored",entries.getExperience(42)!!.title)
         assertEquals("original",entries.getIngestionFlow(1).first()!!.ingestion.notes)
         assertFalse(entries.getExperience(42)!!.isFavorite)
+    }
+    @Test fun contextualEditorsRejectStaleSearchGenerationAndInvalidateOpenSessions() = runBlocking<Unit> {
+        val originalGeneration = guard.currentGeneration()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+        try {
+            val open = JournalEditorSession(scope, guard, SavedStateHandle(mapOf("journalGeneration" to originalGeneration)))
+            open.load { checkNotNull(entries.getExperience(42)) }
+            withTimeout(10000) { while (!open.ready) delay(10) }
+            db.withTransaction {
+                db.experienceDao().deleteEverythingAndInvalidate("reused-search-ids")
+                db.experienceDao().insert(entry.copy(title = "Replacement"))
+                db.experienceDao().insert(ingestion.copy(notes = "Replacement note"))
+            }
+            withTimeout(10000) { while (open.ready) delay(10) }
+            assertNotNull(open.error)
+            var wrote = false
+            open.run { wrote = true }
+            assertFalse(wrote)
+            val stale = JournalEditorSession(scope, guard, SavedStateHandle(mapOf("journalGeneration" to originalGeneration)))
+            stale.load { fail("Old result must not load the replacement record") }
+            withTimeout(10000) { while (stale.loading) delay(10) }
+            assertFalse(stale.ready); assertNotNull(stale.error)
+            assertEquals("Replacement note", entries.getIngestionFlow(1).first()!!.ingestion.notes)
+        } finally { scope.cancel(); scope.coroutineContext[Job]!!.join() }
     }
     @Test fun deletedParentRejectsOldChildrenWithoutChangingGeneration() = runBlocking<Unit> {
         val generation = guard.currentGeneration()
@@ -100,26 +188,61 @@ class JournalMutationRegressionTest {
         assertEquals(ingestion.dose!!.toRawBits(),actual.dose!!.toRawBits())
         assertEquals(ingestion.estimatedDoseStandardDeviation!!.toRawBits(),actual.estimatedDoseStandardDeviation!!.toRawBits())
     }
+    @Test fun ratingEditorRetainsImportedHiddenChoiceAndCanExplicitlyShowTheMarker() = runBlocking<Unit> {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val imported = entries.getRating(1)!!.copy(isHiddenInTimeline = true)
+        db.experienceDao().update(imported)
+        val models = androidx.lifecycle.ViewModelStore()
+        lateinit var model: com.isaakhanimann.journal.ui.tabs.journal.experience.rating.edit.EditRatingViewModel
+        try {
+            instrumentation.runOnMainSync {
+                model = com.isaakhanimann.journal.ui.tabs.journal.experience.rating.edit.EditRatingViewModel(
+                    entries, guard, SavedStateHandle(mapOf("ratingId" to 1)))
+                models.put("rating", model)
+            }
+            withTimeout(10000) { while (model.session.loading) delay(10) }
+            assertTrue(model.session.error, model.session.ready)
+            assertTrue(model.isHiddenInTimeline)
+            val first = CompletableDeferred<Unit>()
+            instrumentation.runOnMainSync { model.onChangeRating(ShulginRatingOption.TWO_PLUS); model.onDoneTap { first.complete(Unit) } }
+            withTimeout(10000) { first.await(); while (model.session.busy) delay(10) }
+            assertTrue(entries.getRating(1)!!.isHiddenInTimeline)
+            val second = CompletableDeferred<Unit>()
+            instrumentation.runOnMainSync { model.changeHiddenInTimeline(false); model.onDoneTap { second.complete(Unit) } }
+            withTimeout(10000) { second.await(); while (model.session.busy) delay(10) }
+            val saved = entries.getRating(1)!!
+            assertFalse(saved.isHiddenInTimeline)
+            assertEquals(ShulginRatingOption.TWO_PLUS, saved.option)
+            assertEquals(rating.time, saved.time)
+            assertEquals(imported.creationDate, saved.creationDate)
+        } finally { instrumentation.runOnMainSync { models.clear() } }
+    }
     @Test fun ingestionEditorNoteOnlySavePreservesUnflaggedUncertaintyAndMissingUnitIsNotSilentlyCleared() = runBlocking<Unit> {
         val instrumentation=InstrumentationRegistry.getInstrumentation()
         val preferenceScope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
         val store=androidx.datastore.preferences.core.PreferenceDataStoreFactory.create(scope=preferenceScope) { File(directory,"editor-preferences.preferences_pb") }
         val preferences=com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences(store)
         try {
-            db.experienceDao().update(ingestion.copy(isDoseAnEstimate=false))
+            db.experienceDao().update(ingestion.copy(isDoseAnEstimate=false, stomachFullness=StomachFullness.HALF_FULL, isHiddenInTimeline=true))
             lateinit var vm: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { vm=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }
-            withTimeout(10000) { while(!vm.session.ready) delay(10) }
+            withTimeout(10000) { while(vm.session.loading) delay(10) }
+            assertTrue(vm.session.error, vm.session.ready)
+            assertEquals(StomachFullness.HALF_FULL, vm.stomachFullness)
+            assertTrue(vm.isHiddenInTimeline)
             val done=CompletableDeferred<Unit>()
             instrumentation.runOnMainSync { vm.note="only note changed"; vm.onDoneTap { done.complete(Unit) } }
             withTimeout(10000) { done.await() }
             val saved=entries.getIngestionFlow(1).first()!!.ingestion
             assertEquals(ingestion.dose!!.toRawBits(),saved.dose!!.toRawBits())
             assertEquals(ingestion.estimatedDoseStandardDeviation!!.toRawBits(),saved.estimatedDoseStandardDeviation!!.toRawBits())
+            assertEquals(StomachFullness.HALF_FULL, saved.stomachFullness)
+            assertTrue(saved.isHiddenInTimeline)
             db.experienceDao().update(saved.copy(customUnitId=999))
             lateinit var missing: com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel
             instrumentation.runOnMainSync { missing=com.isaakhanimann.journal.ui.tabs.journal.experience.editingestion.EditIngestionViewModel(entries,preferences,guard,SavedStateHandle(mapOf("ingestionId" to 1))) }
-            withTimeout(10000) { while(!missing.session.ready) delay(10) }
+            withTimeout(10000) { while(missing.session.loading) delay(10) }
+            assertTrue(missing.session.error, missing.session.ready)
             var closed=false
             instrumentation.runOnMainSync { missing.note="must not clear unit"; missing.onDoneTap { closed=true } }
             withTimeout(10000) { while(missing.session.error==null) delay(10) }

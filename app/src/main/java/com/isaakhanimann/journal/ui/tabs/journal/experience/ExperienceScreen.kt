@@ -70,8 +70,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,7 +106,7 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.AllTimeline
 import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
-import kotlinx.coroutines.delay
+import com.isaakhanimann.journal.ui.utils.rememberUiTime
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -128,10 +126,37 @@ fun ExperienceScreen(
     navigateBack: () -> Unit,
 ) {
     com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
-    val ingestionsWithCompanions = viewModel.ingestionsWithCompanionsFlow.collectAsStateWithLifecycle().value
-    val experience = viewModel.experienceFlow.collectAsStateWithLifecycle().value
-    val photos = viewModel.photos.collectAsStateWithLifecycle().value
-    val isFavorite = viewModel.isFavoriteFlow.collectAsStateWithLifecycle().value
+    if (!viewModel.session.ready) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack)
+        return
+    }
+    val record by viewModel.recordState.collectAsStateWithLifecycle()
+    if (record.loading) {
+        Column(Modifier.padding(24.dp)) {
+            androidx.compose.material3.CircularProgressIndicator()
+            Text("Loading entry")
+        }
+        return
+    }
+    if (record.error != null) {
+        com.isaakhanimann.journal.ui.utils.JournalRecordUnavailable(navigateBack, record.error!!)
+        return
+    }
+    val ingestionsWithCompanions = record.value?.ingestions.orEmpty()
+    val experience = record.value?.experience
+    val photos = record.value?.photos.orEmpty()
+    val isFavorite = experience?.isFavorite ?: false
+    val notificationSettings by viewModel.notificationSettings.collectAsStateWithLifecycle()
+    viewModel.notificationError?.let { message ->
+        AlertDialog(onDismissRequest = viewModel::clearNotificationError,
+            title = { Text("Live notification") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::clearNotificationError) { Text("OK") } })
+    }
+    viewModel.displayPreferenceError?.let { message ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = viewModel::clearDisplayPreferenceError,
+            title = { Text("Preference could not be saved") }, text = { Text(message) },
+            confirmButton = { TextButton(onClick = viewModel::clearDisplayPreferenceError) { Text("OK") } })
+    }
     val oneExperienceScreenModel = OneExperienceScreenModel(
         isFavorite = isFavorite,
         title = experience?.title ?: "",
@@ -147,9 +172,24 @@ fun ExperienceScreen(
         ratings = viewModel.ratingsFlow.collectAsStateWithLifecycle().value,
         timedNotesSorted = viewModel.timedNotesSortedFlow.collectAsStateWithLifecycle().value,
         consumersWithIngestions = viewModel.consumersWithIngestionsFlow.collectAsStateWithLifecycle().value,
-        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsStateWithLifecycle().value
+        dataForEffectLines = viewModel.dataForEffectTimelinesFlow.collectAsStateWithLifecycle().value,
+        calculationNotices = viewModel.cumulativeProjectionFlow.collectAsStateWithLifecycle().value.notices,
     )
     ExperienceScreen(
+        notificationContent = {
+            val selected = notificationSettings.manualTarget?.let {
+                it.experienceId == experience?.id && it.generation == viewModel.session.generation
+            } == true
+            Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                TextButton(onClick = { viewModel.changeLiveNotification(selected) }, enabled = !viewModel.notificationBusy) {
+                    Text(if (viewModel.notificationBusy) "Updating live notification…"
+                        else if (selected) "Stop live notification" else "Show this entry in live notification")
+                }
+                if (selected) Text("Selected for the live notification while its estimated timeline remains active.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        },
+        toleranceContent = { com.isaakhanimann.journal.ui.tabs.stats.tolerance.ExperienceTolerance() },
         lazyPhotos = {
             item(key = "photo-title") {
                 Text("Photos", style = MaterialTheme.typography.titleLarge, modifier = Modifier.padding(vertical = 8.dp))
@@ -179,7 +219,9 @@ fun ExperienceScreen(
         onChangeTimeDisplayOption = viewModel::saveTimeDisplayOption,
         navigateToTimelineScreen = navigateToTimelineScreen,
         areDosageDotsHidden = viewModel.areDosageDotsHiddenFlow.collectAsStateWithLifecycle().value,
-        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value
+        isTimelineHidden = viewModel.isTimelineHiddenFlow.collectAsStateWithLifecycle().value,
+        saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
+        savingDisplayPreference = viewModel.savingDisplayPreference,
     )
 }
 
@@ -243,6 +285,10 @@ fun ExperienceScreen(
     isTimelineHidden: Boolean,
     photosContent: @Composable () -> Unit = {},
     lazyPhotos: LazyListScope.() -> Unit = {},
+    saveHideTimelineQuantities: (Boolean) -> Unit = {},
+    savingDisplayPreference: Boolean = false,
+    toleranceContent: @Composable () -> Unit = {},
+    notificationContent: @Composable () -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -269,6 +315,7 @@ fun ExperienceScreen(
                 .padding(horizontal = horizontalPadding)
         ) {
             val verticalCardPadding = 4.dp
+            item(key = "live-notification") { notificationContent() }
             item(key = "timeline") { MyTimelineSection(
                 timelineDisplayOption = timelineDisplayOption,
                 verticalCardPadding = verticalCardPadding,
@@ -278,9 +325,14 @@ fun ExperienceScreen(
                 timeDisplayOption = timeDisplayOption,
                 isOralDisclaimerHidden = isOralDisclaimerHidden,
                 onChangeIsOralDisclaimerHidden = onChangeIsOralDisclaimerHidden,
+                saveHideTimelineQuantities = saveHideTimelineQuantities,
+                savingDisplayPreference = savingDisplayPreference,
             )
             }
             if (oneExperienceScreenModel.ingestionElements.isNotEmpty()) {
+                item(key = "tolerance") {
+                    if (!com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTolerance) toleranceContent()
+                }
                 item(key = "ingestions") {
                 MyIngestionList(
                     verticalCardPadding = verticalCardPadding,
@@ -292,6 +344,15 @@ fun ExperienceScreen(
                 }
             }
             val cumulativeDoses = oneExperienceScreenModel.cumulativeDoses
+            if (oneExperienceScreenModel.calculationNotices.isNotEmpty()) {
+                item(key = "calculation-notices") {
+                    Column(Modifier.padding(horizontal = horizontalPadding, vertical = 8.dp)) {
+                        oneExperienceScreenModel.calculationNotices.forEach {
+                            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    }
+                }
+            }
             if (cumulativeDoses.isNotEmpty()) {
                 item(key = "cumulative") {
                 CumulativeDosesSection(
@@ -348,7 +409,8 @@ fun ExperienceScreen(
             }
             }
             val interactions = oneExperienceScreenModel.interactions
-            item(key = "interactions") { AnimatedVisibility(visible = interactions.isNotEmpty()) {
+            item(key = "interactions") { AnimatedVisibility(visible = interactions.isNotEmpty() &&
+                !com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideInteractions) {
                 ExperienceInteractionsSection(
                     verticalCardPadding = verticalCardPadding,
                     interactions = interactions,
@@ -443,6 +505,7 @@ private fun ConsumerSection(
                         model = timelineModel,
                         timeDisplayOption = timeDisplayOption,
                         isShowingCurrentTime = true,
+                        hideQuantities = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTimelineQuantities,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
@@ -530,7 +593,7 @@ private fun ShulginRatingsSection(
                     }
                     .fillMaxWidth()
                     .padding(vertical = 8.dp, horizontal = horizontalPadding),
-                ratingSign = pair.second.option.sign) {
+                ratingSign = pair.second.option.sign, isHiddenInTimeline = pair.second.isHiddenInTimeline) {
                 NoteOrRatingTimeOrDurationText(
                     time = pair.first,
                     timeDisplayOption = timeDisplayOption,
@@ -686,6 +749,8 @@ private fun MyTimelineSection(
     timeDisplayOption: TimeDisplayOption,
     isOralDisclaimerHidden: Boolean,
     onChangeIsOralDisclaimerHidden: (Boolean) -> Unit,
+    saveHideTimelineQuantities: (Boolean) -> Unit,
+    savingDisplayPreference: Boolean,
 ) {
     when (timelineDisplayOption) {
         TimelineDisplayOption.Hidden -> {}
@@ -717,14 +782,19 @@ private fun MyTimelineSection(
                         .padding(bottom = 10.dp),
                     verticalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
+                    val hideQuantities = com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings.current.hideTimelineQuantities
                     AllTimelines(
                         model = timelineModel,
                         timeDisplayOption = timeDisplayOption,
                         isShowingCurrentTime = true,
+                        hideQuantities = hideQuantities,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(200.dp)
                     )
+                    TextButton(onClick = { saveHideTimelineQuantities(!hideQuantities) }, enabled = !savingDisplayPreference) {
+                        Text(if (hideQuantities) "Show quantity details" else "Hide quantity details")
+                    }
                     val hasOralIngestion =
                         oneExperienceScreenModel.ingestionElements.any { it.ingestionWithCompanionAndCustomUnit.ingestion.administrationRoute == AdministrationRoute.ORAL }
                     if (hasOralIngestion && !isOralDisclaimerHidden) {
@@ -979,13 +1049,7 @@ private fun ExperienceTopBar(
 
 @Composable
 private fun LastIngestionRelativeToNowText(lastIngestionTime: Instant) {
-    val now: MutableState<Instant> = remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(key1 = "updateTime") {
-        while (true) {
-            delay(10000L) // update every 10 seconds
-            now.value = Instant.now()
-        }
-    }
+    val now = rememberUiTime(active = true, intervalMillis = 10000L)
     val isInPast = lastIngestionTime < now.value
     val relativeTime = if (isInPast) {
         "Last ingestion was " + getDurationText(
@@ -1007,13 +1071,7 @@ private fun LastIngestionRelativeToNowText(lastIngestionTime: Instant) {
 
 @Composable
 private fun NowRelativeToStartTimeText(startTime: Instant) {
-    val now: MutableState<Instant> = remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(key1 = "updateTime") {
-        while (true) {
-            delay(10000L) // update every 10 seconds
-            now.value = Instant.now()
-        }
-    }
+    val now = rememberUiTime(active = true, intervalMillis = 10000L)
     val isStartInPast = startTime < now.value
     val relativeTime = if (isStartInPast) {
         "Now " + getDurationText(

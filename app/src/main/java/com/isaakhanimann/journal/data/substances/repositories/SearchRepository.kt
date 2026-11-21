@@ -27,6 +27,11 @@ class SearchRepository @Inject constructor(
     val substanceRepo: SubstanceRepository
 ) : SearchRepositoryInterface {
 
+    fun getMatchingSubjects(searchText: String, filterCategories: List<String>, recents: List<String>): List<SubstanceWithCategories> {
+        return rankCatalogSubjects(substanceRepo.searchEntries().map { it.ranking }, searchText, filterCategories, recents)
+            .mapNotNull(substanceRepo::getSubstanceWithCategories)
+    }
+
     override fun getMatchingSubstances(searchText: String, filterCategories: List<String>,
         recentlyUsedSubstanceNamesSorted: List<String>): List<SubstanceWithCategories> {
         val query = normalizeSearch(searchText)

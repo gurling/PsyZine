@@ -51,12 +51,15 @@ methods=(
 platform_classes=com.isaakhanimann.journal.psyzine.MainActivityLargeTextTest,com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,com.isaakhanimann.journal.psyzine.NavigationScaffoldRegressionTest
 for method in "${methods[@]}"; do platform_classes+=",$test_class#$method"; done
 controlled_classes="com.isaakhanimann.journal.psyzine.GraphDetailLayoutTest,$test_class,com.isaakhanimann.journal.psyzine.CustomUnitRegressionTest,com.isaakhanimann.journal.psyzine.UiAccessibilityRegressionTest,com.isaakhanimann.journal.psyzine.NavigationScaffoldRegressionTest"
+platform_expected=19
+controlled_expected=45
+passing_tests=0
 run_profile() {
     local profile="$1" font="$2" density="$3" mode="$4"
-    local classes="$controlled_classes" expected=44
+    local classes="$controlled_classes" expected="$controlled_expected"
     local args=() folders=(large-text-captures custom-unit-captures)
     if [[ "$mode" = platform ]]; then
-        classes="$platform_classes"; expected=19
+        classes="$platform_classes"; expected="$platform_expected"
         args=(-e platformFontScale true -e expectedFontScale "$font")
         folders=(large-text-captures main-large-text-captures)
     fi
@@ -84,17 +87,18 @@ if not passed:
     raise SystemExit(f'{log}: expected {expected} passing tests with no skipped cases.\n{text[-7000:]}')
 print(f'{output.name}: {expected} tests passed')
 PY
+    passing_tests=$((passing_tests + expected))
 }
 run_profile platform-max 2.0 240 platform
 run_profile platform-medium 1.3 195 platform
 run_profile platform-large 1.5 240 platform
 run_profile controlled 1.0 160 controlled
-python3 - "$serial" "$sdk" <<'PY'
+python3 - "$serial" "$sdk" "$passing_tests" <<'PY'
 import hashlib, json, subprocess, sys
 from pathlib import Path
 files = ['app/build/outputs/apk/direct/debug/app-direct-debug.apk',
          'app/build/outputs/apk/androidTest/direct/debug/app-direct-debug-androidTest.apk']
-record = {'serial': sys.argv[1], 'sdk': int(sys.argv[2]), 'passingTests': 97,
+record = {'serial': sys.argv[1], 'sdk': int(sys.argv[2]), 'passingTests': int(sys.argv[3]),
           'commit': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
           'apks': {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in files}}
 Path('screenshots/large-text/verification.json').write_text(json.dumps(record, indent=2) + '\n')

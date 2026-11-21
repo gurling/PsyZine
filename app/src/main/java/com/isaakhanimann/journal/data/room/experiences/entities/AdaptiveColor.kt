@@ -73,6 +73,7 @@ enum class AdaptiveColor(val isPreferred: Boolean) {
     GRAYISH_MAGENTA(false),
     HOT_PINK(false),
     JAZZBERRY_JAM(false),
-    MAROON(false);
+    MAROON(false),
+    CITRUS_LEAF(false);
     fun getComposeColor(palette: ThemePalette): Color = DomainColors.adaptive(this, palette)
 }

@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.ShulginRating
 import com.isaakhanimann.journal.data.room.experiences.entities.ShulginRatingOption
@@ -34,10 +34,8 @@ import com.isaakhanimann.journal.ui.utils.getLocalDateTime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -47,12 +45,24 @@ import javax.inject.Inject
 class AddRatingViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var selectedRating by mutableStateOf(ShulginRatingOption.TWO_PLUS)
     var isThisOverallRating by mutableStateOf(false)
-    val experienceId = state.toRoute<AddRatingRoute>().experienceId
+    fun changeOverallRating(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isThisOverallRating = value
+        state["ratingOverall"] = value
+    }
+    var isHiddenInTimeline by mutableStateOf(false)
+        private set
+    fun changeHiddenInTimeline(value: Boolean) {
+        if (!session.ready || session.busy) return
+        isHiddenInTimeline = value
+        state["ratingHiddenInTimeline"] = value
+    }
+    val experienceId = AddRatingRoute(state.journalRecordId("experienceId")).experienceId
     var localDateTimeFlow = MutableStateFlow(LocalDateTime.now())
 
     var isThereAlreadyAnOverallRatingFlow = experienceRepo.getRatingsFlow(experienceId).map { ratings ->
@@ -65,38 +75,44 @@ class AddRatingViewModel @Inject constructor(
 
     init {
         session.load {
-            check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted. Close this screen." }
+            isHiddenInTimeline = state.get<Boolean>("ratingHiddenInTimeline") ?: false
             val experience = experienceRepo.getExperience(id = experienceId) ?: error("This entry was deleted. Close this screen.")
             val isOldExperience = experience.sortDate.isBefore(Instant.now().minus(12, ChronoUnit.HOURS))
             if (isOldExperience) {
-                localDateTimeFlow.emit(experience.sortDate.getLocalDateTime())
+                localDateTimeFlow.value = experience.sortDate.getLocalDateTime()
             }
+            selectedRating = ShulginRatingOption.entries.firstOrNull { it.name == state.get<String>("ratingOption") } ?: selectedRating
+            isThisOverallRating = state.get<Boolean>("ratingOverall") ?: false
+            localDateTimeFlow.value = state.get<String>("ratingTime")?.let { LocalDateTime.parse(it) } ?: localDateTimeFlow.value
+            state["ratingOption"] = selectedRating.name
+            state["ratingOverall"] = isThisOverallRating
+            state["ratingTime"] = localDateTimeFlow.value.toString()
+            state["ratingHiddenInTimeline"] = isHiddenInTimeline
         }
     }
 
     fun onChangeTime(newLocalDateTime: LocalDateTime) {
-        viewModelScope.launch {
-            localDateTimeFlow.emit(newLocalDateTime)
-        }
+        if (!session.ready || session.busy) return
+        localDateTimeFlow.value = newLocalDateTime
+        state["ratingTime"] = newLocalDateTime.toString()
     }
 
     fun onChangeRating(newRating: ShulginRatingOption) {
+        if (!session.ready || session.busy) return
         selectedRating = newRating
+        state["ratingOption"] = newRating.name
     }
 
     fun onDoneTap(onSuccess: () -> Unit) {
+        if (!session.ready || session.busy) return
+        val newRating = ShulginRating(
+            time = if (isThisOverallRating) null else localDateTimeFlow.value.getInstant(),
+            creationDate = Instant.now(),
+            option = selectedRating,
+            experienceId = experienceId,
+            isHiddenInTimeline = isHiddenInTimeline,
+        )
         session.run(onSuccess) {
-            val selectedInstant = if (isThisOverallRating) {
-                null
-            } else {
-                localDateTimeFlow.firstOrNull()?.getInstant()
-            }
-            val newRating = ShulginRating(
-                time = selectedInstant,
-                creationDate = Instant.now(),
-                option = selectedRating,
-                experienceId = experienceId
-            )
             experienceRepo.insert(newRating, session.generation)
         }
     }

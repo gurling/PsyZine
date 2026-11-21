@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.NavDestination.Companion.hierarchy
+import androidx.navigation.NavGraph
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
@@ -34,6 +35,8 @@ import com.isaakhanimann.journal.ui.main.navigation.graphs.journalGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.saferGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.searchGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.settingsGraph
+import com.isaakhanimann.journal.ui.main.navigation.graphs.tagsGraph
+import com.isaakhanimann.journal.ui.main.navigation.graphs.definitionsGraph
 import com.isaakhanimann.journal.ui.main.navigation.graphs.statsGraph
 import com.isaakhanimann.journal.ui.main.navigation.JournalTopLevelRoute
 import com.isaakhanimann.journal.ui.main.navigation.topLevelRoutes
@@ -46,7 +49,13 @@ fun MainScreen(
 ) {
     val accepted = viewModel.isAcceptedFlow.collectAsStateWithLifecycle().value
     if (accepted == null) return
+    val displaySettings by viewModel.journalDisplaySettings.collectAsStateWithLifecycle()
     if (accepted) {
+        viewModel.navigationError?.let { message -> androidx.compose.material3.AlertDialog(
+            onDismissRequest = viewModel::clearNavigationError, title = { androidx.compose.material3.Text("Could not open ingestion form") },
+            text = { androidx.compose.material3.Text(message) }, confirmButton = {
+                androidx.compose.material3.TextButton(onClick = viewModel::clearNavigationError) { androidx.compose.material3.Text("OK") }
+            }) }
         val navController = rememberNavController()
         androidx.compose.runtime.LaunchedEffect(experienceRequest?.token) {
             experienceRequest?.let {
@@ -54,7 +63,14 @@ fun MainScreen(
                 val editingSameEntry = entry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>() == true &&
                     entry.toRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.EditExperienceRoute>().experienceId == it.experienceId
                 // Keep an editor for this entry in focus; otherwise push without discarding drafts.
-                if (!editingSameEntry && viewModel.canOpen(it)) {
+                if (it.action == ExperienceNavigationAction.LOG_INGESTION) {
+                    val adding = entry?.destination?.hierarchy?.any { destination ->
+                        destination.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.AddIngestionRoute>()
+                    } == true
+                    if (!adding && viewModel.prepareNotificationIngestion(it)) {
+                        navController.navigate(com.isaakhanimann.journal.ui.main.navigation.graphs.AddIngestionRoute) { launchSingleTop = true }
+                    }
+                } else if (!editingSameEntry && viewModel.canOpen(it)) {
                     navController.navigate(com.isaakhanimann.journal.ui.main.navigation.graphs.ExperienceRoute(it.experienceId)) { launchSingleTop = true }
                 }
                 consumeExperienceRequest()
@@ -62,18 +78,28 @@ fun MainScreen(
         }
         val navBackStackEntry by navController.currentBackStackEntryAsState()
         val currentDestination = navBackStackEntry?.destination
+        val sharedOriginDestination = currentDestination?.let {
+            it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagEditRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.SubjectTagsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.tags.TagSubjectsRoute>() ||
+                it.hasRoute<com.isaakhanimann.journal.ui.tabs.settings.definitions.DefinitionEditRoute>()
+        } == true
+        val screenOrigin = if (sharedOriginDestination) navBackStackEntry?.arguments?.getString("origin") else null
         val items = topLevelRoutes.map { topLevelRoute ->
-            val selected = currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
+            val selected = screenOrigin == topLevelRoute.name || currentDestination?.hierarchy?.any { it.hasRoute(topLevelRoute.route::class) } == true
             PsyZineNavigationItem(
                 name = topLevelRoute.name,
                 icon = if (selected) topLevelRoute.filledIcon else topLevelRoute.outlinedIcon,
                 selected = selected,
                 onClick = {
                     if (selected) {
-                        val isAlreadyOnTopOfTab =
-                            topLevelRoutes.any { it.route == currentDestination?.route }
-                        if (!isAlreadyOnTopOfTab) {
-                            navController.popBackStack()
+                        val graph = currentDestination?.hierarchy?.filterIsInstance<NavGraph>()
+                            ?.firstOrNull { it.hasRoute(topLevelRoute.route::class) }
+                            ?: (navController.graph.findNode(topLevelRoute.route) as? NavGraph)
+                        val root = graph?.findStartDestination()
+                        if (root != null && currentDestination?.id != root.id) {
+                            navController.popBackStack(root.id, inclusive = false)
                         }
                     } else {
                         navController.navigate(topLevelRoute.route) {
@@ -94,9 +120,17 @@ fun MainScreen(
             )
         }
         PsyZineNavigationScaffold(
-            layoutType = if (navBackStackEntry?.destination?.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
+            layoutType = if (navBackStackEntry?.destination?.let {
+                it.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.PhotoViewerRoute>() ||
+                    it.hasRoute<com.isaakhanimann.journal.ui.main.navigation.graphs.SearchPhotoViewerRoute>()
+            } == true) androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteType.None else androidx.compose.material3.adaptive.navigationsuite.NavigationSuiteScaffoldDefaults.calculateFromAdaptiveInfo(androidx.compose.material3.adaptive.currentWindowAdaptiveInfo()),
             items = items
         ) {
+            val journalDateTime = com.isaakhanimann.journal.ui.utils.rememberUiTime(displaySettings.relativeDates, 60_000L)
+            androidx.compose.runtime.CompositionLocalProvider(
+                com.isaakhanimann.journal.ui.utils.LocalJournalDisplaySettings provides displaySettings,
+                com.isaakhanimann.journal.ui.utils.LocalJournalDateTime provides journalDateTime
+            ) {
             NavHost(
                 navController,
                 startDestination = JournalTopLevelRoute
@@ -106,6 +140,9 @@ fun MainScreen(
                 searchGraph(navController)
                 saferGraph(navController)
                 settingsGraph(navController)
+                tagsGraph(navController)
+                definitionsGraph(navController)
+            }
             }
         }
     } else {

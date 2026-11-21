@@ -32,7 +32,7 @@ fun suggestedUnitPlural(unit: String): String = when {
 
 /** Length-prefixed values make labels unambiguous; raw bits preserve exact numeric identity. Notes are not a definition change. */
 fun CustomUnit.definitionFingerprint(): String {
-    val values = listOf(substanceName, administrationRoute.name, name, unit, unitPlural,
+    val values = listOf(substanceName, administrationRoute?.name, name, unit, unitPlural,
         originalUnit, dose?.toRawBits()?.toString(), estimatedDoseStandardDeviation?.toRawBits()?.toString(),
         isEstimate.toString(), isArchived.toString())
     val bytes = values.joinToString("") { if (it == null) "-1:" else "${it.length}:$it" }.toByteArray(Charsets.UTF_8)

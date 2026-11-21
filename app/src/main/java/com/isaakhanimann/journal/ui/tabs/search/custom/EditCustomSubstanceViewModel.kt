@@ -30,72 +30,77 @@ import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import com.isaakhanimann.journal.ui.main.navigation.graphs.EditCustomSubstanceRoute
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 @HiltViewModel
 class EditCustomSubstanceViewModel @Inject constructor(
     val experienceRepo: ExperienceRepository,
     private val sessionGuard: JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
 
-    var id = 0
-    var name by mutableStateOf("")
-    var units by mutableStateOf("")
-    var description by mutableStateOf("")
-    private var generation: String? = null
-    var isSaving by mutableStateOf(false)
-        private set
-    var saveError by mutableStateOf<String?>(null)
-        private set
-    fun dismissSaveError() { saveError = null }
+    val id = state.toRoute<EditCustomSubstanceRoute>().customSubstanceId
+    val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
+    private var draftName by mutableStateOf(state.get<String>("customSubstanceName") ?: "")
+    private var draftUnits by mutableStateOf(state.get<String>("customSubstanceUnits") ?: "")
+    private var draftDescription by mutableStateOf(state.get<String>("customSubstanceDescription") ?: "")
 
-    val isValid get() = id > 0 && name.isNotBlank() && units.isNotBlank() && !isSaving
+    var name: String
+        get() = draftName
+        set(value) {
+            draftName = value
+            state["customSubstanceName"] = value
+        }
+    var units: String
+        get() = draftUnits
+        set(value) {
+            draftUnits = value
+            state["customSubstanceUnits"] = value
+        }
+    var description: String
+        get() = draftDescription
+        set(value) {
+            draftDescription = value
+            state["customSubstanceDescription"] = value
+        }
+
+    val isValid get() = session.ready && !session.busy && name.isNotBlank() && units.isNotBlank()
 
     init {
-        val editCustomSubstanceRoute = state.toRoute<EditCustomSubstanceRoute>()
-        val customSubstanceId = editCustomSubstanceRoute.customSubstanceId
-        viewModelScope.launch {
-            try {
-                generation = state.get<String>("journalGeneration") ?: sessionGuard.currentGeneration().also { state["journalGeneration"] = it }
-                val customSubstance = sessionGuard.withSession(generation) { experienceRepo.getCustomSubstance(customSubstanceId) }
-                checkNotNull(customSubstance) { "This custom substance was deleted. Close this screen." }
-                id = customSubstanceId
-                name = customSubstance.name
-                units = customSubstance.units
-                description = customSubstance.description
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                saveError = if (e is IllegalStateException) e.message else "Could not load this substance. Close this screen and try again."
+        session.load {
+            val substance = checkNotNull(experienceRepo.getCustomSubstance(id)) {
+                "This custom substance was deleted. Close this screen."
             }
+            if (!state.contains("customSubstanceName")) name = substance.name
+            if (!state.contains("customSubstanceUnits")) units = substance.units
+            if (!state.contains("customSubstanceDescription")) description = substance.description
         }
     }
 
     fun onDoneTap(dismiss: () -> Unit) {
-        if (isValid) mutate(dismiss) {
-            check(experienceRepo.getCustomSubstance(id) != null) { "This custom substance was deleted. Close this screen." }
-            experienceRepo.update(CustomSubstance(id, name, units, description))
+        if (!isValid) return
+        val substance = CustomSubstance(id, name, units, description)
+        session.run(onSuccess = dismiss) {
+            sessionGuard.withSession(session.generation) {
+                requireCurrentSubstance()
+                experienceRepo.update(substance)
+            }
         }
     }
 
     fun deleteCustomSubstance(dismiss: () -> Unit) {
-        if (id > 0 && !isSaving) mutate(dismiss) { experienceRepo.delete(CustomSubstance(id, name, units, description)) }
+        val substance = CustomSubstance(id, name, units, description)
+        session.run(onSuccess = dismiss) {
+            sessionGuard.withSession(session.generation) {
+                requireCurrentSubstance()
+                experienceRepo.delete(substance)
+            }
+        }
     }
 
-    private fun mutate(dismiss: () -> Unit, action: suspend () -> Unit) {
-        isSaving = true
-        viewModelScope.launch {
-            try {
-                sessionGuard.withSession(generation, action = action)
-                dismiss()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                saveError = if (e is IllegalStateException) e.message else "Could not save changes. Try again."
-            } finally { isSaving = false }
+    private suspend fun requireCurrentSubstance() {
+        if (experienceRepo.getCustomSubstance(id) == null) {
+            throw com.isaakhanimann.journal.data.room.StaleJournalSession()
         }
     }
 }

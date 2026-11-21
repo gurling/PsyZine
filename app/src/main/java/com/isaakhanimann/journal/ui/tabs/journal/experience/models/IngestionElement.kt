@@ -20,9 +20,30 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.models
 
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDuration
+import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
+import com.isaakhanimann.journal.data.definitions.ResolvedDose
+import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
+import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
+
+data class CalculatedComponent(val dose: ResolvedDose, val numDots: Int?, val isShownAsCurve: Boolean,
+    val pluralUnits: String? = null) {
+    val description: String get() {
+        val amount = dose.quantity.amount ?: return "Unknown dose"
+        val unit = if (amount == 1.0) dose.units.orEmpty() else pluralUnits ?: dose.units.orEmpty()
+        val number = if (dose.quantity.isEstimate) {
+            dose.quantity.uncertainty?.let { "${amount.toReadableString()}±${it.toReadableString()}" }
+                ?: "~${amount.toReadableString()}"
+        } else amount.toReadableString()
+        return "$number $unit".trim()
+    }
+}
 
 data class IngestionElement(
     val ingestionWithCompanionAndCustomUnit: IngestionWithCompanionAndCustomUnit,
     val roaDuration: RoaDuration?,
-    val numDots: Int?
+    val numDots: Int?,
+    val doseReference: RoaDose? = null,
+    val components: List<CalculatedComponent> = emptyList(),
+    val calculationError: String? = null,
+    val displayColor: AdaptiveColor? = null,
 )

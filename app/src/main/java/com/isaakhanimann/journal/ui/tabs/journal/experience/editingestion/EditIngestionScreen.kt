@@ -118,9 +118,17 @@ fun EditIngestionScreen(
     navigateToAddIngestion: () -> Unit,
     navigateBack: () -> Unit
 ) {
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     EditIngestionScreen(
         note = viewModel.note,
+        isHiddenInTimeline = viewModel.isHiddenInTimeline,
+        changeHiddenInTimeline = viewModel::changeHiddenInTimeline,
+        stomachFullness = viewModel.stomachFullness,
+        changeStomachFullness = viewModel::changeStomachFullness,
+        showStomachFullness = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL ||
+            viewModel.ingestion?.stomachFullness != null,
+        fullnessAffectsTimeline = viewModel.ingestion?.administrationRoute == com.isaakhanimann.journal.data.substances.AdministrationRoute.ORAL,
+        editorControlsEnabled = !viewModel.session.busy,
         onNoteChange = { viewModel.note = it },
         isEstimate = viewModel.isEstimate,
         onChangeIsEstimate = viewModel::onChangeIsEstimate,
@@ -234,7 +242,14 @@ fun EditIngestionScreen(
     customUnit: CustomUnit?,
     onCustomUnitChange: (CustomUnit?) -> Unit,
     otherCustomUnits: List<CustomUnit>,
-    addIngestionWithClonedTime: () -> Unit
+    addIngestionWithClonedTime: () -> Unit,
+    showStomachFullness: Boolean = false,
+    stomachFullness: com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness? = null,
+    changeStomachFullness: (com.isaakhanimann.journal.data.room.experiences.entities.StomachFullness?) -> Unit = {},
+    fullnessAffectsTimeline: Boolean = true,
+    editorControlsEnabled: Boolean = true,
+    isHiddenInTimeline: Boolean = false,
+    changeHiddenInTimeline: (Boolean) -> Unit = {},
 ) {
     val density = LocalDensity.current
     var fabHeight by remember { mutableStateOf(56.dp) }
@@ -458,7 +473,13 @@ fun EditIngestionScreen(
                     singleLine = true
                 )
             }
+            if (showStomachFullness) CardWithTitle(title = "Stomach fullness") {
+                com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.StomachFullnessPicker(
+                    stomachFullness, changeStomachFullness, enabled = editorControlsEnabled, affectsTimeline = fullnessAffectsTimeline)
+            }
             CardWithTitle(title = "Time") {
+                com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.IngestionTimelineVisibility(
+                    isHiddenInTimeline, changeHiddenInTimeline, enabled = editorControlsEnabled)
                 Column(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,

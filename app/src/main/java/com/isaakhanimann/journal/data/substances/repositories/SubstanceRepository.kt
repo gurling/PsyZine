@@ -39,7 +39,9 @@ class SubstanceRepository @Inject constructor(
     @Volatile private var loaded: LoadedSubstances? = null
     private val data get() = checkNotNull(loaded) { "Substances are not initialized. Await initialize() before reading." }
 
-    data class SearchEntry(val value: SubstanceWithCategories, val primary: String, val names: List<String>)
+    data class SearchEntry(val value: SubstanceWithCategories, val primary: String, val names: List<String>) {
+        val ranking = CatalogSearchRecord(value.substance.name, value.substance.commonNames, value.substance.categories.toSet())
+    }
     private data class LoadedSubstances(val file: SubstanceFile, val categories: List<SubstanceWithCategories>,
         val byName: Map<String, SubstanceWithCategories>, val search: List<SearchEntry>)
 
@@ -69,9 +71,9 @@ class SubstanceRepository @Inject constructor(
     override fun getAllSubstances(): List<Substance> = data.file.substances
     override fun getAllSubstancesWithCategories(): List<SubstanceWithCategories> = data.categories
     override fun getAllCategories(): List<Category> = data.file.categories
-    override fun getSubstance(substanceName: String): Substance? = data.file.substancesMap[substanceName]
+    override fun getSubstance(substanceName: String?): Substance? = substanceName?.let { data.file.substancesMap[it] }
     override fun getCategory(categoryName: String): Category? = data.file.categories.firstOrNull { it.name == categoryName }
-    override fun getSubstanceWithCategories(substanceName: String): SubstanceWithCategories? = data.byName[substanceName]
+    override fun getSubstanceWithCategories(substanceName: String?): SubstanceWithCategories? = substanceName?.let { data.byName[it] }
 }
 
 fun normalizeSearch(value: String): String = value.filter { it != '-' && it != ' ' }.lowercase(java.util.Locale.ROOT)

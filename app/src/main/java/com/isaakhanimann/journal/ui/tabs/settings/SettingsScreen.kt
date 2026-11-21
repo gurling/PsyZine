@@ -74,6 +74,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -149,6 +153,13 @@ fun SettingsScreen(
         saveIsTimelineHidden = viewModel::saveIsTimelineHidden,
         areSubstanceHeightsIndependent = viewModel.areSubstanceHeightsIndependentFlow.collectAsStateWithLifecycle().value,
         saveAreSubstanceHeightsIndependent = viewModel::saveAreSubstanceHeightsIndependent,
+        journalDisplaySettings = viewModel.journalDisplaySettings.collectAsStateWithLifecycle().value,
+        saveShowComponents = viewModel::saveShowComponents,
+        saveHideTimelineQuantities = viewModel::saveHideTimelineQuantities,
+        saveHideInteractions = viewModel::saveHideInteractions,
+        saveHideTolerance = viewModel::saveHideTolerance,
+        saveRelativeDates = viewModel::saveRelativeDates,
+        saveRecentTimePresets = viewModel::saveRecentTimePresets,
     )
 }
 
@@ -180,6 +191,13 @@ fun SettingsScreen(
     saveIsTimelineHidden: (Boolean) -> Unit,
     areSubstanceHeightsIndependent: Boolean,
     saveAreSubstanceHeightsIndependent: (Boolean) -> Unit,
+    journalDisplaySettings: com.isaakhanimann.journal.data.preferences.JournalDisplaySettings = com.isaakhanimann.journal.data.preferences.JournalDisplaySettings(),
+    saveShowComponents: (Boolean) -> Unit = {},
+    saveHideTimelineQuantities: (Boolean) -> Unit = {},
+    saveHideInteractions: (Boolean) -> Unit = {},
+    saveHideTolerance: (Boolean) -> Unit = {},
+    saveRelativeDates: (Boolean) -> Unit = {},
+    saveRecentTimePresets: (Boolean) -> Unit = {},
 ) {
     Scaffold(
         topBar = {
@@ -250,6 +268,24 @@ fun SettingsScreen(
                     )
                 }
                 HorizontalDivider()
+                JournalDisplaySwitch("Show components in experience", journalDisplaySettings.showComponents,
+                    "Use direct ingredient names on experience cards. Nested definitions keep their name.", saveShowComponents)
+                HorizontalDivider()
+                JournalDisplaySwitch("Show relative dates", journalDisplaySettings.relativeDates,
+                    "Use elapsed or upcoming time on experience cards. Calendar views keep calendar dates.", saveRelativeDates)
+                HorizontalDivider()
+                JournalDisplaySwitch("Use recent-time presets", journalDisplaySettings.recentTimePresets,
+                    "Open new-ingestion time entry with relative presets. Switching modes retains the entered times.", saveRecentTimePresets)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide timeline quantity details", journalDisplaySettings.hideTimelineQuantities,
+                    "Keep the graph and time cursor visible.", saveHideTimelineQuantities)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide interactions in experiences", journalDisplaySettings.hideInteractions,
+                    "Hide the experience summary. Interaction checks when adding ingestions remain available.", saveHideInteractions)
+                HorizontalDivider()
+                JournalDisplaySwitch("Hide tolerance in experiences", journalDisplaySettings.hideTolerance,
+                    "Hide the inline panel. Tolerance remains available from Statistics.", saveHideTolerance)
+                HorizontalDivider()
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -296,6 +332,7 @@ fun SettingsScreen(
                     }
                     Switch(
                         checked = areSubstanceHeightsIndependent,
+                        modifier = Modifier.semantics { contentDescription = "Independent substance heights" },
                         onCheckedChange = saveAreSubstanceHeightsIndependent
                     )
                 }
@@ -306,6 +343,11 @@ fun SettingsScreen(
                     Text("Ongoing notification", Modifier.weight(1f))
                     Switch(presentation.enabled, saveNotificationEnabled)
                 }
+                if (presentation.manualTarget != null) {
+                    Text("A specific entry is selected for the live notification. The automatic setting resumes when that selection expires.", style = MaterialTheme.typography.bodySmall)
+                    TextButton(onClick = { saveNotificationEnabled(true) }) { Text("Use automatic selection") }
+                    TextButton(onClick = { saveNotificationEnabled(false) }) { Text("Stop live notification") }
+                }
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     Text("Show details on lock screen", Modifier.weight(1f))
                     Switch(presentation.lockScreenDetails, saveLockScreenDetails)
@@ -314,7 +356,7 @@ fun SettingsScreen(
                     Text("Show details in home-screen widget", Modifier.weight(1f))
                     Switch(presentation.widgetDetails, saveWidgetDetails)
                 }
-                Text("Phases are estimates from reference durations. Notifications update while an experience has an ingestion in the past 12 hours.", style = MaterialTheme.typography.bodySmall)
+                Text("Phases are estimates from reference durations. Automatic notifications use ingestions from the past 12 hours. You can select an entry with a remaining estimated timeline from its detail screen.", style = MaterialTheme.typography.bodySmall)
                 val notificationContext = LocalContext.current
                 TextButton(onClick = { notificationContext.startActivity(Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, notificationContext.packageName)) }) { Text("Android notification settings") }
             }
@@ -440,12 +482,6 @@ fun SettingsScreen(
                                 onClick = {
                                     isShowingDeleteDialog = false
                                     deleteEverything()
-                                    scope.launch {
-                                        snackbarHostState.showSnackbar(
-                                            message = "Deleted everything",
-                                            duration = SnackbarDuration.Short
-                                        )
-                                    }
                                 }
                             ) {
                                 Text("Delete")
@@ -503,6 +539,19 @@ fun SettingsScreen(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun JournalDisplaySwitch(label: String, checked: Boolean, description: String, save: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        .toggleable(checked, role = androidx.compose.ui.semantics.Role.Switch, onValueChange = save)
+        .padding(horizontal = horizontalPadding, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f).padding(end = 8.dp)) {
+            Text(label)
+            Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        Switch(checked = checked, onCheckedChange = null)
     }
 }
 

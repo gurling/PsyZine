@@ -22,11 +22,11 @@ code, base = read_version()
 for apk in (baseline, candidate, following):
     if apk['applicationId'] != 'app.psyzine.debug' or apk['signerCertificateSha256'] != [pins()['app.psyzine.debug']]:
         raise SystemExit('Wrong fixture package or certificate')
-published = json.loads(Path('config/upgrade-baselines.json').read_text())['code3']
+published = json.loads(Path('config/upgrade-baselines.json').read_text())
 if not ((baseline['versionCode'] == 1 and baseline['debuggable']) or
         (baseline['versionCode'] == 2 and not baseline['debuggable']) or
-        (baseline['versionCode'] == 3 and not baseline['debuggable'] and baseline['sha256'] == published['sha256'])):
-    raise SystemExit('Baseline must be reviewed code1/code2 or the pinned published code3 compatibility APK')
+        (not baseline['debuggable'] and any(baseline['sha256'] == p['sha256'] and baseline['versionCode'] == int(key.removeprefix('code')) for key, p in published.items()))):
+    raise SystemExit('Baseline must be reviewed code1/code2 or the pinned published compatibility APK')
 if candidate['versionCode'] != code or following['versionCode'] != code + 1 or code <= baseline['versionCode']:
     raise SystemExit('Candidate codes do not prove two increasing updates')
 if candidate['debuggable'] or following['debuggable']:
@@ -74,8 +74,8 @@ PY
 }
 baseline_code="$(python3 -c 'import json; print(json.load(open("artifacts/upgrade/FIXTURE_APKS.json"))[0]["versionCode"])')"
 baseline_schema=8
-if [[ "$baseline_code" == 3 ]]; then
-    baseline_schema="$(python3 -c 'import json; print(json.load(open("config/upgrade-baselines.json"))["code3"]["schemaVersion"])')"
+if [[ "$baseline_code" -ge 3 ]]; then
+    baseline_schema="$(python3 -c 'import json,sys; print(json.load(open("config/upgrade-baselines.json"))["code"+sys.argv[1]]["schemaVersion"])' "$baseline_code")"
 fi
 run_test seedVersionOneFixture "$baseline_code" "$baseline_schema" artifacts/upgrade/seed.log
 run_test verifyRetainedFixtureAndKeystore "$baseline_code" "$baseline_schema" artifacts/upgrade/baseline-verify.log
@@ -83,15 +83,16 @@ if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
     python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${baseline_code}.json"
 fi
 code="$(python3 -c 'import sys; sys.path.insert(0,"tools"); from release_policy import read_version; print(read_version()[0])')"
+candidate_schema=10
 for apk in "$candidate" "$next"; do
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
     # No uninstall, data clearing, downgrade flag or signature workaround.
     "${adb_cmd[@]}" install -r "$apk"
-    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-verify.log"
-    run_test upgradedJournalPhotosAndBackupWork "$code" 9 "artifacts/upgrade/code${code}-smoke.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" "$candidate_schema" "artifacts/upgrade/code${code}-verify.log"
+    run_test upgradedJournalPhotosAndBackupWork "$code" "$candidate_schema" "artifacts/upgrade/code${code}-smoke.log"
     # Include the post-UI state in the retention check too.
     "${adb_cmd[@]}" shell am force-stop app.psyzine.debug
-    run_test verifyRetainedFixtureAndKeystore "$code" 9 "artifacts/upgrade/code${code}-post-ui.log"
+    run_test verifyRetainedFixtureAndKeystore "$code" "$candidate_schema" "artifacts/upgrade/code${code}-post-ui.log"
     if [[ "${PSYZINE_BENCHMARK_STARTUP:-false}" == true ]]; then
         python3 tools/benchmark-startup.py "$serial" --fixture-confirmed --output "artifacts/upgrade/startup-code${code}.json"
     fi

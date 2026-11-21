@@ -20,6 +20,7 @@ package com.isaakhanimann.journal.data.room.experiences.entities
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import androidx.room.ColumnInfo
 import com.isaakhanimann.journal.data.substances.AdministrationRoute
 import com.isaakhanimann.journal.ui.tabs.search.substance.roa.toReadableString
 import java.time.Instant
@@ -28,18 +29,24 @@ import java.time.Instant
 data class CustomUnit(
     @PrimaryKey(autoGenerate = true)
     val id: Int = 0,
-    val substanceName: String,
+    val substanceName: String?,
     var name: String,
     val creationDate: Instant = Instant.now(),
-    val administrationRoute: AdministrationRoute,
+    val administrationRoute: AdministrationRoute?,
     var dose: Double?,
     var estimatedDoseStandardDeviation: Double?,
     var isEstimate: Boolean,
     var isArchived: Boolean,
     var unit: String,
     var unitPlural: String? = null,
-    var originalUnit: String,
-    var note: String
+    var originalUnit: String?,
+    var note: String,
+    val color: String? = null,
+    @ColumnInfo(defaultValue = "0") val isHiddenInTimeline: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val areTimelinesOfSubcomponentsShown: Boolean = false,
+    @ColumnInfo(defaultValue = "0") val areTolerancesOfSubcomponentsShown: Boolean = false,
+    val halfToleranceInDays: Double? = null,
+    val zeroToleranceInDays: Double? = null,
 ) {
 
     fun getDoseOfOneUnitDescription(): String {

@@ -32,5 +32,15 @@ data class DataForOneEffectLine(
     val color: AdaptiveColor,
     val startTime: Instant,
     val endTime: Instant?,
-    val doseInMilligrams: Double? = null
-)
+    val doseInMilligrams: Double? = null,
+    val subjectKey: String? = null,
+    val sourceIngestionId: Int? = null,
+    val quantity: Double? = null,
+    val quantityUnit: String? = null,
+    val quantityUnitPlural: String? = null,
+    val recordedStartTime: Instant? = null,
+    val componentPath: List<Int> = emptyList(),
+) {
+    val groupingKey: String get() = subjectKey ?: "pw:$substanceName"
+    val recordedTime: Instant get() = recordedStartTime ?: startTime
+}

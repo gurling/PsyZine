@@ -16,7 +16,7 @@ The required release evidence is the successful complete [Actions run](https://g
 
 See [the audit patch evidence](audit-patch-verification.md) for current local checks and outstanding protected/device acceptance.
 
-The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The current version source is `version.properties`: code `4`, base `1.0.3`. The compatibility candidate is `1.0.3-compat.4`, tag `v1.0.3-compat.4`, title `PsyZine Compatibility 1.0.3-compat.4`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.3-compat.4.apk`. The published code3 / 1.0.2 APK is pinned by source and SHA-256 in `config/upgrade-baselines.json` and verified from downloaded release assets. Publication requires a code greater than every published code for each affected package; missing historical metadata or download failures stop publication. Two clean builds share one candidate code and produce one release.
+The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The current version source is `version.properties`: code `5`, base `1.0.4`. The compatibility candidate is `1.0.4-compat.5`, tag `v1.0.4-compat.5`, title `PsyZine Compatibility 1.0.4-compat.5`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.4-compat.5.apk`. The published code3 / 1.0.2 APK is pinned by source and SHA-256 in `config/upgrade-baselines.json` and verified from downloaded release assets. Publication requires a code greater than every published code for each affected package; missing historical metadata or download failures stop publication. Two clean builds share one candidate code and produce one release.
 
 `config/signing-policy.json` pins all four package IDs to this retained identity. Published historical CI certificates differed; matching package IDs alone cannot update those installations. No key rotation is proposed. The original local key files must remain unchanged.
 
@@ -31,11 +31,11 @@ python3 tools/verify-obtainium.py --assets-dir artifacts/apks
 
 | Variant | Gradle APK path under `app/build/outputs/apk/` | Application ID | Version |
 | --- | --- | --- | --- |
-| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.3` |
-| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.3-dev` |
-| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.3` |
-| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.3-dev` |
-| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.3-compat.4` |
+| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.4` |
+| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.4-dev` |
+| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.4` |
+| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.4-dev` |
+| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.4-compat.5` |
 
 The compatible build uses release minification/resource shrinking, `debuggable=false`, and `release` dependency fallbacks. Namespace, FileProvider authority, schema history, storage and all 13 themes remain intact. It cannot coexist with Direct Debug because they deliberately share the installed identity.
 
@@ -66,10 +66,24 @@ All workflow actions are pinned to full commits resolving their selected major v
 
 At the owner's request, current release device checks use Android 17/API37 with 16KiB pages. The explicit `android-37.0;google_apis_ps16k` image and checked KVM setup are shared by ordinary, large-text and upgrade jobs. Older API results remain historical evidence; no older-version matrix is required for this release. SDK35/JDK17 build requirements remain unchanged.
 
-`Android checks` runs the five-variant unpublished build/test/lint job, ordinary instrumentation and the reusable 97-case large-text suite. An approved `verify_compatibility=true` or `publish_compatibility=true` dispatch on `main` additionally uses the protected environment for two independent clean signed builds and three fresh Android17 upgrade jobs: code1, minified code2 and the actual published minified code3 APK each advance to code4 and unpublished code5. Baseline schemas are 8/8/9; candidate and follow-up require schema9. Historical checkouts fetch full history and fail when pinned source is missing. Code3 is downloaded and checked against its pinned hash, source, report, checksums and certificate. Fixture seeding refuses physical devices and nonempty journals. The independent harness works against minified apps and checks completed backup exports. Only `publish_compatibility=true` enables publication, and all five job groups must pass first.
+`Android checks` runs the five-variant unpublished build/test/lint job, ordinary instrumentation and the reusable large-text suite (three platform profiles and one controlled profile). An approved `verify_compatibility=true` or `publish_compatibility=true` dispatch on `main` additionally uses the protected environment for two independent clean signed builds and four fresh Android17 upgrade jobs: code1, minified code2 and the actual published minified code3/code4 APKs each advance to the next allocated candidate code and its unpublished follow-up. Baseline schemas are 8/8/9/9; candidate and follow-up require schema10. Historical checkouts fetch full history and fail when pinned source is missing. Code3 is downloaded and checked against its pinned hash, source, report, checksums and certificate. Fixture seeding refuses physical devices and nonempty journals. The independent harness works against minified apps and checks completed backup exports. Only `publish_compatibility=true` enables publication, and all five job groups must pass first.
 
 `verify-publication.py` checks downloaded candidate checksums and real manifests/certificates, compares both builds' identities/commit, downloads every previously published release APK/report/checksum, verifies their actual version metadata, rejects stale codes and existing candidate tags, and records historical evidence. Network/auth failures stop the job. `verify-obtainium.py` decodes the actual README deep link and checks it selects exactly one compatible APK among all five variants and supplementary assets. The publisher uploads matching GPL source and all assets to an explicit draft, re-downloads the complete server-side set for checksum/signature/selection checks, then publishes that verified draft. Verification failure retains the draft for inspection. Obtainium's actual consecutive phone updates remain a separate owner acceptance check.
 
 Production uses the existing **release** environment and `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`; credentials are unchanged. `PSYZINE_SIGNING_MODE=production` is explicit. Pre-release tags are excluded; versions/filenames are dynamic. The `CONTENT_RIGHTS_VERIFIED=true` gate is retained and package certificate pins still apply. A different production certificate cannot silently replace this existing identity; separately approve any policy/migration change. Manual dispatch builds a candidate; only a matching stable version tag publishes.
 
 Before requesting a source push, show the branch/destination, commits, change summary and checks. Do not push or publish until explicitly approved. No release has been published by the source implementation itself. See [verification.md](verification.md) for current execution results and gaps.
+
+## Published code4 upgrade baseline — 21 November 2026
+
+The protected upgrade matrix now also starts from the actual published
+`v1.0.3-compat.4` APK. Published baselines are downloaded from the pinned catalog
+and checked by one shared validator against checksums, source reports, actual
+manifests, ZIP alignment and the full retained certificate pin. Schema selection
+uses the catalog for each published baseline.
+
+The code4 download passed actual SDK inspection and validation locally. Three
+focused validator tests and the schema-history contract test passed, along with
+shell/embedded-Python syntax and diff checks. Installed upgrades have not run for
+this increment. Candidate code5 exceeds published code4; its unpublished follow-up fixture uses
+code6. Publication still requires the protected checks and downloaded-asset validation.

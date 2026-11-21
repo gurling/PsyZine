@@ -85,7 +85,7 @@ class AddIngestionSearchViewModel @Inject constructor(
             filteredSubstances.any { it.name == custom.substanceName } || custom.name.contains(
                 other = searchText,
                 ignoreCase = true
-            ) || custom.substanceName.contains(
+            ) || custom.substanceName.orEmpty().contains(
                 other = searchText,
                 ignoreCase = true
             ) || custom.unit.contains(
@@ -138,7 +138,7 @@ class AddIngestionSearchViewModel @Inject constructor(
         val groupedBySubstance = ingestions.groupBy { it.ingestion.substanceName }
         val suggestions = groupedBySubstance.flatMap { entry ->
             return@flatMap getSuggestionsForSubstance(
-                substanceName = entry.key,
+                substanceName = entry.key ?: return@flatMap emptyList(),
                 ingestionsGroupedBySubstance = entry.value,
                 customSubstances = customSubstances
             )

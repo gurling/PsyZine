@@ -57,7 +57,8 @@ fun SearchField(
     onChange: (searchText: String) -> Unit,
     categories: List<CategoryChipModel>,
     onFilterTapped: (filterName: String) -> Unit,
-    isShowingFilter: Boolean
+    isShowingFilter: Boolean,
+    placeholder: String = "Search substances",
 ) {
     val focusManager = LocalFocusManager.current
     TextField(
@@ -66,7 +67,7 @@ fun SearchField(
             onChange(value)
         },
         modifier = modifier,
-        placeholder = { Text(text = "Search substances") },
+        placeholder = { Text(text = placeholder) },
         leadingIcon = {
             Icon(
                 Icons.Default.Search,

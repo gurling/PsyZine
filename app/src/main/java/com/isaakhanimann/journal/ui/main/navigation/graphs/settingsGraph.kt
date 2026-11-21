@@ -32,6 +32,10 @@ import com.isaakhanimann.journal.ui.tabs.settings.customunits.CustomUnitsScreen
 import com.isaakhanimann.journal.ui.tabs.settings.customunits.archive.CustomUnitArchiveScreen
 import com.isaakhanimann.journal.ui.tabs.settings.customunits.edit.EditCustomUnitScreen
 import kotlinx.serialization.Serializable
+import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.tabs.settings.definitions.*
+import com.isaakhanimann.journal.ui.tabs.settings.tags.*
+import com.isaakhanimann.journal.data.definitions.SubjectId
 
 fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
     navigation<SettingsTopLevelRoute>(
@@ -51,7 +55,7 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
                     navController.navigate(SubstanceColorsRoute)
                 },
                 navigateToCustomUnits = {
-                    navController.navigate(CustomUnitsRoute)
+                    navController.navigate(DefinitionLibraryRoute)
                 },
                 navigateToDonate = {
                     navController.navigate(DonateRoute)
@@ -59,11 +63,26 @@ fun NavGraphBuilder.settingsGraph(navController: NavHostController) {
             )
         }
         composableWithTransitions<AppearanceRoute> { com.isaakhanimann.journal.ui.tabs.settings.appearance.AppearanceScreen() }
-        composableWithTransitions<AboutRoute> { com.isaakhanimann.journal.ui.tabs.settings.about.AboutScreen() }
+        composableWithTransitions<DefinitionLibraryRoute> {
+            DefinitionLibraryScreen(edit = { id, generation -> navController.navigate(DefinitionEditRoute(id, generation)) },
+                legacyUnits = { navController.navigate(CustomUnitsRoute) }, legacyEdit = { navController.navigate(EditCustomUnitRoute(it)) }, back = { navController.popBackStack() },
+                log = { id, generation -> navController.navigate(ChooseDoseCustomUnitRoute(id, generation, startAtNow = true)) },
+                tags = { navController.navigate(TagsRoute("Settings")) },
+                subjectTags = { navController.navigate(SubjectTagsRoute(SubjectId.Definition(it).key, "Settings")) })
+        }
+        composableWithTransitions<AboutRoute> { com.isaakhanimann.journal.ui.tabs.settings.about.AboutScreen(
+            navigateToSupportInfo = { navController.navigate(SupportInfoRoute) },
+            navigateToReleaseNotes = { navController.navigate(ReleaseNotesRoute) }) }
+        composableWithTransitions<SupportInfoRoute> {
+            com.isaakhanimann.journal.ui.tabs.settings.about.SupportInfoScreen { navController.popBackStack() }
+        }
+        composableWithTransitions<ReleaseNotesRoute> {
+            com.isaakhanimann.journal.ui.tabs.settings.about.ReleaseNotesScreen { navController.popBackStack() }
+        }
         composableWithTransitions<FAQRoute> { FAQScreen() }
         composableWithTransitions<DonateRoute> { DonateScreen() }
         composableWithTransitions<CombinationSettingsRoute> { CombinationSettingsScreen() }
-        composableWithTransitions<SubstanceColorsRoute> { SubstanceColorsScreen() }
+        composableWithTransitions<SubstanceColorsRoute> { SubstanceColorsScreen(navigateBack = { navController.popBackStack() }) }
         composableWithTransitions<CustomUnitArchiveRoute> {
             CustomUnitArchiveScreen(navigateToEditCustomUnit = { customUnitId ->
                 navController.navigate(EditCustomUnitRoute(customUnitId))
@@ -115,3 +134,5 @@ data class EditCustomUnitRoute(val customUnitId: Int)
 
 @Serializable object AppearanceRoute
 @Serializable object AboutRoute
+@Serializable object SupportInfoRoute
+@Serializable object ReleaseNotesRoute

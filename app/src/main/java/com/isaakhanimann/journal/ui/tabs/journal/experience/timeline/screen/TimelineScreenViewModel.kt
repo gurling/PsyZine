@@ -21,16 +21,13 @@ package com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.screen
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
-import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCompanionAndCustomUnit
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDose
 import com.isaakhanimann.journal.data.substances.classes.roa.RoaDuration
 import com.isaakhanimann.journal.data.substances.repositories.SubstanceRepository
 import com.isaakhanimann.journal.ui.YOU
-import com.isaakhanimann.journal.ui.main.navigation.graphs.TimelineScreenRoute
 import com.isaakhanimann.journal.ui.tabs.journal.addingestion.time.hourLimitToSeparateIngestions
-import com.isaakhanimann.journal.ui.tabs.journal.experience.ExperienceViewModel
 import com.isaakhanimann.journal.ui.tabs.journal.experience.TimelineDisplayOption
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.SavedTimeDisplayOption
 import com.isaakhanimann.journal.ui.tabs.journal.experience.components.TimeDisplayOption
@@ -40,6 +37,9 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.DataForOneR
 import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.DataForOneTimedNote
 import com.isaakhanimann.journal.ui.tabs.settings.combinations.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -53,9 +53,10 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class TimelineScreenViewModel @Inject constructor(
-    experienceRepo: ExperienceRepository,
+    records: com.isaakhanimann.journal.data.room.experiences.JournalRecordRepository,
     private val substanceRepo: SubstanceRepository,
     userPreferences: UserPreferences,
     state: SavedStateHandle
@@ -68,14 +69,15 @@ class TimelineScreenViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(0)
         )
 
-    private val timelineRoute = state.toRoute<TimelineScreenRoute>()
-    private val experienceID = timelineRoute.experienceId
-    val consumerName = timelineRoute.consumerName
+    private val experienceID = state.journalRecordId("experienceId")
+    val consumerName = checkNotNull(state.get<String>("consumerName")) { "A timeline consumer is required." }
+    val recordState = com.isaakhanimann.journal.ui.utils.journalReadSession(viewModelScope, state) { generation ->
+        records.observeTimeline(experienceID, generation)
+    }
 
     private val ingestionsWithCompanionsFlow =
-        experienceRepo.getIngestionsWithCompanionsFlow(experienceID)
-            .map { ingestions ->
-                ingestions.filter {
+        recordState.map { record ->
+                record.value?.ingestions.orEmpty().filter {
                     if (consumerName == YOU) {
                         it.ingestion.consumerName == null
                     } else {
@@ -84,9 +86,9 @@ class TimelineScreenViewModel @Inject constructor(
                 }
             }
 
-    private val ratingsFlow = experienceRepo.getRatingsFlow(experienceID)
+    private val ratingsFlow = recordState.map { it.value?.ratings.orEmpty() }
 
-    private val timedNotesFlow = experienceRepo.getTimedNotesFlowSorted(experienceID)
+    private val timedNotesFlow = recordState.map { it.value?.timedNotes.orEmpty() }
 
     private val currentTimeFlow: Flow<Instant> = flow {
         while (true) {
@@ -120,42 +122,16 @@ class TimelineScreenViewModel @Inject constructor(
         )
 
 
-    private val sortedIngestionsWithCompanionsFlow =
-        ingestionsWithCompanionsFlow.map { ingestionsWithCompanions ->
-            ingestionsWithCompanions.sortedBy { it.ingestion.time }
+    private val presentedRecords = recordState.mapLatest { state ->
+        val record = state.value ?: return@mapLatest emptyList()
+        val context = currentCoroutineContext()
+        val rows = record.ingestions.filter {
+            if (consumerName == YOU) it.ingestion.consumerName == null else it.ingestion.consumerName == consumerName
         }
-
-    private data class IngestionWithAssociatedData(
-        val ingestionWithCompanionAndCustomUnit: IngestionWithCompanionAndCustomUnit,
-        val roaDuration: RoaDuration?,
-        val roaDose: RoaDose?
-    )
-
-    private val ingestionsWithAssociatedDataFlow: Flow<List<IngestionWithAssociatedData>> =
-        sortedIngestionsWithCompanionsFlow.map { ingestionsWithComps ->
-            ingestionsWithComps.map { oneIngestionWithComp ->
-                val ingestion = oneIngestionWithComp.ingestion
-                val roa = substanceRepo.getSubstance(oneIngestionWithComp.ingestion.substanceName)
-                    ?.getRoa(ingestion.administrationRoute)
-                val roaDuration = roa?.roaDuration
-                IngestionWithAssociatedData(
-                    ingestionWithCompanionAndCustomUnit = oneIngestionWithComp,
-                    roaDuration = roaDuration,
-                    roaDose = roa?.roaDose
-                )
-            }
-        }
-
-    private val dataForEffectLinesFlow =
-        ingestionsWithAssociatedDataFlow.map { ingestionWithAssociatedData ->
-            val ingestionElements = getIngestionElements(ingestionWithAssociatedData)
-            val substances =
-                ingestionElements.mapNotNull { substanceRepo.getSubstance(it.ingestionWithCompanionAndCustomUnit.ingestion.substanceName) }
-            com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.effectLines(
-                ingestionElements = ingestionElements,
-                substances = substances
-            )
-        }
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.TimelineModelFactory.projectRecords(
+            rows, substanceRepo.getAllSubstances(), record.definitionGraph, record.companionMap) { context.ensureActive() }
+    }.flowOn(Dispatchers.Default).stateIn(viewModelScope, SharingStarted.WhileSubscribed(0), emptyList())
+    private val dataForEffectLinesFlow = presentedRecords.map { records -> records.flatMap { it.curves } }
 
     val timelineDisplayOptionFlow = combine(
         dataForEffectLinesFlow,
@@ -164,42 +140,11 @@ class TimelineScreenViewModel @Inject constructor(
         areSubstanceHeightsIndependentFlow
     ) { dataForEffectLines, ratings, timedNotesSorted, areSubstanceHeightsIndependent ->
 
-        val newRatings = if (consumerName == YOU) ratings else emptyList()
-        val newTimedNotes = if (consumerName == YOU) timedNotesSorted else emptyList()
-
-        if (dataForEffectLines.isEmpty()) {
-            return@combine TimelineDisplayOption.NotWorthDrawing
-        } else {
-            val dataForRatings = newRatings.mapNotNull {
-                val ratingTime = it.time
-                return@mapNotNull if (ratingTime == null) {
-                    null
-                } else {
-                    DataForOneRating(
-                        time = ratingTime,
-                        option = it.option
-                    )
-                }
-            }
-            val dataForTimedNotes =
-                newTimedNotes.filter { it.isPartOfTimeline }
-                    .map {
-                        DataForOneTimedNote(time = it.time, color = it.color)
-                    }
-            val isWorthDrawing =
-                dataForEffectLines.isNotEmpty() && !(dataForEffectLines.all { it.roaDuration == null } && newRatings.isEmpty() && newTimedNotes.isEmpty())
-            if (isWorthDrawing) {
-                val model = AllTimelinesModel(
-                    dataForLines = dataForEffectLines,
-                    dataForRatings = dataForRatings,
-                    timedNotes = dataForTimedNotes,
-                    areSubstanceHeightsIndependent = areSubstanceHeightsIndependent
-                )
-                return@combine TimelineDisplayOption.Shown(model)
-            } else {
-                return@combine TimelineDisplayOption.NotWorthDrawing
-            }
-        }
+        com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.buildTimelineDisplay(
+            dataForEffectLines,
+            if (consumerName == YOU) ratings else emptyList(),
+            if (consumerName == YOU) timedNotesSorted else emptyList(),
+            areSubstanceHeightsIndependent)
     }.flowOn(Dispatchers.Default)
         .stateIn(
         initialValue = TimelineDisplayOption.Loading,
@@ -207,18 +152,4 @@ class TimelineScreenViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(0)
     )
 
-    private fun getIngestionElements(sortedIngestionsWith: List<IngestionWithAssociatedData>): List<IngestionElement> {
-        return sortedIngestionsWith.map { ingestionWith ->
-            val numDots =
-                ingestionWith.roaDose?.getNumDots(
-                    ingestionWith.ingestionWithCompanionAndCustomUnit.ingestion.dose,
-                    ingestionUnits = ingestionWith.ingestionWithCompanionAndCustomUnit.ingestion.units
-                )
-            IngestionElement(
-                ingestionWithCompanionAndCustomUnit = ingestionWith.ingestionWithCompanionAndCustomUnit,
-                roaDuration = ingestionWith.roaDuration,
-                numDots = numDots
-            )
-        }
-    }
 }

@@ -64,7 +64,8 @@ fun AddOrEditCustomSubstanceContent(
     units: String,
     onUnitsChange: (String) -> Unit,
     description: String,
-    onDescriptionChange: (String) -> Unit
+    onDescriptionChange: (String) -> Unit,
+    showRequiredErrors: Boolean = false
 ) {
     Column(
         modifier = Modifier
@@ -78,6 +79,10 @@ fun AddOrEditCustomSubstanceContent(
             value = name,
             onValueChange = onNameChange,
             label = { Text("Name") },
+            isError = showRequiredErrors && name.isBlank(),
+            supportingText = if (showRequiredErrors && name.isBlank()) {
+                { Text("Enter a name for this substance.") }
+            } else null,
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             keyboardOptions = KeyboardOptions(
                 keyboardType = KeyboardType.Text,
@@ -90,6 +95,10 @@ fun AddOrEditCustomSubstanceContent(
             value = units,
             onValueChange = onUnitsChange,
             label = { Text("Units") },
+            isError = showRequiredErrors && units.isBlank(),
+            supportingText = if (showRequiredErrors && units.isBlank()) {
+                { Text("Enter a unit, such as mg or mL, or choose one below.") }
+            } else null,
             keyboardActions = KeyboardActions(onDone = { focusManager.clearFocus() }),
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Text),
             singleLine = true,

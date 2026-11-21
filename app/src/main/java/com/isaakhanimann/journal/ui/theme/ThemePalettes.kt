@@ -29,16 +29,19 @@ fun readable(color: Color, background: Color, ratio: Double = 4.5): Color {
 data class ThemePalette(
     val id: ThemeId, val dark: Boolean, val background: Color, val foreground: Color,
     val panel: Color, val muted: Color, val accents: List<Color>, val source: String, val license: String, val sourceRevision: String,
-    val raised: Color = lerp(panel, foreground, .12f)
+    val raised: Color = lerp(panel, foreground, .12f),
+    val systemScheme: ColorScheme? = null,
 ) {
     // Domain labels and Material action text also appear on raised cards. Use
     // the least contrasting neutral surface, rather than only the window base.
     private val contrastSurface: Color get() {
+        systemScheme?.let { return neutralContrastSurface(it, dark) }
         return if (dark) listOf(background, panel, raised).maxBy { it.luminance() }
         else listOf(background, panel, raised).minBy { it.luminance() }
     }
     fun accent(index: Int) = readable(accents[Math.floorMod(index, accents.size)], contrastSurface)
     val scheme: ColorScheme get() {
+        systemScheme?.let { return it }
         val body = readable(foreground, contrastSurface)
         val subdued = readable(muted, contrastSurface)
         val primary = accent(1)

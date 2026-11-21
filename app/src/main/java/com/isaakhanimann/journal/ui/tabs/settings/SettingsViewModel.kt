@@ -44,15 +44,24 @@ class SettingsViewModel @Inject constructor(
     private val presentation: com.isaakhanimann.journal.data.preferences.PresentationPreferences,
 ) : ViewModel() {
 
-    fun saveDosageDotsAreHidden(value: Boolean) = viewModelScope.launch {
+    val journalDisplaySettings = userPreferences.journalDisplaySettingsFlow.stateIn(viewModelScope,
+        SharingStarted.WhileSubscribed(0), com.isaakhanimann.journal.data.preferences.JournalDisplaySettings())
+    fun saveShowComponents(value: Boolean) = savePresentation { userPreferences.saveShowComponents(value) }
+    fun saveHideTimelineQuantities(value: Boolean) = savePresentation { userPreferences.saveHideTimelineQuantities(value) }
+    fun saveHideInteractions(value: Boolean) = savePresentation { userPreferences.saveHideInteractions(value) }
+    fun saveHideTolerance(value: Boolean) = savePresentation { userPreferences.saveHideTolerance(value) }
+    fun saveRelativeDates(value: Boolean) = savePresentation { userPreferences.saveRelativeDates(value) }
+    fun saveRecentTimePresets(value: Boolean) = savePresentation { userPreferences.saveRecentTimePresets(value) }
+
+    fun saveDosageDotsAreHidden(value: Boolean) = savePresentation {
         userPreferences.saveDosageDotsAreHidden(value)
     }
 
-    fun saveAreSubstanceHeightsIndependent(value: Boolean) = viewModelScope.launch {
+    fun saveAreSubstanceHeightsIndependent(value: Boolean) = savePresentation {
         userPreferences.saveAreSubstanceHeightsIndependent(value)
     }
 
-    fun saveIsTimelineHidden(value: Boolean) = viewModelScope.launch {
+    fun saveIsTimelineHidden(value: Boolean) = savePresentation {
         userPreferences.saveIsTimelineHidden(value)
     }
 

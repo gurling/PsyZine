@@ -33,17 +33,25 @@ fun AppearanceScreen(viewModel: AppearanceViewModel = hiltViewModel()) {
 }
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun ThemePreviewCard(id: ThemeId, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     PsyZineTheme(id) {
         Card(onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).semantics { this.selected = selected },
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text((if (selected) "✓ " else "") + id.label, style = MaterialTheme.typography.titleLarge)
+                if (id == ThemeId.DYNAMIC) Text(
+                    if (LocalPsyZinePalette.current.id == ThemeId.DYNAMIC) "Use Android's wallpaper-based colors and system light/dark mode."
+                    else "System colors are unavailable. Uses Catppuccin Latte or Mocha to follow system light/dark mode.",
+                    style = MaterialTheme.typography.bodySmall)
                 Text("Saturday · 18:45", style = MaterialTheme.typography.labelSmall)
                 Text("A quiet afternoon by the lake. A few thoughts to remember.")
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     SuggestionChip(onClick = onClick, enabled = enabled, label = { Text("Journal") })
-                    LocalPsyZinePalette.current.accents.take(4).forEach { color ->
+                    val swatches = if (id == ThemeId.DYNAMIC) listOf(MaterialTheme.colorScheme.primary,
+                        MaterialTheme.colorScheme.secondary, MaterialTheme.colorScheme.tertiary, MaterialTheme.colorScheme.error)
+                        else LocalPsyZinePalette.current.accents.take(4)
+                    swatches.forEach { color ->
                         Surface(color = color, shape = MaterialTheme.shapes.small, modifier = Modifier.size(24.dp)) {}
                     }
                 }

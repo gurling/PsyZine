@@ -42,7 +42,7 @@ fun EditTimedNoteScreen(
     viewModel: EditTimedNoteViewModel = hiltViewModel(),
     navigateBack: () -> Unit
 ) {
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     Scaffold(
         topBar = {
             TopAppBar(

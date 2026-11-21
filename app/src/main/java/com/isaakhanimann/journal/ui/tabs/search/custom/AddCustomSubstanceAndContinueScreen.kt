@@ -37,14 +37,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddCustomSubstanceAndContinueScreen(
+    navigateBack: () -> Unit,
     navigateToChooseRoa: (customSubstanceName: String) -> Unit,
     initialName: String = "",
     viewModel: AddCustomSubstanceViewModel = hiltViewModel()
 ) {
     LaunchedEffect(Unit) {
-        viewModel.name = initialName
+        viewModel.initializeName(initialName)
     }
-    com.isaakhanimann.journal.ui.utils.JournalEditorStatus(viewModel.session)
+    if (!com.isaakhanimann.journal.ui.utils.JournalEditorGate(viewModel.session, navigateBack)) return
     Scaffold(
         topBar = {
             TopAppBar(title = { Text("Add custom substance", maxLines = 1, overflow = TextOverflow.Ellipsis) })
@@ -71,6 +72,7 @@ fun AddCustomSubstanceAndContinueScreen(
     ) { padding ->
         AddOrEditCustomSubstanceContent(
             padding = padding,
+            showRequiredErrors = true,
             name = viewModel.name,
             units = viewModel.units,
             description = viewModel.description,

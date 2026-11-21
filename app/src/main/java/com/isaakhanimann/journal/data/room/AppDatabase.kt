@@ -22,6 +22,7 @@ import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
+import com.isaakhanimann.journal.data.definitions.*
 import com.isaakhanimann.journal.data.room.experiences.ExperienceDao
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance
 import com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit
@@ -34,8 +35,9 @@ import com.isaakhanimann.journal.data.room.experiences.entities.TimedNote
 
 @TypeConverters(InstantConverter::class)
 @Database(
-    version = 9,
-    entities = [com.isaakhanimann.journal.data.room.attachments.JournalState::class, com.isaakhanimann.journal.data.room.attachments.PhotoAttachment::class, Experience::class, Ingestion::class, SubstanceCompanion::class, CustomSubstance::class, ShulginRating::class, TimedNote::class, CustomUnit::class],
+    version = 10,
+    entities = [com.isaakhanimann.journal.data.room.attachments.JournalState::class, com.isaakhanimann.journal.data.room.attachments.PhotoAttachment::class, Experience::class, Ingestion::class, SubstanceCompanion::class, CustomSubstance::class, ShulginRating::class, TimedNote::class, CustomUnit::class,
+        DoseComponent::class, CustomRoaInfo::class, SubstanceTag::class, SubstanceTagMembership::class],
     autoMigrations = [
         AutoMigration (from = 1, to = 2),
         AutoMigration (from = 2, to = 3),
@@ -46,6 +48,7 @@ import com.isaakhanimann.journal.data.room.experiences.entities.TimedNote
     ]
 )
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun definitionDao(): DefinitionDao
     abstract fun photoAttachmentDao(): com.isaakhanimann.journal.data.room.attachments.PhotoAttachmentDao
     abstract fun experienceDao(): ExperienceDao
 }

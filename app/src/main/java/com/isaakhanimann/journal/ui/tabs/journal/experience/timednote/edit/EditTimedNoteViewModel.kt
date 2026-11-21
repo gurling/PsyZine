@@ -24,7 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import androidx.navigation.toRoute
+import com.isaakhanimann.journal.ui.utils.journalRecordId
 import com.isaakhanimann.journal.data.room.experiences.ExperienceRepository
 import com.isaakhanimann.journal.data.room.experiences.entities.AdaptiveColor
 import com.isaakhanimann.journal.data.room.experiences.entities.TimedNote
@@ -36,10 +36,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import javax.inject.Inject
 
@@ -47,7 +45,7 @@ import javax.inject.Inject
 class EditTimedNoteViewModel @Inject constructor(
     private val experienceRepo: ExperienceRepository,
     sessionGuard: com.isaakhanimann.journal.data.room.JournalSessionGuard,
-    state: SavedStateHandle
+    private val state: SavedStateHandle
 ) : ViewModel() {
     val session = com.isaakhanimann.journal.ui.utils.JournalEditorSession(viewModelScope, sessionGuard, state)
     var note by mutableStateOf("")
@@ -57,7 +55,7 @@ class EditTimedNoteViewModel @Inject constructor(
     private var loadedLocal: LocalDateTime = loadedInstant.getLocalDateTime()
     var localDateTimeFlow = MutableStateFlow(loadedLocal)
     private var timedNote: TimedNote? = null
-    private val editTimedNoteRoute = state.toRoute<EditTimedNoteRoute>()
+    private val editTimedNoteRoute = EditTimedNoteRoute(state.journalRecordId("timedNoteId"), state.journalRecordId("experienceId"))
     val experienceId = editTimedNoteRoute.experienceId
 
     private val timedNoteId: Int
@@ -72,31 +70,41 @@ class EditTimedNoteViewModel @Inject constructor(
             loadedNote.time.let { time ->
                 loadedInstant = time
                 loadedLocal = time.getLocalDateTime()
-                localDateTimeFlow.emit(loadedLocal)
+                localDateTimeFlow.value = state.get<String>("timedNoteTime")?.let { LocalDateTime.parse(it) } ?: loadedLocal
             }
-            note = loadedNote.note
-            color = loadedNote.color
-            isPartOfTimeline = loadedNote.isPartOfTimeline
+            note = state.get<String>("timedNoteText") ?: loadedNote.note
+            color = AdaptiveColor.entries.firstOrNull { it.name == state.get<String>("timedNoteColor") } ?: loadedNote.color
+            isPartOfTimeline = state.get<Boolean>("timedNoteInTimeline") ?: loadedNote.isPartOfTimeline
+            state["timedNoteText"] = note
+            state["timedNoteColor"] = color.name
+            state["timedNoteInTimeline"] = isPartOfTimeline
+            state["timedNoteTime"] = localDateTimeFlow.value.toString()
         }
     }
 
 
     fun onChangeTime(newLocalDateTime: LocalDateTime) {
-        viewModelScope.launch {
-            localDateTimeFlow.emit(newLocalDateTime)
-        }
+        if (!session.ready || session.busy) return
+        localDateTimeFlow.value = newLocalDateTime
+        state["timedNoteTime"] = newLocalDateTime.toString()
     }
 
     fun onChangeIsPartOfTimeline(newIsPartOfTimeline: Boolean) {
+        if (!session.ready || session.busy) return
         isPartOfTimeline = newIsPartOfTimeline
+        state["timedNoteInTimeline"] = newIsPartOfTimeline
     }
 
     fun onChangeNote(newNote: String) {
+        if (!session.ready || session.busy) return
         note = newNote
+        state["timedNoteText"] = newNote
     }
 
     fun onChangeColor(newColor: AdaptiveColor) {
+        if (!session.ready || session.busy) return
         color = newColor
+        state["timedNoteColor"] = newColor.name
     }
 
     private val ingestionsFlow = experienceRepo.getIngestionsWithCompanionsFlow(experienceId)
@@ -128,9 +136,17 @@ class EditTimedNoteViewModel @Inject constructor(
         experienceRepo.delete(checkNotNull(timedNote), session.generation)
     }
 
-    fun onDoneTap(onSuccess: () -> Unit) = session.run(onSuccess) {
-        check(note.isNotBlank()) { "Enter a note before saving." }
-        val updated = checkNotNull(timedNote).copy(time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant), note = note, color = color, isPartOfTimeline = isPartOfTimeline)
-        experienceRepo.update(updated, session.generation)
+    fun onDoneTap(onSuccess: () -> Unit) {
+        if (!session.ready || session.busy) return
+        if (note.isBlank()) {
+            session.run { error("Enter a note before saving.") }
+            return
+        }
+        val updated = checkNotNull(timedNote).copy(
+            time = com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeFlow.value, loadedLocal, loadedInstant),
+            note = note, color = color, isPartOfTimeline = isPartOfTimeline)
+        session.run(onSuccess) {
+            experienceRepo.update(updated, session.generation)
+        }
     }
 }

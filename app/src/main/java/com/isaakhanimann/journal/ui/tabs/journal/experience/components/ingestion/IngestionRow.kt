@@ -69,13 +69,13 @@ fun IngestionRow(
     ContentWithSideStripe(
         stripeWidth = 5.dp,
         modifier = modifier,
-        stripe = { VerticalLine(color = ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
+        stripe = { VerticalLine(color = ingestionElement.displayColor ?: ingestionWithCompanionAndCustomUnit.substanceCompanion?.color ?: AdaptiveColor.RED) }
     ) {
         time()
-        val title = if (customUnit != null) {
+        val title = if (customUnit != null && ingestion.substanceName != null) {
             "${ingestion.substanceName}, ${customUnit.name}"
         } else {
-            ingestion.substanceName
+            ingestionWithCompanionAndCustomUnit.displayName
         }
         Text(
             text = title,
@@ -89,7 +89,7 @@ fun IngestionRow(
             val text = buildAnnotatedString {
                 append(ingestionWithCompanionAndCustomUnit.doseDescription)
                 withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
-                    if (customUnit == null) {
+                    if (customUnit == null || customUnit.substanceName == null) {
                         append(" " + ingestion.administrationRoute.displayText.lowercase())
                     } else {
                         ingestionWithCompanionAndCustomUnit.customUnitDose?.calculatedDoseDescription?.let {
@@ -105,6 +105,13 @@ fun IngestionRow(
             if (numDots != null && !areDosageDotsHidden) {
                 DotRows(numDots = numDots)
             }
+        }
+        ingestionElement.calculationError?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+        CalculatedComponents(ingestion.id, ingestionElement.components, areDosageDotsHidden)
+        if (ingestion.isHiddenInTimeline) Text("Hidden from timeline", style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        ingestion.stomachFullness?.let { fullness ->
+            Text("Stomach fullness: ${fullness.text}", style = MaterialTheme.typography.bodySmall)
         }
         val note = ingestion.notes
         if (!note.isNullOrBlank()) {

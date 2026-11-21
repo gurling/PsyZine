@@ -108,9 +108,11 @@ fun ChooseDoseCustomUnitScreen(
 ) {
     CustomUnitEditorStatus(viewModel, navigateBack)
     if (!viewModel.ready) return
-    val navigate: (CustomUnit, Double?, Double?, Boolean, String, String) -> Unit = { unit, dose, uncertainty, estimate, generation, fingerprint ->
-        navigateToChooseTimeAndMaybeColor(unit.administrationRoute, unit.unit, estimate, dose, uncertainty,
-            unit.substanceName, unit.id, generation, fingerprint)
+    val navigate: (CustomUnit, Double?, Double?, Boolean, String, String) -> Unit = navigate@{ unit, dose, uncertainty, estimate, generation, fingerprint ->
+        val route = unit.administrationRoute ?: return@navigate
+        val substance = unit.substanceName ?: return@navigate
+        navigateToChooseTimeAndMaybeColor(route, unit.unit, estimate, dose, uncertainty,
+            substance, unit.id, generation, fingerprint)
     }
     viewModel.customUnit?.let { customUnitUnwrapped ->
         ChooseDoseCustomUnitScreen(
@@ -250,7 +252,7 @@ fun ChooseDoseCustomUnitScreen(
                     )
                 ) {
                     Text(
-                        text = "${customUnit.substanceName} ${customUnit.administrationRoute.displayText}",
+                        text = "${customUnit.substanceName.orEmpty()} ${customUnit.administrationRoute?.displayText.orEmpty()}",
                         style = MaterialTheme.typography.titleLarge
                     )
                     if (!doseRemark.isNullOrBlank()) {
@@ -390,8 +392,8 @@ fun ChooseDoseCustomUnitScreen(
             }
             TextButton(enabled = enabled, onClick = {
                 navigateToCreateCustomUnit(
-                    customUnit.administrationRoute,
-                    customUnit.substanceName
+                    customUnit.administrationRoute ?: return@TextButton,
+                    customUnit.substanceName ?: return@TextButton
                 )
             }) {
                 Text(text = "Create new unit")

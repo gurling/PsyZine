@@ -40,8 +40,13 @@ data class IngestionWithCompanionAndCustomUnit(
         parentColumn = "customUnitId",
         entityColumn = "id"
     )
-    var customUnit: CustomUnit?
+    var customUnit: CustomUnit?,
+
+    @Relation(parentColumn = "customUnitId", entityColumn = "parentCustomUnitId")
+    val customUnitComponents: List<com.isaakhanimann.journal.data.definitions.DoseComponent> = emptyList(),
 ) {
+    @get:androidx.room.Ignore
+    val displayName: String get() = ingestion.substanceName ?: customUnit?.name ?: "Missing substance (edit to correct)"
 
     val originalUnit: String? get() = customUnit?.originalUnit ?: ingestion.units
     val pureDose: Double? get() {
