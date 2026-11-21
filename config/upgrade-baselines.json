@@ -5,5 +5,12 @@
     "commit": "ca1e1eb56d636c5d3e3e0c2a959e2f35e42e1dbc",
     "sha256": "b07987a2fcd0076c833fd15dfb41cd042e5ebb14ba750b0e1be8512afba9f12e",
     "schemaVersion": 9
+  },
+  "code4": {
+    "tag": "v1.0.3-compat.4",
+    "filename": "PsyZine-Direct-Compatible-Release-v1.0.3-compat.4.apk",
+    "commit": "f34455ff032e292d478499002a6f3ab73c21f21a",
+    "sha256": "faa2d367ab9d442a6798d3f3c56ce4b53be2c385ece342736e040455ca674490",
+    "schemaVersion": 9
   }
 }

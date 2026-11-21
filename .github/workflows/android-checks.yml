@@ -222,7 +222,7 @@ jobs:
       fail-fast: false
       matrix:
         api: [37]
-        baseline: [code1, code2, code3]
+        baseline: [code1, code2, code3, code4]
     environment: compatibility
     env:
       ANDROID_AVD_HOME: ${{ github.workspace }}/.local/ci-upgrade-avds

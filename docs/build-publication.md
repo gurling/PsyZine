@@ -66,10 +66,24 @@ All workflow actions are pinned to full commits resolving their selected major v
 
 At the owner's request, current release device checks use Android 17/API37 with 16KiB pages. The explicit `android-37.0;google_apis_ps16k` image and checked KVM setup are shared by ordinary, large-text and upgrade jobs. Older API results remain historical evidence; no older-version matrix is required for this release. SDK35/JDK17 build requirements remain unchanged.
 
-`Android checks` runs the five-variant unpublished build/test/lint job, ordinary instrumentation and the reusable large-text suite (three platform profiles and one controlled profile). An approved `verify_compatibility=true` or `publish_compatibility=true` dispatch on `main` additionally uses the protected environment for two independent clean signed builds and three fresh Android17 upgrade jobs: code1, minified code2 and the actual published minified code3 APK each advance to code4 and unpublished code5. Baseline schemas are 8/8/9; candidate and follow-up require schema10. Historical checkouts fetch full history and fail when pinned source is missing. Code3 is downloaded and checked against its pinned hash, source, report, checksums and certificate. Fixture seeding refuses physical devices and nonempty journals. The independent harness works against minified apps and checks completed backup exports. Only `publish_compatibility=true` enables publication, and all five job groups must pass first.
+`Android checks` runs the five-variant unpublished build/test/lint job, ordinary instrumentation and the reusable large-text suite (three platform profiles and one controlled profile). An approved `verify_compatibility=true` or `publish_compatibility=true` dispatch on `main` additionally uses the protected environment for two independent clean signed builds and four fresh Android17 upgrade jobs: code1, minified code2 and the actual published minified code3/code4 APKs each advance to the next allocated candidate code and its unpublished follow-up. Baseline schemas are 8/8/9/9; candidate and follow-up require schema10. Historical checkouts fetch full history and fail when pinned source is missing. Code3 is downloaded and checked against its pinned hash, source, report, checksums and certificate. Fixture seeding refuses physical devices and nonempty journals. The independent harness works against minified apps and checks completed backup exports. Only `publish_compatibility=true` enables publication, and all five job groups must pass first.
 
 `verify-publication.py` checks downloaded candidate checksums and real manifests/certificates, compares both builds' identities/commit, downloads every previously published release APK/report/checksum, verifies their actual version metadata, rejects stale codes and existing candidate tags, and records historical evidence. Network/auth failures stop the job. `verify-obtainium.py` decodes the actual README deep link and checks it selects exactly one compatible APK among all five variants and supplementary assets. The publisher uploads matching GPL source and all assets to an explicit draft, re-downloads the complete server-side set for checksum/signature/selection checks, then publishes that verified draft. Verification failure retains the draft for inspection. Obtainium's actual consecutive phone updates remain a separate owner acceptance check.
 
 Production uses the existing **release** environment and `PSYZINE_KEYSTORE_BASE64`, `PSYZINE_KEY_ALIAS`, `PSYZINE_STORE_PASSWORD`, `PSYZINE_KEY_PASSWORD`; credentials are unchanged. `PSYZINE_SIGNING_MODE=production` is explicit. Pre-release tags are excluded; versions/filenames are dynamic. The `CONTENT_RIGHTS_VERIFIED=true` gate is retained and package certificate pins still apply. A different production certificate cannot silently replace this existing identity; separately approve any policy/migration change. Manual dispatch builds a candidate; only a matching stable version tag publishes.
 
 Before requesting a source push, show the branch/destination, commits, change summary and checks. Do not push or publish until explicitly approved. No release has been published by the source implementation itself. See [verification.md](verification.md) for current execution results and gaps.
+
+## Published code4 upgrade baseline — 21 November 2026
+
+The protected upgrade matrix now also starts from the actual published
+`v1.0.3-compat.4` APK. Published baselines are downloaded from the pinned catalog
+and checked by one shared validator against checksums, source reports, actual
+manifests, ZIP alignment and the full retained certificate pin. Schema selection
+uses the catalog for each published baseline.
+
+The code4 download passed actual SDK inspection and validation locally. Three
+focused validator tests and the schema-history contract test passed, along with
+shell/embedded-Python syntax and diff checks. Installed upgrades have not run for
+this increment. Candidate code must exceed published code4 before dispatching the
+protected matrix; the current source version is not a publishable new candidate.
