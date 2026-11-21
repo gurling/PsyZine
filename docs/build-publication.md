@@ -16,7 +16,7 @@ The required release evidence is the successful complete [Actions run](https://g
 
 See [the audit patch evidence](audit-patch-verification.md) for current local checks and outstanding protected/device acceptance.
 
-The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The current version source is `version.properties`: code `4`, base `1.0.3`. The compatibility candidate is `1.0.3-compat.4`, tag `v1.0.3-compat.4`, title `PsyZine Compatibility 1.0.3-compat.4`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.3-compat.4.apk`. The published code3 / 1.0.2 APK is pinned by source and SHA-256 in `config/upgrade-baselines.json` and verified from downloaded release assets. Publication requires a code greater than every published code for each affected package; missing historical metadata or download failures stop publication. Two clean builds share one candidate code and produce one release.
+The compatibility remediation retains `app.psyzine.debug` and certificate SHA-256 `7a8752f2571342ec6b9b0bb767e0b880e682ca35006fff8f01b4891d0bbd86b5`. The current version source is `version.properties`: code `5`, base `1.0.4`. The compatibility candidate is `1.0.4-compat.5`, tag `v1.0.4-compat.5`, title `PsyZine Compatibility 1.0.4-compat.5`, canonical asset `PsyZine-Direct-Compatible-Release-v1.0.4-compat.5.apk`. The published code3 / 1.0.2 APK is pinned by source and SHA-256 in `config/upgrade-baselines.json` and verified from downloaded release assets. Publication requires a code greater than every published code for each affected package; missing historical metadata or download failures stop publication. Two clean builds share one candidate code and produce one release.
 
 `config/signing-policy.json` pins all four package IDs to this retained identity. Published historical CI certificates differed; matching package IDs alone cannot update those installations. No key rotation is proposed. The original local key files must remain unchanged.
 
@@ -31,11 +31,11 @@ python3 tools/verify-obtainium.py --assets-dir artifacts/apks
 
 | Variant | Gradle APK path under `app/build/outputs/apk/` | Application ID | Version |
 | --- | --- | --- | --- |
-| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.3` |
-| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.3-dev` |
-| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.3` |
-| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.3-dev` |
-| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.3-compat.4` |
+| Direct Debug | `direct/debug/app-direct-debug.apk` | `app.psyzine.debug` | `1.0.4` |
+| Direct Release | `direct/release/app-direct-release.apk` | `app.psyzine` | `1.0.4-dev` |
+| Play Debug | `play/debug/app-play-debug.apk` | `app.psyzine.play.debug` | `1.0.4` |
+| Play Release | `play/release/app-play-release.apk` | `app.psyzine.play` | `1.0.4-dev` |
+| Direct Compatible Release | `direct/compatibleRelease/app-direct-compatibleRelease.apk` | `app.psyzine.debug` | `1.0.4-compat.5` |
 
 The compatible build uses release minification/resource shrinking, `debuggable=false`, and `release` dependency fallbacks. Namespace, FileProvider authority, schema history, storage and all 13 themes remain intact. It cannot coexist with Direct Debug because they deliberately share the installed identity.
 
@@ -85,5 +85,5 @@ uses the catalog for each published baseline.
 The code4 download passed actual SDK inspection and validation locally. Three
 focused validator tests and the schema-history contract test passed, along with
 shell/embedded-Python syntax and diff checks. Installed upgrades have not run for
-this increment. Candidate code must exceed published code4 before dispatching the
-protected matrix; the current source version is not a publishable new candidate.
+this increment. Candidate code5 exceeds published code4; its unpublished follow-up fixture uses
+code6. Publication still requires the protected checks and downloaded-asset validation.
