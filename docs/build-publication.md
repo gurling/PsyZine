@@ -87,3 +87,18 @@ focused validator tests and the schema-history contract test passed, along with
 shell/embedded-Python syntax and diff checks. Installed upgrades have not run for
 this increment. Candidate code5 exceeds published code4; its unpublished follow-up fixture uses
 code6. Publication still requires the protected checks and downloaded-asset validation.
+
+
+## Upgrade UI synchronization correction
+
+The upgrade harness waits for the experience destination and reacquires app
+scroll containers for every gesture. A stale accessibility node is retried only
+within a bounded ten-second window; other failures and every retention/backup
+assertion still fail the test. Vertical content and horizontal navigation are
+selected separately by their visible bounds.
+
+The corrected independent harness passed all eight checks for an actual local
+code4 → code5 → unpublished-code6 sequence on a fresh Android17/16KiB emulator
+at 320×640. This includes schema9→10, both photo/backup smoke checks and post-UI
+retention. No uninstall, data clearing or downgrade flag was used. The four
+protected baseline paths still require successful execution on the final source.

@@ -86,6 +86,32 @@ class InPlaceUpgradeTest {
         error("Clickable target did not stabilize: $selector")
     }
 
+    private fun scrollAppWhenReady(direction: Direction, fraction: Float) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 10000
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            try {
+                // Compose can replace accessibility nodes during navigation or lazy composition.
+                // Reacquire the target for each gesture, including after a stale-node failure.
+                val containers = device.findObjects(By.pkg(context.packageName).scrollable(true))
+                    .filter { !it.visibleBounds.isEmpty }
+                val target = if (direction == Direction.RIGHT || direction == Direction.LEFT) {
+                    containers.filter { it.visibleBounds.centerY() > device.displayHeight / 2 }
+                        .minByOrNull { it.visibleBounds.height() }
+                } else containers.maxByOrNull { it.visibleBounds.height() }
+                if (target != null) {
+                    target.scroll(direction, fraction, 500)
+                    device.waitForIdle()
+                    return
+                }
+            } catch (_: StaleObjectException) {
+                device.waitForIdle()
+            }
+            android.os.SystemClock.sleep(100)
+        }
+        device.dumpWindowHierarchy(File(context.getExternalFilesDir(null), "upgrade-scroll-failure.xml"))
+        error("App scroll container did not stabilize for $direction")
+    }
+
     private fun requireEmulator() {
         check(arguments.getString("psyzineUpgradeFixture") == "true") { "Explicit emulator fixture mode required" }
         check(device.executeShellCommand("getprop ro.kernel.qemu").trim() == "1") { "Physical-device fixture seeding is forbidden" }
@@ -249,14 +275,14 @@ class InPlaceUpgradeTest {
             .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK))
         check(device.wait(Until.hasObject(By.text("Journal")), 30000)) { "Journal did not open" }
         check(device.wait(Until.hasObject(By.text("Upgrade fixture")), 15000)) { "Preserved entry is missing" }
-        device.findObject(By.text("Upgrade fixture")).click()
-        val scroll = device.wait(Until.findObject(By.scrollable(true)), 10000)
-        repeat(8) { if (!device.hasObject(By.desc("Open photo 1 of 2"))) scroll?.scroll(Direction.DOWN, 0.6f) }
+        clickWhenReady(By.text("Upgrade fixture"))
+        check(device.wait(Until.hasObject(By.desc("Edit options")), 10000)) { "Preserved entry did not open" }
+        repeat(8) { if (!device.hasObject(By.desc("Open photo 1 of 2"))) scrollAppWhenReady(Direction.DOWN, 0.6f) }
         check(device.wait(Until.hasObject(By.desc("Open photo 1 of 2")), 10000)) { "Photos did not render" }
-        device.findObject(By.desc("Open photo 1 of 2")).click()
+        clickWhenReady(By.desc("Open photo 1 of 2"))
         check(device.wait(Until.hasObject(By.desc("Close photo viewer")), 10000)) { "Photo viewer did not open" }
         // Wait for each destination: consecutive system Back events can outrun navigation.
-        device.findObject(By.desc("Close photo viewer")).click()
+        clickWhenReady(By.desc("Close photo viewer"))
         check(device.wait(Until.hasObject(By.desc("Edit options")), 10000)) { "Photo viewer did not return to the entry" }
         device.pressBack()
         check(device.wait(Until.gone(By.desc("Edit options")), 10000) &&
@@ -265,23 +291,15 @@ class InPlaceUpgradeTest {
         // Settings tab can be offscreen even after navigation correctly returns.
         repeat(6) {
             if (device.findObject(By.text("Settings"))?.visibleBounds?.isEmpty != false) {
-                val navigation = device.findObjects(By.pkg(context.packageName).scrollable(true))
-                    .filter { it.visibleBounds.centerY() > device.displayHeight / 2 }
-                    .minByOrNull { it.visibleBounds.height() }
-                    ?: error("Settings is hidden and the navigation scroll container is missing")
-                navigation.scroll(Direction.RIGHT, 0.8f, 500)
-                device.waitForIdle()
+                scrollAppWhenReady(Direction.RIGHT, 0.8f)
             }
         }
         clickWhenReady(By.text("Settings"))
         check(device.wait(Until.hasObject(By.text("Appearance")), 10000)) { "Settings screen did not open" }
         repeat(12) {
             if (!device.hasObject(By.text("Back up journal and photos"))) {
-                val settingsScroll = device.wait(Until.findObject(By.pkg(context.packageName).scrollable(true)), 10000)
-                    ?: error("Settings scroll container missing")
                 // Small, slow steps keep the backup row from being skipped by a fling.
-                settingsScroll.scroll(Direction.DOWN, 0.25f, 500)
-                device.waitForIdle()
+                scrollAppWhenReady(Direction.DOWN, 0.25f)
             }
         }
         if (!device.wait(Until.hasObject(By.text("Back up journal and photos")), 10000)) {
