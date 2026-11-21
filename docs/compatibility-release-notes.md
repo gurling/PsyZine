@@ -9,6 +9,7 @@ Testing compatibility pre-release signed with the retained PsyZine identity.
 - Improve grouped timeline estimates and large-text graph captions. Grouped amounts remain unknown when any contribution lacks a dose or usable conversion ratio.
 - Preserve editor drafts and dose precision, reject stale or changed records, and keep failed saves visible with readable recovery actions.
 - Improve large-journal queries, lazy photo loading and lifecycle-aware relative-time updates.
+- Keep tag subject assignment scrollable on small screens with large text and the keyboard open.
 - Add local support information and bundled release notes without automatically sharing private journal data.
 
 The Direct Compatible Release APK retains `app.psyzine.debug`, the existing certificate, minification and `debuggable=false`. The additive schema-10 migration preserves existing records and schema history. Portable backups retain attachments and new definition/tag data; older supported backup formats remain readable. Obtainium's README channel filter selects the compatible APK.

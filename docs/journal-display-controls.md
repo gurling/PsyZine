@@ -85,3 +85,15 @@ substance-history improvements on the emulator. Journal-size fixtures covered
 100, 1,000 and 10,000 experiences. These are comparative emulator measurements,
 not physical speed or battery claims. Protected signed upgrades, startup
 comparison, physical accessibility and the complete parity ledger remain gates.
+
+
+### Small-screen release correction
+
+At 320×640 and 200% text, the tag-assignment heading, search and selection
+summary could consume the list viewport while the keyboard was open. These
+controls now scroll in the same lazy list as the subjects. Six focused tag and
+tolerance UI tests passed at that size, including the keyboard-open case and
+RTL tolerance navigation. Original emulator size, density and font were restored
+and verified. The tolerance navigation test now brings its button fully into
+view before tapping and waits for UI callbacks before asserting. Final protected
+release checks run separately on the corrected source.
