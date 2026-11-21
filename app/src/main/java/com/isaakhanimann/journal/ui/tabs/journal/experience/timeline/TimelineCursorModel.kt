@@ -27,7 +27,8 @@ data class TimelineCursorReadout(
     val milligramEquivalent: Double?,
     val quantityEquivalent: Double? = null,
 )
-data class GroupedTimelineReadout(val value: TimelineCursorReadout, val contributionCount: Int)
+data class GroupedTimelineReadout(val value: TimelineCursorReadout, val contributionCount: Int,
+    val knownDoseCount: Int = contributionCount)
 
 fun TimelineCursorReadout.equivalentText(): String {
     val unit = ingestion.quantityUnit?.takeIf { it.isNotBlank() }
@@ -78,15 +79,27 @@ class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
         return groups.map { group ->
             val parts = group.indices.map { values[it] }
             val units = parts.map { it.ingestion.quantityUnit }.distinct()
-            fun sumKnown(numbers: List<Double?>): Double? = if (numbers.any { it == null || !it.isFinite() || it < 0 }) null
-                else numbers.sumOf { it!! }.takeIf(Double::isFinite)
-            val quantity = if (units.size == 1 && !units.single().isNullOrBlank()) sumKnown(parts.map { it.quantityEquivalent }) else null
-            val mg = sumKnown(parts.map { it.milligramEquivalent })
-            val line = if (units.size == 1) parts.first().ingestion else parts.first().ingestion.copy(quantityUnit = null, quantityUnitPlural = null)
             val seconds = Duration.between(group.start, time).toMillis() / 1000f
+            val rawHeight = group.full?.heightAt(seconds)?.takeIf { it.isFinite() && it >= 0 }
+            fun ratios(amount: (DataForOneEffectLine) -> Double?): List<Double> = parts.mapNotNull { part ->
+                val value = amount(part.ingestion) ?: return@mapNotNull null
+                val height = part.ingestion.height.toDouble()
+                if (!value.isFinite() || value < 0 || !height.isFinite() || height <= 0) return@mapNotNull null
+                (value / height).takeIf { it.isFinite() }
+            }
+            fun equivalent(amount: (DataForOneEffectLine) -> Double?): Double? {
+                val ratios = ratios(amount)
+                val maximum = ratios.maxOrNull() ?: return null
+                val average = if (maximum == 0.0) 0.0 else ratios.sumOf { it / maximum } / ratios.size * maximum
+                return rawHeight?.let { (it.toDouble() * average).takeIf { result -> result.isFinite() && result >= 0 } }
+            }
+            val quantity = if (units.size == 1 && !units.single().isNullOrBlank()) equivalent { it.quantity } else null
+            val mg = equivalent { it.doseInMilligrams }
+            val line = if (units.size == 1) parts.first().ingestion else parts.first().ingestion.copy(quantityUnit = null, quantityUnitPlural = null)
             val fraction = group.full?.let { (it.heightAt(seconds) / it.nonNormalisedHeight).takeIf(Float::isFinite)?.coerceIn(0f, 1f) }
-            GroupedTimelineReadout(TimelineCursorReadout(line, fraction, mg, quantity), parts.size)
-        }
+            val knownCount = if (!line.quantityUnit.isNullOrBlank()) ratios { it.quantity }.size else ratios { it.doseInMilligrams }.size
+            GroupedTimelineReadout(TimelineCursorReadout(line, fraction, mg, quantity), parts.size, knownCount)
+        }.filter { it.value.peakFraction?.let { fraction -> fraction >= 0.005f } ?: true }
     }
 
     fun at(time: Instant): List<TimelineCursorReadout> = curves.map { (line, full) ->

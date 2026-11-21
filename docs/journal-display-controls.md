@@ -30,9 +30,10 @@ Settings error and retain previous choices.
 Timeline quantity panels also offer an optional “Group by subject” view. Groups
 use persistent subject identity and administration route. Peak percentages come
 from the combined raw curve, independently of the chart's height normalization.
-The equivalent amount is the sum of existing per-ingestion estimates, labeled
-separately from the combined-peak percentage. Unknown contributions keep totals
-unknown; incompatible quantity units are not added. Compatible mass equivalents
+The equivalent amount uses the combined raw curve height multiplied by the mean
+of the contributing dose-to-height ratios, separately from peak percentage. When some doses are unknown, the estimate uses available known-dose ratios and
+labels that population; stored unknown doses remain unknown. Without a known
+ratio the amount remains unavailable. Incompatible quantity units are not combined. Compatible mass equivalents
 may still be shown in mg. The original per-ingestion view remains the default.
 Group curves are cached on demand, and hiding quantities skips grouped readouts.
 
@@ -58,3 +59,29 @@ The grouped quantity follow-up passed ten focused cursor tests, the Direct debug
 APK build and diff checks. Cases cover combined peaks, separated ingestions,
 typed identities/routes, unknown quantities and the existing individual cursor
 behavior. New panel interaction and large-font device checks were not run.
+
+## Grouped calculations and release milestone — 21 November 2026
+
+Grouped equivalents now use the raw combined curve multiplied by the mean of
+known dose-to-height ratios. Inactive groups below 0.5% of peak are omitted.
+Partially known estimates identify the known-dose population; no known ratios
+leave the amount unavailable. Per-ingestion readouts and stored doses remain
+separate. The grouping action is in the panel header so the estimate caption
+remains visible at large fonts. The independent-heights settings switch also
+has its own accessible label.
+
+Both debug unit suites passed 217 tests and both debug lint tasks had zero errors
+in the initial milestone. The subsequent focused cursor suite passed 13 tests.
+The full Android 17 emulator run recorded 178 passes, three intentional protected
+upgrade-fixture skips and one outdated settings assertion failure. The corrected
+settings test passed separately. All 57 platform-font checks then passed on the
+final panel layout: 19 each at 130%, 150% and 200%, with original font and density
+restored. The first 200% run exposed a genuine caption-height regression; the
+header action fixes it without removing clipping assertions.
+
+All 34 host policy tests passed. The 50,000-ingestion experiment used indexed
+query plans and measured approximately 71x parent-query, 32x day-query and 3.9x
+substance-history improvements on the emulator. Journal-size fixtures covered
+100, 1,000 and 10,000 experiences. These are comparative emulator measurements,
+not physical speed or battery claims. Protected signed upgrades, startup
+comparison, physical accessibility and the complete parity ledger remain gates.

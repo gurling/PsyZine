@@ -27,7 +27,8 @@ class TimelineCursorTest {
             line().copy(subjectKey = "custom:1", route = AdministrationRoute.SMOKED)))
         val groups = model.groupedAt(start.plusSeconds(40))
         assertEquals(3, groups.size)
-        assertNull(groups.first().value.milligramEquivalent)
+        assertEquals(200.0, groups.first().value.milligramEquivalent!!, .001)
+        assertEquals(1, groups.first().knownDoseCount)
         assertEquals(1f, groups.first().value.peakFraction!!, .0001f)
     }
     @Test fun separatedIngestionsUseTheirActualCombinedPeakRatherThanSumOfIndividualPeaks() {
@@ -35,6 +36,27 @@ class TimelineCursorTest {
         assertEquals(1f, model.groupedAt(start.plusSeconds(40)).single().value.peakFraction!!, .0001f)
         val partial = TimelineCursorModel(listOf(line(), line().copy(roaDuration = null, subjectKey = "other")))
         assertNull(partial.groupedAt(start).last().value.peakFraction)
+    }
+    @Test fun groupedQuantityUsesRawHeightTimesMeanDoseToHeightRatio() {
+        val model = TimelineCursorModel(listOf(line().copy(height = 1f), line().copy(height = 2f)))
+        val group = model.groupedAt(start.plusSeconds(40)).single()
+        assertEquals(225.0, group.value.milligramEquivalent!!, .001)
+        assertEquals(200.0, model.at(start.plusSeconds(40)).sumOf { it.milligramEquivalent!! }, .001)
+    }
+    @Test fun groupedRatioIsIndependentOfWhichIngestionIsActive() {
+        val model = TimelineCursorModel(listOf(line().copy(height = 1f),
+            line().copy(height = 2f, startTime = start.plusSeconds(200))))
+        assertEquals(75.0, model.groupedAt(start.plusSeconds(40)).single().value.milligramEquivalent!!, .001)
+        assertEquals(150.0, model.groupedAt(start.plusSeconds(240)).single().value.milligramEquivalent!!, .001)
+    }
+    @Test fun noKnownDosesRemainUnknownAndInactiveGroupsAreOmitted() {
+        val unknown = TimelineCursorModel(listOf(line(null), line(null)))
+        assertNull(unknown.groupedAt(start.plusSeconds(40)).single().value.milligramEquivalent)
+        assertEquals(0, unknown.groupedAt(start.plusSeconds(40)).single().knownDoseCount)
+        val known = TimelineCursorModel(listOf(line()))
+        assertTrue(known.groupedAt(start.minusSeconds(1)).isEmpty())
+        assertTrue(known.groupedAt(start.plusMillis(10010)).isEmpty())
+        assertEquals(1, known.groupedAt(start.plusSeconds(11)).size)
     }
     private val start = Instant.parse("2026-01-01T12:00:00Z")
     private fun range(seconds: Float) = DurationRange(seconds, seconds, DurationUnits.SECONDS)
