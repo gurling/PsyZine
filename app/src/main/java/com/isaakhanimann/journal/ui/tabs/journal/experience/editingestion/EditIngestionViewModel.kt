@@ -46,7 +46,6 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -154,6 +153,12 @@ class EditIngestionViewModel @Inject constructor(
             }
             loadedEnd = localDateTimeEndFlow.value
             initialEndInstant = ing.endTime ?: ing.time.plus(30, ChronoUnit.MINUTES)
+            localDateTimeStartFlow.value = state.get<String>("editIngestionStart")?.let { LocalDateTime.parse(it) } ?: localDateTimeStartFlow.value
+            localDateTimeEndFlow.value = state.get<String>("editIngestionEnd")?.let { LocalDateTime.parse(it) } ?: localDateTimeEndFlow.value
+            ingestionTimePickerOptionFlow.value = IngestionTimePickerOption.entries.firstOrNull {
+                it.name == state.get<String>("editIngestionTimeMode")
+            } ?: ingestionTimePickerOptionFlow.value
+            rememberTiming()
         }
     }
 
@@ -172,30 +177,38 @@ class EditIngestionViewModel @Inject constructor(
         }
     }
 
-    fun onChangeTimePickerOption(ingestionTimePickerOption: IngestionTimePickerOption) =
-        viewModelScope.launch {
-            ingestionTimePickerOptionFlow.emit(ingestionTimePickerOption)
-        }
-
-    fun onChangeStartTime(newLocalDateTime: LocalDateTime) = viewModelScope.launch {
-        localDateTimeStartFlow.emit(newLocalDateTime)
-        val startTime = newLocalDateTime.atZone(ZoneId.systemDefault()).toInstant()
-        val endTime = localDateTimeEndFlow.first().atZone(ZoneId.systemDefault()).toInstant()
-        if (startTime > endTime) {
-            val newEndTime = startTime.plus(30, ChronoUnit.MINUTES)
-            localDateTimeEndFlow.emit(newEndTime.getLocalDateTime())
-        }
+    fun onChangeTimePickerOption(ingestionTimePickerOption: IngestionTimePickerOption) {
+        if (!session.ready || session.busy) return
+        ingestionTimePickerOptionFlow.value = ingestionTimePickerOption
+        rememberTiming()
     }
 
-    fun onChangeEndTime(newLocalDateTime: LocalDateTime) = viewModelScope.launch {
-        localDateTimeEndFlow.emit(newLocalDateTime)
-        val endTime = newLocalDateTime.atZone(ZoneId.systemDefault()).toInstant()
-        val startTime =
-            localDateTimeStartFlow.first().atZone(ZoneId.systemDefault()).toInstant()
+    fun onChangeStartTime(newLocalDateTime: LocalDateTime) {
+        if (!session.ready || session.busy) return
+        localDateTimeStartFlow.value = newLocalDateTime
+        val startTime = newLocalDateTime.atZone(ZoneId.systemDefault()).toInstant()
+        val endTime = localDateTimeEndFlow.value.atZone(ZoneId.systemDefault()).toInstant()
         if (startTime > endTime) {
-            val newStartTime = endTime.minus(30, ChronoUnit.MINUTES)
-            localDateTimeStartFlow.emit(newStartTime.getLocalDateTime())
+            localDateTimeEndFlow.value = startTime.plus(30, ChronoUnit.MINUTES).getLocalDateTime()
         }
+        rememberTiming()
+    }
+
+    fun onChangeEndTime(newLocalDateTime: LocalDateTime) {
+        if (!session.ready || session.busy) return
+        localDateTimeEndFlow.value = newLocalDateTime
+        val endTime = newLocalDateTime.atZone(ZoneId.systemDefault()).toInstant()
+        val startTime = localDateTimeStartFlow.value.atZone(ZoneId.systemDefault()).toInstant()
+        if (startTime > endTime) {
+            localDateTimeStartFlow.value = endTime.minus(30, ChronoUnit.MINUTES).getLocalDateTime()
+        }
+        rememberTiming()
+    }
+
+    private fun rememberTiming() {
+        state["editIngestionStart"] = localDateTimeStartFlow.value.toString()
+        state["editIngestionEnd"] = localDateTimeEndFlow.value.toString()
+        state["editIngestionTimeMode"] = ingestionTimePickerOptionFlow.value.name
     }
 
     fun onChangeConsumerName(newName: String) {

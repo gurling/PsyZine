@@ -122,3 +122,24 @@ On 21 November 2026 the Direct Debug APK build, instrumentation-source compilati
 and diff check passed. The two new cases were compiled, not executed: Android MCP
 reported no connected devices. Actual process recreation, overall-conflict
 recovery and time-picker behavior still require device checks.
+
+## Ingestion timing controls
+
+The ingestion editor now updates start, end and point/range mode synchronously,
+so an immediate Save sees the selected timing. Moving start past end still moves
+end forward by 30 elapsed minutes; moving end before start still moves start back
+by 30 elapsed minutes. The paired adjustment is retained together in SavedState.
+
+Timing recovery runs after the existing generation and definition checks. Original
+loaded timestamps remain separate, preserving unchanged instants when editing.
+This increment covers timing controls; recovery of other ingestion draft fields
+remains separate work. No schema or backup format changes.
+
+`IngestionTimingRecoveryTest` covers range reconstruction, paired adjustments,
+immediate time/mode selection followed by Save, duplicate taps and precise dose
+retention using an isolated in-memory Room database.
+
+On 21 November 2026, the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two new cases were compiled, not executed. Android MCP
+found no connected devices; actual time-picker interaction, process recreation
+and DST behavior remain runtime checks.
