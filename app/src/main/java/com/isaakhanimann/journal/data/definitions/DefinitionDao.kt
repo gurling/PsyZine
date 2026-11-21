@@ -23,7 +23,8 @@ interface DefinitionDao {
     fun observeSubjectBrowserChanges(query: androidx.sqlite.db.SupportSQLiteQuery): Flow<Int>
     @Query("SELECT * FROM Ingestion ORDER BY time DESC, id DESC LIMIT 500")
     suspend fun recentBrowserIngestions(): List<com.isaakhanimann.journal.data.room.experiences.entities.Ingestion>
-    @RawQuery(observedEntities = [com.isaakhanimann.journal.data.room.experiences.entities.Ingestion::class,
+    @RawQuery(observedEntities = [com.isaakhanimann.journal.data.room.experiences.entities.Experience::class,
+        com.isaakhanimann.journal.data.room.experiences.entities.Ingestion::class,
         com.isaakhanimann.journal.data.room.experiences.entities.CustomUnit::class,
         com.isaakhanimann.journal.data.room.experiences.entities.CustomSubstance::class,
         com.isaakhanimann.journal.data.room.experiences.entities.SubstanceCompanion::class,

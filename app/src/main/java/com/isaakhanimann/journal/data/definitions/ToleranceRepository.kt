@@ -33,23 +33,27 @@ class ToleranceRepository @Inject constructor(private val db: AppDatabase, priva
         val catalog = substances.getAllSubstances().associateBy { it.name }
         emitAll(db.definitionDao().observeToleranceChanges(SimpleSQLiteQuery("SELECT 1")).mapLatest {
             val current = now()
-            val start = current.instant.minus(Duration.ofDays(period.days))
             val snapshot = guard.readSession(null) { generation ->
                 val dao = db.experienceDao()
-                if (experienceId != null) check(dao.getExperience(experienceId) != null) { "This experience was deleted. Reopen the journal." }
-                val events = db.definitionDao().toleranceIngestions(start.minus(Duration.ofDays(90)), current.instant)
+                val cutoff = if (experienceId == null) current.instant else {
+                    val experience = checkNotNull(dao.getExperience(experienceId)) { "This experience was deleted. Reopen the journal." }
+                    experienceToleranceCutoff(dao.getIngestionsWithCompanions(experienceId).map { it.ingestion.time }, experience.sortDate)
+                }
+                val start = cutoff.minus(Duration.ofDays(period.days))
+                val events = db.definitionDao().toleranceIngestions(start.minus(Duration.ofDays(90)), cutoff)
                 val graph = db.definitionDao().definitions().toGraph()
                 val colors = dao.getAllSubstanceCompanions().associate { it.substanceName to it.color.name }
                 val locals = dao.getAllCustomSubstances().map { it.name }.toSet()
-                Snapshot(events, graph, colors, locals, generation)
+                Snapshot(events, graph, colors, locals, generation, cutoff)
             }
             withContext(Dispatchers.Default) {
                 val sources = definitionToleranceEvents(snapshot.ingestions, snapshot.graph, catalog, snapshot.colors, snapshot.locals)
-                ToleranceReport(projectTolerance(sources.events, start, current.instant, current.zone), start, current.instant,
+                val start = snapshot.cutoff.minus(Duration.ofDays(period.days))
+                ToleranceReport(projectTolerance(sources.events, start, snapshot.cutoff, current.zone), start, snapshot.cutoff,
                     sources.unresolvedDefinitionIds, snapshot.generation, current.zone)
             }
         })
     }
     private data class Snapshot(val ingestions: List<com.isaakhanimann.journal.data.room.experiences.entities.Ingestion>,
-        val graph: CustomDefinitionGraph, val colors: Map<String, String>, val locals: Set<String>, val generation: String)
+        val graph: CustomDefinitionGraph, val colors: Map<String, String>, val locals: Set<String>, val generation: String, val cutoff: Instant)
 }

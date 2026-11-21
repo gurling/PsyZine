@@ -88,4 +88,28 @@ class ToleranceRepositoryTest {
             assertEquals(2, report.projection.rows.single().ingestionIds.size)
         } finally { job.cancelAndJoin(); received.close() }
     }
+    @Test fun experienceAnchorUsesAllStartsAndEmptyDateEditsRefreshTheChart() = runBlocking {
+        val received = Channel<ToleranceReport>(Channel.UNLIMITED)
+        val job = launch { repo.observe({ now }, TolerancePeriod.PAST_1M, 1).collect { received.send(it) } }
+        suspend fun at(cutoff: Instant) = withTimeout(15000) {
+            var report = received.receive()
+            while (report.cutoff != cutoff) report = received.receive()
+            report
+        }
+        try {
+            val original = db.experienceDao().getIngestion(1)!!
+            assertEquals(original.time, at(original.time).cutoff)
+            val other = original.copy(id = 2, time = now.instant.plusSeconds(3600), consumerName = "Synthetic other")
+            db.experienceDao().insert(other)
+            val report = at(other.time)
+            assertTrue(report.projection.rows.all { 2 !in it.ingestionIds })
+            db.withTransaction { db.experienceDao().delete(original); db.experienceDao().delete(other) }
+            at(now.instant)
+            val changedDate = now.instant.minus(Duration.ofDays(10))
+            val experience = db.experienceDao().getExperience(1)!!
+            db.experienceDao().update(experience.copy(sortDate = changedDate))
+            assertEquals(changedDate, at(changedDate).cutoff)
+        } finally { job.cancelAndJoin(); received.close() }
+    }
+
 }

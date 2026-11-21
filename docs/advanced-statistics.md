@@ -52,12 +52,13 @@ exclude it; supported mass conversions remain compatible. Overflowing experience
 sums are excluded. Counts of included and excluded experiences are explicit.
 Per-ingestion samples and known totals retain their existing populations.
 
-Experience screens offer an expandable current-tolerance panel. It reuses the
+Experience screens offer an expandable historical-tolerance panel. It reuses the
 Statistics interval model and subject details, with an independent saved period
 defaulting to Past 1M (30 elapsed days). It loads while expanded and collects
-state with the screen lifecycle. The panel labels its journal-wide, current-time
-scope explicitly; it does not reconstruct tolerance at a historical experience
-date. Missing metadata remains unknown, and preference failures retain the
+state with the screen lifecycle. The panel includes recorded events through the latest ingestion start in the
+experience, falling back to its stored date when empty. All consumers participate
+in choosing that anchor; the interval events retain their existing Me-only filter.
+Statistics continues to use the current time. Missing metadata remains unknown, and preference failures retain the
 previous choice. This local period preference does not change portable backups.
 
 Interval details also show a current recorded break, using all matching subjects
@@ -105,3 +106,14 @@ interval cases), the Direct debug APK build and diff checks. Added cases cover
 future starts, ongoing and overlapping ranges, empty histories, consumer
 isolation and current context outside the historical filter. Device, lint and
 full-regression checks were not run for this follow-up.
+
+## Historical experience anchor — 21 November 2026
+
+The experience tolerance panel now anchors at the latest recorded ingestion start
+and falls back to the experience date when empty. Statistics remains anchored to
+now. Date edits invalidate the empty-experience panel as well.
+
+Ten focused JVM tests passed, and the Direct Debug APK and instrumentation-source
+compilation passed. The new Room subscription scenario was compiled, not executed;
+no fixture suite was installed on the physical Pixel. Physical reference inspection
+and static analysis informed this behavior; PsyZine runtime acceptance is pending.

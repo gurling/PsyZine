@@ -105,12 +105,12 @@ fun ToleranceScreenContent(state: ToleranceUiState, saving: Boolean, period: (To
 fun ExperienceTolerance() {
     var expanded by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     Column {
-        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide current tolerance" else "Show current tolerance") }
+        TextButton(onClick = { expanded = !expanded }) { Text(if (expanded) "Hide experience tolerance" else "Show experience tolerance") }
         if (expanded) {
             val model: ToleranceViewModel = hiltViewModel()
             val state by model.state.collectAsStateWithLifecycle()
             var subject by remember(state.report?.generation) { mutableStateOf<String?>(null) }
-            Text("Current tolerance across your journal, as of now. This is not a reconstruction at this experience's date.", style = MaterialTheme.typography.bodySmall)
+            Text("Tolerance of recorded ingestions up to this experience's latest ingestion start, or its stored date when empty.", style = MaterialTheme.typography.bodySmall)
             if (subject != null) TextButton(onClick = { subject = null }) { Text("All subjects") }
             Box(Modifier.fillMaxWidth().height(480.dp)) {
                 ToleranceScreenContent(state.copy(subjectKey = subject), model.saving, model::period, model::retry,
