@@ -58,20 +58,23 @@ fun TagSubjectsScreen(back: () -> Unit, model: TagSubjectsViewModel = hiltViewMo
     Scaffold(topBar = { TopAppBar(title = { Text("Assign subjects") }, navigationIcon = { TagBackButton(back) }) },
         bottomBar = { TagSaveButton(model, "Save subjects") { model.save(back) } }) { padding ->
         if (model.loading || !model.ready) TagLoadStatus(model, padding, model::load)
-        else Column(Modifier.fillMaxSize().padding(padding)) {
-            Text(model.tagName, Modifier.padding(12.dp), style = MaterialTheme.typography.headlineSmall)
-            OutlinedTextField(query, model::search, Modifier.fillMaxWidth().padding(horizontal = 12.dp), label = { Text("Search subjects") })
-            Text("${model.selected.size} selected. Other tags and existing primary choices are retained.", Modifier.padding(12.dp))
-            LazyColumn(Modifier.weight(1f).testTag("tag-subject-list"), contentPadding = PaddingValues(12.dp)) {
-                if (filtered.isEmpty()) item { Text("No matching subjects.") }
-                items(filtered, key = { it.key }) { subject ->
-                    Row(Modifier.fillMaxWidth().toggleable(subject.key in model.selected, enabled = model.canSave, role = Role.Checkbox,
-                        onValueChange = { model.toggle(subject.key) }).padding(vertical = 8.dp).testTag("tag-subject:${subject.key}")) {
-                        Checkbox(subject.key in model.selected, onCheckedChange = null)
-                        Column(Modifier.weight(1f).padding(12.dp)) {
-                            Text(subject.name, style = MaterialTheme.typography.titleMedium)
-                            Text(subject.kind, style = MaterialTheme.typography.bodyMedium)
-                        }
+        else LazyColumn(Modifier.fillMaxSize().padding(padding).testTag("tag-subject-list"),
+            contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            item(key = "tag-heading") { Text(model.tagName, style = MaterialTheme.typography.headlineSmall) }
+            item(key = "subject-search") {
+                OutlinedTextField(query, model::search, Modifier.fillMaxWidth(), label = { Text("Search subjects") })
+            }
+            item(key = "selection-summary") {
+                Text("${model.selected.size} selected. Other tags and existing primary choices are retained.")
+            }
+            if (filtered.isEmpty()) item { Text("No matching subjects.") }
+            items(filtered, key = { it.key }) { subject ->
+                Row(Modifier.fillMaxWidth().toggleable(subject.key in model.selected, enabled = model.canSave, role = Role.Checkbox,
+                    onValueChange = { model.toggle(subject.key) }).padding(vertical = 8.dp).testTag("tag-subject:${subject.key}")) {
+                    Checkbox(subject.key in model.selected, onCheckedChange = null)
+                    Column(Modifier.weight(1f).padding(12.dp)) {
+                        Text(subject.name, style = MaterialTheme.typography.titleMedium)
+                        Text(subject.kind, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }

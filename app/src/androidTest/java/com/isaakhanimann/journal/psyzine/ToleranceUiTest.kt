@@ -71,14 +71,14 @@ class ToleranceUiTest {
         device.executeShellCommand("screencap -p $capture/tolerance-200-rtl.png")
         println("PsyZine tolerance screenshot: $capture/tolerance-200-rtl.png")
         compose.onNodeWithTag("tolerance-list").performScrollToNode(hasContentDescription("Open tolerance for $name"))
-        compose.onNodeWithContentDescription("Open tolerance for $name").performClick()
-        assertEquals("custom:1/synthetic", opened)
+        compose.onNodeWithContentDescription("Open tolerance for $name").performScrollTo().assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("custom:1/synthetic", opened) }
         compose.onNodeWithTag("tolerance-list").performScrollToNode(hasText("Missing numeric metadata"))
         compose.onNodeWithText("Missing numeric metadata").assertIsDisplayed()
         compose.onNodeWithTag("tolerance-list").performScrollToNode(hasText("Past 2M"))
         compose.onNodeWithText("Past 2M").performClick()
         compose.onNodeWithText("Past 8M").performScrollTo().performClick()
-        assertEquals(TolerancePeriod.PAST_8M, selected)
+        compose.runOnIdle { assertEquals(TolerancePeriod.PAST_8M, selected) }
     }
     @Test fun failedPeriodWriteExplainsTheErrorAndRetainsThePreviousPeriod() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
