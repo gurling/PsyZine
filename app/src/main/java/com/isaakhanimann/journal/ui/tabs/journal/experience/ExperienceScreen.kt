@@ -70,8 +70,6 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -108,7 +106,7 @@ import com.isaakhanimann.journal.ui.tabs.journal.experience.timeline.AllTimeline
 import com.isaakhanimann.journal.ui.theme.PsyZineTheme
 import com.isaakhanimann.journal.ui.theme.horizontalPadding
 import com.isaakhanimann.journal.ui.utils.getDateWithWeekdayText
-import kotlinx.coroutines.delay
+import com.isaakhanimann.journal.ui.utils.rememberUiTime
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
@@ -1051,13 +1049,7 @@ private fun ExperienceTopBar(
 
 @Composable
 private fun LastIngestionRelativeToNowText(lastIngestionTime: Instant) {
-    val now: MutableState<Instant> = remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(key1 = "updateTime") {
-        while (true) {
-            delay(10000L) // update every 10 seconds
-            now.value = Instant.now()
-        }
-    }
+    val now = rememberUiTime(active = true, intervalMillis = 10000L)
     val isInPast = lastIngestionTime < now.value
     val relativeTime = if (isInPast) {
         "Last ingestion was " + getDurationText(
@@ -1079,13 +1071,7 @@ private fun LastIngestionRelativeToNowText(lastIngestionTime: Instant) {
 
 @Composable
 private fun NowRelativeToStartTimeText(startTime: Instant) {
-    val now: MutableState<Instant> = remember { mutableStateOf(Instant.now()) }
-    LaunchedEffect(key1 = "updateTime") {
-        while (true) {
-            delay(10000L) // update every 10 seconds
-            now.value = Instant.now()
-        }
-    }
+    val now = rememberUiTime(active = true, intervalMillis = 10000L)
     val isStartInPast = startTime < now.value
     val relativeTime = if (isStartInPast) {
         "Now " + getDurationText(
