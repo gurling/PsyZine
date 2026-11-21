@@ -131,15 +131,18 @@ class JournalSearchNavigationUiTest {
         androidx.test.espresso.Espresso.closeSoftKeyboard()
         compose.waitUntil(15000) { compose.onAllNodes(hasText(title) and hasClickAction()).fetchSemanticsNodes().isNotEmpty() }
         compose.onNodeWithText(title).performClick()
-        compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Open photo 1 of 1")).fetchSemanticsNodes().isNotEmpty() }
-        compose.onNodeWithContentDescription("Open photo 1 of 1").performScrollTo().performClick()
+        compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Edit options")).fetchSemanticsNodes().isNotEmpty() }
+        // Photo rows are composed lazily; bring the target into the viewport first.
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasContentDescription("Open photo 1 of 1"))
+        compose.onNodeWithContentDescription("Open photo 1 of 1").performClick()
         compose.waitUntil(15000) { compose.onAllNodes(hasContentDescription("Photo 1 of 1. Pinch to zoom.")).fetchSemanticsNodes().isNotEmpty() }
         compose.onAllNodes(isSelectable() and hasText("Journal")).assertCountEquals(0)
         compose.onAllNodes(isSelectable() and hasText("Drugs")).assertCountEquals(0)
         compose.onNodeWithContentDescription("Close photo viewer").performClick()
         compose.waitUntil(15000) { compose.onAllNodes(isSelectable() and hasText("Drugs")).fetchSemanticsNodes().isNotEmpty() }
         tab("Drugs").assertIsSelected()
-        compose.onNodeWithContentDescription("Expand timeline").performScrollTo().performClick()
+        compose.onNode(hasScrollToIndexAction()).performScrollToNode(hasContentDescription("Expand timeline"))
+        compose.onNodeWithContentDescription("Expand timeline").performClick()
         compose.waitUntil(15000) { compose.onAllNodes(hasText("Loading timeline")).fetchSemanticsNodes().isEmpty() }
         compose.onNodeWithText(com.isaakhanimann.journal.ui.YOU).assertIsDisplayed()
         tab("Drugs").assertIsSelected()

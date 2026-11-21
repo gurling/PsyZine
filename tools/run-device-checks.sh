@@ -11,5 +11,8 @@ collect_visual_captures() {
 }
 # Capture before the emulator runner shuts down; preserve the Gradle exit status.
 trap collect_visual_captures EXIT
+# Bound each test so a deadlock reports its stack before the job-wide timeout.
+# Five minutes leaves ample room for the intentional two-minute lifecycle check.
 ./gradlew :app:connectedDirectDebugAndroidTest \
+    -Pandroid.testInstrumentationRunnerArguments.timeout_msec=300000 \
     -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true "$@"
