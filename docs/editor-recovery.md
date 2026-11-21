@@ -164,3 +164,25 @@ On 21 November 2026 the Direct Debug APK build, instrumentation-source compilati
 and diff check passed. The two additional cases were compiled, not executed.
 Android MCP reported no connected devices; process recreation, unit-selection
 interaction and error recovery still require device verification.
+
+## Unit changes while saving
+
+The ingestion editor passes its captured unit fingerprint to the repository. The
+repository compares it with the current unit inside the existing save transaction,
+after acquiring the journal mutation lock and before updating the ingestion.
+A changed unit rejects the save with a readable explanation and leaves the draft
+open. The current unit remains available in the picker for explicit reselection
+and review. Native-definition graph validation also remains active.
+
+For records opened with an existing unit, its fingerprint is retained across
+recreation as well. A changed original unit cannot silently refresh an old draft's
+meaning during recovery. No schema or backup changes are required.
+
+A queued-save regression holds the mutation lock, changes the unit before the
+save acquires it, checks that the ingestion remains unchanged, then explicitly
+reselects the updated unit and retries successfully.
+
+On 21 November 2026 the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The new queued-save case was compiled, not executed.
+Android MCP reported no connected devices; transactional contention and picker
+reselection still require device execution.

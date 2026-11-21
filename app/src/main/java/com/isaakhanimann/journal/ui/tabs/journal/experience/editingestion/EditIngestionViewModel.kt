@@ -140,10 +140,12 @@ class EditIngestionViewModel @Inject constructor(
         }
     private var selectedCustomUnitId: Int? = null
     private var selectedDefinitionFingerprint: String? = null
+    private var selectedUnitFingerprint: String? = null
     var customUnit: CustomUnit? by mutableStateOf(null)
     val otherCustomUnits = experienceRepo.getAllCustomUnitsFlow().combine(ingestionFlow) { customUnits, ing ->
         customUnits.filter {customUnit ->
-            ing != null && customUnit.administrationRoute == ing.administrationRoute && customUnit.substanceName == ing.substanceName && customUnit.id != ing.customUnitId
+            ing != null && customUnit.substanceName == ing.substanceName &&
+                (customUnit.administrationRoute == ing.administrationRoute || customUnit.id == ing.customUnitId)
         }
     }.stateIn(
         initialValue = emptyList(),
@@ -191,6 +193,13 @@ class EditIngestionViewModel @Inject constructor(
             }
             selectedCustomUnitId = ing.customUnitId
             customUnit = ingestionAndCustomUnit.customUnit
+            selectedUnitFingerprint = customUnit?.editorFingerprint()
+            if (state.get<Boolean>("editSelectedUnitChosen") != true && customUnit != null) {
+                check(state.get<String>("editLoadedUnitFingerprint")?.let { it == selectedUnitFingerprint } != false) {
+                    "This custom unit changed. Close this entry and reopen it before saving."
+                }
+                state["editLoadedUnitFingerprint"] = selectedUnitFingerprint
+            }
             val definitionId = ing.customUnitId
             val definition = ingestionAndCustomUnit.customUnit
             if (definitionId != null && definition != null && definition.substanceName == null) {
@@ -220,6 +229,7 @@ class EditIngestionViewModel @Inject constructor(
                 }
                 selectedCustomUnitId = recoveredId
                 customUnit = recovered
+                selectedUnitFingerprint = recovered?.editorFingerprint()
                 selectedDefinitionFingerprint = fingerprint
             }
             loadedEnd = localDateTimeEndFlow.value
@@ -258,6 +268,7 @@ class EditIngestionViewModel @Inject constructor(
                 }
                 selectedCustomUnitId = selected?.id
                 customUnit = selected
+                selectedUnitFingerprint = selected?.editorFingerprint()
                 selectedDefinitionFingerprint = fingerprint
                 selected?.unit?.let { units = it }
                 state["editSelectedUnitChosen"] = true
@@ -356,7 +367,7 @@ class EditIngestionViewModel @Inject constructor(
             endTime = if (ingestionTimePickerOptionFlow.value == IngestionTimePickerOption.TIME_RANGE)
                 com.isaakhanimann.journal.ui.utils.preservedInstant(localDateTimeEndFlow.value, loadedEnd, initialEndInstant) else null,
             consumerName = if (consumerName == current.consumerName.orEmpty()) current.consumerName else consumerName.ifBlank { null })
-        experienceRepo.update(updated, current.experienceId, session.generation, selectedDefinitionFingerprint)
+        experienceRepo.update(updated, current.experienceId, session.generation, selectedDefinitionFingerprint, selectedUnitFingerprint)
     }
 
     fun deleteIngestion(onSuccess: () -> Unit) = session.run(onSuccess) {

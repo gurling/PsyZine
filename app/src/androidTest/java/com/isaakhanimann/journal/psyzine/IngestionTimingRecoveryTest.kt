@@ -34,6 +34,7 @@ class IngestionTimingRecoveryTest {
     private lateinit var repository: ExperienceRepository
     private lateinit var guard: JournalSessionGuard
     private lateinit var preferences: UserPreferences
+    private lateinit var mutationLock: JournalMutationLock
     private val store = ViewModelStore()
     private val original = Ingestion(id = 91, substanceName = "Synthetic", time = Instant.parse("2026-11-21T10:00:00Z"),
         creationDate = Instant.parse("2026-11-21T10:00:00Z"),
@@ -45,6 +46,7 @@ class IngestionTimingRecoveryTest {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java).build()
         val lock = JournalMutationLock()
+        mutationLock = lock
         guard = JournalSessionGuard(database, lock)
         repository = ExperienceRepository(database.experienceDao(), database.photoAttachmentDao(), AttachmentStorage(context), lock, guard)
         preferences = UserPreferences(object : DataStore<Preferences> {
@@ -179,6 +181,48 @@ class IngestionTimingRecoveryTest {
             restored.onDoneTap { fail("Changed selection must not save") }
         }
         assertEquals(original, runBlocking { repository.getIngestion(original.id) })
+    }
+
+
+    @Test fun queuedSaveRejectsChangedUnitAndExplicitReselectionAllowsRetry() {
+        val unit = CustomUnit.mdmaSample.copy(id = 101, substanceName = original.substanceName, dose = 1.0, creationDate = original.time)
+        runBlocking {
+            database.experienceDao().insert(unit)
+            database.experienceDao().update(original.copy(customUnitId = unit.id, units = unit.unit))
+        }
+        val before = runBlocking { repository.getIngestion(original.id) }!!
+        val model = create(SavedStateHandle(mapOf("ingestionId" to original.id)))
+        compose.waitUntil(10000) { model.session.ready }
+        var completed = 0
+        runBlocking { mutationLock.mutex.lock() }
+        try {
+            compose.runOnIdle {
+                model.note = "Pending draft"
+                model.onDoneTap { completed++ }
+                assertTrue(model.session.busy)
+            }
+            // Emulate a preceding writer completing while this save waits for the lock.
+            runBlocking { database.experienceDao().insert(unit.copy(dose = 2.0)) }
+        } finally { mutationLock.mutex.unlock() }
+        compose.waitUntil(10000) { !model.session.busy }
+        compose.runOnIdle {
+            assertEquals(0, completed)
+            assertTrue(model.session.ready)
+            assertTrue(model.session.error.orEmpty().contains("Select it again"))
+            assertEquals("Pending draft", model.note)
+            model.session.dismissError()
+        }
+        assertEquals(before, runBlocking { repository.getIngestion(original.id) })
+        val changed = runBlocking { repository.getCustomUnit(unit.id) }!!
+        compose.runOnIdle { model.onChangeCustomUnit(changed) }
+        compose.waitUntil(10000) { !model.session.busy }
+        compose.runOnIdle { model.onDoneTap { completed++ } }
+        compose.waitUntil(10000) { !model.session.busy }
+        compose.runOnIdle { assertEquals(1, completed) }
+        val saved = runBlocking { repository.getIngestion(original.id) }!!
+        assertEquals("Pending draft", saved.notes)
+        assertEquals(before.dose, saved.dose)
+        assertEquals(unit.id, saved.customUnitId)
     }
 
 }

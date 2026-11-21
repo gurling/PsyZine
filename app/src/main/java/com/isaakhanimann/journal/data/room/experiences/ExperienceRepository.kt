@@ -34,6 +34,7 @@ import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithCo
 import com.isaakhanimann.journal.data.room.experiences.relations.IngestionWithExperienceAndCustomUnit
 import com.isaakhanimann.journal.ui.tabs.settings.JournalExport
 import com.isaakhanimann.journal.data.definitions.*
+import com.isaakhanimann.journal.data.room.editorFingerprint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.Flow
@@ -78,12 +79,15 @@ class ExperienceRepository @Inject constructor(private val experienceDao: Experi
         check(experienceDao.update(note) == 1) { "This note was deleted." }
     }
 
-    suspend fun update(ingestion: Ingestion, previousParent: Int, generation: String?, definitionFingerprint: String? = null) = sessionGuard.withSession(generation, previousParent) {
+    suspend fun update(ingestion: Ingestion, previousParent: Int, generation: String?, definitionFingerprint: String? = null, customUnitFingerprint: String? = null) = sessionGuard.withSession(generation, previousParent) {
         requireParent(ingestion.experienceId)
         check(experienceDao.getIngestion(ingestion.id)?.experienceId == previousParent) { "This ingestion was deleted or moved. Reopen it." }
         ingestion.customUnitId?.let { id ->
             val unit = experienceDao.getCustomUnit(id)
             check(unit != null && unit.substanceName == ingestion.substanceName) { "This custom unit was deleted or changed. Choose a unit again." }
+            check(customUnitFingerprint == null || unit.editorFingerprint() == customUnitFingerprint) {
+                "This custom unit changed after the editor opened. Select it again to review its current values before saving. Your draft is still open."
+            }
             if (unit.substanceName == null) {
                 val content = experienceDao.definitionContents()
                 check(definitionFingerprint != null && content.definitionFingerprint(id) == definitionFingerprint) { "This definition changed. Reopen the entry before saving." }
