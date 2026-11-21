@@ -31,9 +31,9 @@ Timeline quantity panels also offer an optional “Group by subject” view. Gro
 use persistent subject identity and administration route. Peak percentages come
 from the combined raw curve, independently of the chart's height normalization.
 The equivalent amount uses the combined raw curve height multiplied by the mean
-of the contributing dose-to-height ratios, separately from peak percentage. When some doses are unknown, the estimate uses available known-dose ratios and
-labels that population; stored unknown doses remain unknown. Without a known
-ratio the amount remains unavailable. Incompatible quantity units are not combined. Compatible mass equivalents
+of the contributing dose-to-height ratios, separately from peak percentage. When any contribution lacks a known dose or usable conversion ratio, the grouped
+amount remains unavailable; it is never extrapolated from other ingestions.
+Stored unknown doses remain unknown. Incompatible quantity units are not combined. Compatible mass equivalents
 may still be shown in mg. The original per-ingestion view remains the default.
 Group curves are cached on demand, and hiding quantities skips grouped readouts.
 
@@ -64,8 +64,8 @@ behavior. New panel interaction and large-font device checks were not run.
 
 Grouped equivalents now use the raw combined curve multiplied by the mean of
 known dose-to-height ratios. Inactive groups below 0.5% of peak are omitted.
-Partially known estimates identify the known-dose population; no known ratios
-leave the amount unavailable. Per-ingestion readouts and stored doses remain
+A grouped amount requires known, usable ratios for every contribution. Missing
+values leave it unavailable, as an explicitly approved safety difference. Per-ingestion readouts and stored doses remain
 separate. The grouping action is in the panel header so the estimate caption
 remains visible at large fonts. The independent-heights settings switch also
 has its own accessible label.

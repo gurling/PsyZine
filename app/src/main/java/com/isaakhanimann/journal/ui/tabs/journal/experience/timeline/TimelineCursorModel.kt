@@ -89,6 +89,8 @@ class TimelineCursorModel(lines: List<DataForOneEffectLine>) {
             }
             fun equivalent(amount: (DataForOneEffectLine) -> Double?): Double? {
                 val ratios = ratios(amount)
+                // Unknown doses stay unknown: never extrapolate them from another ingestion.
+                if (ratios.size != parts.size) return null
                 val maximum = ratios.maxOrNull() ?: return null
                 val average = if (maximum == 0.0) 0.0 else ratios.sumOf { it / maximum } / ratios.size * maximum
                 return rawHeight?.let { (it.toDouble() * average).takeIf { result -> result.isFinite() && result >= 0 } }

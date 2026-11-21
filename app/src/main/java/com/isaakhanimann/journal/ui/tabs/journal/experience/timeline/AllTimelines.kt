@@ -28,7 +28,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.foundation.layout.padding
@@ -360,7 +360,7 @@ fun AllTimelines(
                         Text(if (cursorPoint == null) "Now · ${time.getShortTimeText()}" else cursorTimeLabel(time, model.startTime, currentTime, timeDisplayOption),
                             style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
                         if (!hideQuantities) IconButton(onClick = { groupQuantities = !groupQuantities }) {
-                            Icon(Icons.Default.List, contentDescription = if (groupQuantities) "Show per ingestion" else "Group by subject")
+                            Icon(Icons.AutoMirrored.Filled.List, contentDescription = if (groupQuantities) "Show per ingestion" else "Group by subject")
                         }
                     }
                     if (!hideQuantities) {
@@ -372,9 +372,8 @@ fun AllTimelines(
                                     style = MaterialTheme.typography.labelMedium, modifier = Modifier.padding(top = 6.dp))
                                 val percentage = value.peakFraction?.let { "${(it * 100).roundToInt().coerceIn(1, 100)}% of combined peak" } ?: "Combined peak unavailable"
                                 Text("$percentage · ${value.equivalentText()}", style = MaterialTheme.typography.bodySmall)
-                                if (group.knownDoseCount in 1 until group.contributionCount &&
-                                    (value.quantityEquivalent != null || value.milligramEquivalent != null)) {
-                                    Text("Estimate from ${group.knownDoseCount} known doses; other doses remain unknown.", style = MaterialTheme.typography.bodySmall)
+                                if (group.knownDoseCount < group.contributionCount) {
+                                    Text("Grouped amount unavailable: some doses or conversion ratios are unknown.", style = MaterialTheme.typography.bodySmall)
                                 }
                             }
                         } else {

@@ -27,7 +27,7 @@ class TimelineCursorTest {
             line().copy(subjectKey = "custom:1", route = AdministrationRoute.SMOKED)))
         val groups = model.groupedAt(start.plusSeconds(40))
         assertEquals(3, groups.size)
-        assertEquals(200.0, groups.first().value.milligramEquivalent!!, .001)
+        assertNull(groups.first().value.milligramEquivalent)
         assertEquals(1, groups.first().knownDoseCount)
         assertEquals(1f, groups.first().value.peakFraction!!, .0001f)
     }
