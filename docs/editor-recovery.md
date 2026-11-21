@@ -100,3 +100,25 @@ On 20 November 2026, the Direct Debug APK build, instrumentation-source compilat
 and diff check passed. The two new cases were compiled, not executed. Android MCP
 found no connected device; actual process recreation, form interaction and DST
 behavior still require runtime verification.
+
+## Rating draft recovery
+
+Add and edit rating forms now retain the selected rating, local time and timeline
+visibility in SavedStateHandle. New-rating drafts also retain the overall-rating
+choice. Restoring a draft keeps the existing journal-generation check, and the
+existing overall-rating conflict recovery remains available. Editing an overall
+rating still keeps its stored overall status.
+
+Time changes update synchronously before Save, and saves capture a single form
+snapshot. Busy or unavailable forms reject further changes and duplicate saves.
+Unchanged timed ratings keep their original recorded instant through the existing
+preservation rule. No schema, backup or counting rules change.
+
+`RatingDraftRecoveryTest` adds isolated in-memory cases for both forms, including
+reconstruction, overall-to-timed selection, immediate time selection followed by
+Save, duplicate taps, and retaining an unedited recorded instant.
+
+On 21 November 2026 the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two new cases were compiled, not executed: Android MCP
+reported no connected devices. Actual process recreation, overall-conflict
+recovery and time-picker behavior still require device checks.

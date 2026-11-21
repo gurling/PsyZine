@@ -34,10 +34,8 @@ import com.isaakhanimann.journal.ui.utils.getLocalDateTime
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.temporal.ChronoUnit
@@ -55,6 +53,7 @@ class AddRatingViewModel @Inject constructor(
     fun changeOverallRating(value: Boolean) {
         if (!session.ready || session.busy) return
         isThisOverallRating = value
+        state["ratingOverall"] = value
     }
     var isHiddenInTimeline by mutableStateOf(false)
         private set
@@ -77,39 +76,43 @@ class AddRatingViewModel @Inject constructor(
     init {
         session.load {
             isHiddenInTimeline = state.get<Boolean>("ratingHiddenInTimeline") ?: false
-            check(experienceRepo.getExperience(experienceId) != null) { "This experience was deleted. Close this screen." }
             val experience = experienceRepo.getExperience(id = experienceId) ?: error("This entry was deleted. Close this screen.")
             val isOldExperience = experience.sortDate.isBefore(Instant.now().minus(12, ChronoUnit.HOURS))
             if (isOldExperience) {
-                localDateTimeFlow.emit(experience.sortDate.getLocalDateTime())
+                localDateTimeFlow.value = experience.sortDate.getLocalDateTime()
             }
+            selectedRating = ShulginRatingOption.entries.firstOrNull { it.name == state.get<String>("ratingOption") } ?: selectedRating
+            isThisOverallRating = state.get<Boolean>("ratingOverall") ?: false
+            localDateTimeFlow.value = state.get<String>("ratingTime")?.let { LocalDateTime.parse(it) } ?: localDateTimeFlow.value
+            state["ratingOption"] = selectedRating.name
+            state["ratingOverall"] = isThisOverallRating
+            state["ratingTime"] = localDateTimeFlow.value.toString()
+            state["ratingHiddenInTimeline"] = isHiddenInTimeline
         }
     }
 
     fun onChangeTime(newLocalDateTime: LocalDateTime) {
-        viewModelScope.launch {
-            localDateTimeFlow.emit(newLocalDateTime)
-        }
+        if (!session.ready || session.busy) return
+        localDateTimeFlow.value = newLocalDateTime
+        state["ratingTime"] = newLocalDateTime.toString()
     }
 
     fun onChangeRating(newRating: ShulginRatingOption) {
+        if (!session.ready || session.busy) return
         selectedRating = newRating
+        state["ratingOption"] = newRating.name
     }
 
     fun onDoneTap(onSuccess: () -> Unit) {
+        if (!session.ready || session.busy) return
+        val newRating = ShulginRating(
+            time = if (isThisOverallRating) null else localDateTimeFlow.value.getInstant(),
+            creationDate = Instant.now(),
+            option = selectedRating,
+            experienceId = experienceId,
+            isHiddenInTimeline = isHiddenInTimeline,
+        )
         session.run(onSuccess) {
-            val selectedInstant = if (isThisOverallRating) {
-                null
-            } else {
-                localDateTimeFlow.firstOrNull()?.getInstant()
-            }
-            val newRating = ShulginRating(
-                time = selectedInstant,
-                creationDate = Instant.now(),
-                option = selectedRating,
-                experienceId = experienceId,
-                isHiddenInTimeline = isHiddenInTimeline,
-            )
             experienceRepo.insert(newRating, session.generation)
         }
     }
