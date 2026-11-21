@@ -186,3 +186,21 @@ On 21 November 2026 the Direct Debug APK build, instrumentation-source compilati
 and diff check passed. The new queued-save case was compiled, not executed.
 Android MCP reported no connected devices; transactional contention and picker
 reselection still require device execution.
+
+## Recovering explicitly reviewed definition changes
+
+When an ingestion draft contains an explicitly selected definition, recovery now
+validates that selected record and composition fingerprint. The original record's
+graph token is used only when no explicit selection exists. This lets a reviewed,
+reselected composition survive recreation, while a later unreviewed graph change
+still rejects the draft. Final transactional unit and graph checks remain active.
+
+Two additional isolated in-memory cases exercise composition-only changes with
+an unchanged parent unit: reviewed selection recovery followed by Save, and a
+subsequent composition change rejecting recovery without changing the ingestion.
+No schema, backup or quantity calculation changes are required.
+
+On 21 November 2026 the Direct Debug APK build, instrumentation-source compilation
+and diff check passed. The two new native-graph cases were compiled, not executed.
+Android MCP reported no connected devices; reviewed-selection recreation and
+unreviewed-change rejection still require device execution.

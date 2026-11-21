@@ -8,6 +8,7 @@ import androidx.datastore.preferences.core.emptyPreferences
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModelStore
 import androidx.room.Room
+import androidx.room.withTransaction
 import androidx.test.platform.app.InstrumentationRegistry
 import com.isaakhanimann.journal.data.attachments.AttachmentStorage
 import com.isaakhanimann.journal.data.attachments.JournalMutationLock
@@ -223,6 +224,85 @@ class IngestionTimingRecoveryTest {
         assertEquals("Pending draft", saved.notes)
         assertEquals(before.dose, saved.dose)
         assertEquals(unit.id, saved.customUnitId)
+    }
+
+
+    private fun seedNativeDefinition(): CustomUnit {
+        val unit = CustomUnit.mdmaSample.copy(id = 101, substanceName = null, dose = null, creationDate = original.time,
+            administrationRoute = null, originalUnit = null)
+        runBlocking {
+            database.experienceDao().insert(unit)
+            database.definitionDao().insertComponents(listOf(com.isaakhanimann.journal.data.definitions.DoseComponent(
+                id = 501, parentCustomUnitId = unit.id, substanceName = "Synthetic", substanceUnit = "mg", dose = 1.0, creationDate = original.time)))
+            database.experienceDao().update(original.copy(substanceName = null, customUnitId = unit.id, units = unit.unit))
+        }
+        return unit
+    }
+
+    private fun changeNativeComposition(unitId: Int, dose: Double) = runBlocking {
+        database.withTransaction {
+            database.definitionDao().deleteComponents(unitId)
+            database.definitionDao().insertComponents(listOf(com.isaakhanimann.journal.data.definitions.DoseComponent(
+                id = 501, parentCustomUnitId = unitId, substanceName = "Synthetic", substanceUnit = "mg", dose = dose, creationDate = original.time)))
+        }
+    }
+
+    @Test fun explicitlyReselectedNativeGraphRecoversAndSavesAfterRecreation() {
+        val unit = seedNativeDefinition()
+        val state = SavedStateHandle(mapOf("ingestionId" to original.id))
+        val first = create(state)
+        compose.waitUntil(10000) { first.session.ready }
+        changeNativeComposition(unit.id, 2.0)
+        compose.runOnIdle { first.onChangeCustomUnit(unit) }
+        compose.waitUntil(10000) { !first.session.busy }
+        lateinit var recovered: SavedStateHandle
+        compose.runOnIdle {
+            assertNull(first.session.error)
+            first.note = "Reviewed updated composition"
+            recovered = SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
+            store.clear()
+        }
+        val restored = create(recovered)
+        compose.waitUntil(10000) { !restored.session.loading }
+        var completed = false
+        compose.runOnIdle {
+            assertTrue(restored.session.error, restored.session.ready)
+            assertEquals("Reviewed updated composition", restored.note)
+            assertEquals(unit.id, restored.customUnit?.id)
+            restored.onDoneTap { completed = true }
+        }
+        compose.waitUntil(10000) { !restored.session.busy }
+        compose.runOnIdle { assertTrue(completed) }
+        val saved = runBlocking { repository.getIngestion(original.id) }!!
+        assertEquals(unit.id, saved.customUnitId)
+        assertEquals("Reviewed updated composition", saved.notes)
+        assertEquals(original.dose, saved.dose)
+    }
+
+    @Test fun laterNativeGraphChangeStillRejectsRecoveryOfExplicitSelection() {
+        val unit = seedNativeDefinition()
+        val before = runBlocking { repository.getIngestion(original.id) }!!
+        val state = SavedStateHandle(mapOf("ingestionId" to original.id))
+        val first = create(state)
+        compose.waitUntil(10000) { first.session.ready }
+        changeNativeComposition(unit.id, 2.0)
+        compose.runOnIdle { first.onChangeCustomUnit(unit) }
+        compose.waitUntil(10000) { !first.session.busy }
+        lateinit var recovered: SavedStateHandle
+        compose.runOnIdle {
+            assertNull(first.session.error)
+            recovered = SavedStateHandle(state.keys().associateWith { state.get<Any?>(it) })
+            store.clear()
+        }
+        changeNativeComposition(unit.id, 3.0)
+        val restored = create(recovered)
+        compose.waitUntil(10000) { !restored.session.loading }
+        compose.runOnIdle {
+            assertFalse(restored.session.ready)
+            assertTrue(restored.session.unavailableMessage.orEmpty().contains("selected definition changed"))
+            restored.onDoneTap { fail("An unreviewed graph must not save") }
+        }
+        assertEquals(before, runBlocking { repository.getIngestion(original.id) })
     }
 
 }

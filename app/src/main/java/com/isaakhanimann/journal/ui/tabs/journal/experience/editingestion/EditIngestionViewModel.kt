@@ -191,10 +191,11 @@ class EditIngestionViewModel @Inject constructor(
             } else {
                 localDateTimeEndFlow.emit(ing.time.plus(30, ChronoUnit.MINUTES).getLocalDateTime())
             }
+            val hasRecoveredUnitSelection = state.get<Boolean>("editSelectedUnitChosen") == true
             selectedCustomUnitId = ing.customUnitId
             customUnit = ingestionAndCustomUnit.customUnit
             selectedUnitFingerprint = customUnit?.editorFingerprint()
-            if (state.get<Boolean>("editSelectedUnitChosen") != true && customUnit != null) {
+            if (!hasRecoveredUnitSelection && customUnit != null) {
                 check(state.get<String>("editLoadedUnitFingerprint")?.let { it == selectedUnitFingerprint } != false) {
                     "This custom unit changed. Close this entry and reopen it before saving."
                 }
@@ -202,13 +203,13 @@ class EditIngestionViewModel @Inject constructor(
             }
             val definitionId = ing.customUnitId
             val definition = ingestionAndCustomUnit.customUnit
-            if (definitionId != null && definition != null && definition.substanceName == null) {
+            if (!hasRecoveredUnitSelection && definitionId != null && definition != null && definition.substanceName == null) {
                 val fingerprint = experienceRepo.definitionContents().definitionFingerprint(definitionId)
                 check(state.get<String>("editDefinitionFingerprint")?.let { it == fingerprint } != false) { "This definition changed. Close this entry and reopen it." }
                 state["editDefinitionFingerprint"] = fingerprint
                 selectedDefinitionFingerprint = fingerprint
             }
-            if (state.get<Boolean>("editSelectedUnitChosen") == true) {
+            if (hasRecoveredUnitSelection) {
                 val recoveredId = state.get<Int>("editSelectedUnitId")
                 val recovered = recoveredId?.let { id ->
                     checkNotNull(experienceRepo.getCustomUnit(id)) { "The selected custom unit was deleted. Reopen this entry and choose a unit again." }
